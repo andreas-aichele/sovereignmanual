@@ -209,8 +209,12 @@
                 90deg,
                 hsl(310 100% 58% / 0.11) 1px,
                 transparent 1px
-            );
-        background-size: 72px 72px;
+            ),
+            linear-gradient(hsl(36 100% 50% / 0.06) 2px, transparent 2px);
+        background-size:
+            72px 72px,
+            72px 72px,
+            12px 12px;
         mask-image: linear-gradient(to bottom, black, transparent 78%);
     }
 
@@ -220,17 +224,34 @@
             0 0 42px hsl(184 100% 57% / 0.14);
     }
 
+    .pixel-frame {
+        clip-path: polygon(
+            0 10px,
+            10px 10px,
+            10px 0,
+            calc(100% - 10px) 0,
+            calc(100% - 10px) 10px,
+            100% 10px,
+            100% calc(100% - 10px),
+            calc(100% - 10px) calc(100% - 10px),
+            calc(100% - 10px) 100%,
+            10px 100%,
+            10px calc(100% - 10px),
+            0 calc(100% - 10px)
+        );
+    }
+
     .synthwave-sky {
         background:
             radial-gradient(
-                circle at 50% 42%,
-                hsl(36 100% 50% / 0.28),
-                transparent 12rem
+                circle at 50% 30%,
+                hsl(36 100% 50% / 0.32),
+                transparent 11rem
             ),
             linear-gradient(
                 180deg,
                 hsl(246 64% 6%) 0%,
-                hsl(276 62% 14%) 54%,
+                hsl(276 62% 14%) 48%,
                 hsl(310 80% 10%) 100%
             );
     }
@@ -246,6 +267,72 @@
         background-size: 42px 42px;
         transform: perspective(360px) rotateX(62deg) translateY(20%);
         transform-origin: bottom;
+    }
+
+    .pixel-sun {
+        background-image: repeating-linear-gradient(
+            to bottom,
+            hsl(36 100% 50% / 0.95) 0 8px,
+            hsl(36 100% 50% / 0.18) 8px 13px
+        );
+    }
+
+    .pixel-tower {
+        background:
+            repeating-linear-gradient(
+                to bottom,
+                hsl(184 100% 57% / 0.35) 0 4px,
+                transparent 4px 14px
+            ),
+            linear-gradient(
+                180deg,
+                hsl(250 54% 4% / 0.92),
+                hsl(260 70% 8% / 0.98)
+            );
+        box-shadow:
+            inset 0 0 0 1px hsl(310 100% 58% / 0.28),
+            0 0 18px hsl(184 100% 57% / 0.18);
+    }
+
+    .pixel-noise {
+        background-image:
+            linear-gradient(
+                45deg,
+                hsl(184 100% 57% / 0.12) 25%,
+                transparent 25%
+            ),
+            linear-gradient(
+                -45deg,
+                hsl(310 100% 58% / 0.12) 25%,
+                transparent 25%
+            ),
+            linear-gradient(
+                45deg,
+                transparent 75%,
+                hsl(184 100% 57% / 0.1) 75%
+            ),
+            linear-gradient(-45deg, transparent 75%, hsl(36 100% 50% / 0.1) 75%);
+        background-position:
+            0 0,
+            0 8px,
+            8px -8px,
+            -8px 0;
+        background-size: 16px 16px;
+    }
+
+    .crt-lines {
+        background: repeating-linear-gradient(
+            to bottom,
+            transparent 0 3px,
+            hsl(0 0% 0% / 0.24) 3px 5px
+        );
+        mix-blend-mode: multiply;
+    }
+
+    .pixel-panel {
+        box-shadow:
+            6px 6px 0 hsl(184 100% 57% / 0.12),
+            -1px -1px 0 hsl(310 100% 58% / 0.34);
     }
 
     .article-markdown {

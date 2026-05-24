@@ -25,11 +25,19 @@
     let {
         locale,
         posts,
+        copy,
         meta,
     }: {
         locale: string;
         alternateLocale: string;
         posts: PaginatedPosts;
+        copy: {
+            eyebrow: string;
+            heading: string;
+            featured: string;
+            read: string;
+            empty: string;
+        };
         meta: {
             title: string;
             description: string;
@@ -67,12 +75,12 @@
                 <p
                     class="text-sm font-semibold tracking-[0.24em] text-neon-pink uppercase"
                 >
-                    Archive // Research notes
+                    {copy.eyebrow}
                 </p>
                 <h1
                     class="max-w-3xl text-5xl font-black leading-none md:text-7xl"
                 >
-                    Sovereign Manual Blog
+                    {copy.heading}
                 </h1>
                 <p class="max-w-2xl text-lg leading-8 text-cyan-50/70">
                     {meta.description}
@@ -101,7 +109,7 @@
                     <p
                         class="text-xs font-semibold tracking-[0.22em] text-bitcoin-orange uppercase"
                     >
-                        Featured transmission
+                        {copy.featured}
                     </p>
                     <p class="mt-3 text-sm text-cyan-50/55">
                         {featuredPost.audience_level}
@@ -160,7 +168,7 @@
                                 href={post.url}
                                 class="mt-auto text-sm font-semibold text-neon-cyan hover:text-bitcoin-orange"
                             >
-                                Read article
+                                {copy.read}
                             </Link>
                         </div>
                     </article>
@@ -168,7 +176,7 @@
             </div>
         {:else if !featuredPost}
             <div class="border-y border-white/10 py-16">
-                <p class="text-cyan-50/65">No published articles yet.</p>
+                <p class="text-cyan-50/65">{copy.empty}</p>
             </div>
         {/if}
     </section>

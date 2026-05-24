@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Enums\PostStatus;
 use App\Models\Post;
+use App\Models\PostAsset;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -28,6 +29,7 @@ class BlogController extends Controller
             'locale' => $locale,
             'alternateLocale' => $locale === 'de' ? 'en' : 'de',
             'posts' => $posts,
+            'copy' => $this->indexCopy($locale),
             'meta' => [
                 'title' => 'Sovereign Manual Blog',
                 'description' => $locale === 'de'
@@ -76,6 +78,10 @@ class BlogController extends Controller
                         ] : null,
                     ]),
             ],
+            'copy' => [
+                'back' => $locale === 'de' ? 'Zurueck ins Archiv' : 'Back to archive',
+                'freshness' => $locale === 'de' ? 'Aktualitaet getrackt' : 'Freshness tracked',
+            ],
             'meta' => [
                 'title' => $translation->meta_title ?: $translation->title,
                 'description' => $translation->meta_description ?: $translation->excerpt,
@@ -101,9 +107,16 @@ class BlogController extends Controller
             'slug' => $translation?->slug ?? $post->slug,
             'excerpt' => $translation?->excerpt,
             'url' => route($routeName, $translation?->slug ?? $post->slug),
-            'image' => $post->assets->firstWhere('status', 'ready')?->url,
-            'image_alt' => $post->assets->firstWhere('status', 'ready')?->alt_text,
+            'image' => $this->coverImage($post)?->url,
+            'image_alt' => $this->coverImage($post)?->alt_text,
         ];
+    }
+
+    private function coverImage(Post $post): ?PostAsset
+    {
+        return $post->assets
+            ->where('status', 'ready')
+            ->first(fn (PostAsset $asset): bool => ($asset->metadata['style'] ?? null) === 'synthwave-cypherpunk');
     }
 
     private function alternateUrl(Post $post, string $locale): ?string
@@ -126,5 +139,29 @@ class BlogController extends Controller
                 'allow_unsafe_links' => false,
             ])
             ->toString();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function indexCopy(string $locale): array
+    {
+        if ($locale === 'de') {
+            return [
+                'eyebrow' => 'Archiv // Research Notes',
+                'heading' => 'Sovereign Manual Blog',
+                'featured' => 'Ausgewaehlte Transmission',
+                'read' => 'Artikel lesen',
+                'empty' => 'Noch keine veroeffentlichten Artikel.',
+            ];
+        }
+
+        return [
+            'eyebrow' => 'Archive // Research notes',
+            'heading' => 'Sovereign Manual Blog',
+            'featured' => 'Featured transmission',
+            'read' => 'Read article',
+            'empty' => 'No published articles yet.',
+        ];
     }
 }

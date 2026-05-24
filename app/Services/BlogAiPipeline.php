@@ -185,6 +185,25 @@ class BlogAiPipeline
         $this->finishRun($reviewRun, json_encode($review, JSON_THROW_ON_ERROR), $review);
     }
 
+    public function regeneratePostImage(Post $post): void
+    {
+        $post->assets()
+            ->where('type', 'image')
+            ->get()
+            ->filter(fn ($asset): bool => str_contains((string) $asset->url, 'unsplash')
+                || ($asset->metadata['style'] ?? null) !== 'synthwave-cypherpunk')
+            ->each(fn ($asset): bool => $asset->update(['status' => 'replaced']));
+
+        $this->generatePostImage(
+            $post,
+            $post->contentTopic ?? new ContentTopic([
+                'title' => $post->topic,
+                'audience_level' => $post->audience_level,
+                'primary_language' => $post->primary_language,
+            ]),
+        );
+    }
+
     private function promptWithFallback(string $instructions, string $prompt, string $fallback): string
     {
         if (! config('ai.providers.'.config('blog_ai.provider').'.key')) {

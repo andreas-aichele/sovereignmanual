@@ -34,10 +34,15 @@
     let {
         locale,
         post,
+        copy,
         meta,
     }: {
         locale: string;
         post: BlogPost;
+        copy: {
+            back: string;
+            freshness: string;
+        };
         meta: {
             title: string;
             description: string | null;
@@ -97,7 +102,7 @@
                         href={blogUrl}
                         class="text-sm font-semibold text-neon-cyan hover:text-bitcoin-orange"
                     >
-                        Back to archive
+                        {copy.back}
                     </Link>
                     <div
                         class="flex flex-wrap items-center gap-3 text-xs font-semibold text-cyan-50/55 uppercase"
@@ -111,7 +116,7 @@
                             </time>
                         {/if}
                         {#if post.next_review_at}
-                            <span>Freshness tracked</span>
+                            <span>{copy.freshness}</span>
                         {/if}
                     </div>
                     <h1 class="text-4xl font-black leading-tight md:text-6xl">

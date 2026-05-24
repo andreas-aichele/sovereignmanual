@@ -4,6 +4,7 @@
     import PublicNav from '@/components/PublicNav.svelte';
     import SynthwavePoster from '@/components/SynthwavePoster.svelte';
     import { index as blogIndex } from '@/routes/blog';
+    import { index as germanBlogIndex } from '@/routes/blog/de';
 
     type BlogPost = {
         id: number;
@@ -17,17 +18,36 @@
     };
 
     let {
+        locale,
         featuredPost,
         latestPosts,
+        copy,
         meta,
     }: {
+        locale: string;
         featuredPost: BlogPost | null;
         latestPosts: BlogPost[];
+        copy: {
+            eyebrow: string;
+            intro: string;
+            primaryCta: string;
+            secondaryCta: string;
+            signalEyebrow: string;
+            signalTitle: string;
+            topics: {
+                title: string;
+                body: string;
+            }[];
+        };
         meta: {
             title: string;
             description: string;
         };
     } = $props();
+
+    const blogUrl = $derived(
+        locale === 'de' ? germanBlogIndex.url() : blogIndex.url(),
+    );
 </script>
 
 <AppHead title={meta.title}>
@@ -35,7 +55,7 @@
 </AppHead>
 
 <main class="synthwave-page min-h-screen text-white">
-    <PublicNav />
+    <PublicNav {locale} />
 
     <section class="relative overflow-hidden border-b border-white/10">
         <div class="absolute inset-0 synthwave-hero-grid"></div>
@@ -46,7 +66,7 @@
                 <p
                     class="text-sm font-semibold tracking-[0.28em] text-neon-cyan uppercase"
                 >
-                    Bitcoin sovereignty // Cypherpunk finance
+                    {copy.eyebrow}
                 </p>
                 <h1
                     class="max-w-4xl text-5xl font-black leading-[0.95] md:text-7xl"
@@ -54,22 +74,21 @@
                     Sovereign Manual
                 </h1>
                 <p class="max-w-2xl text-lg leading-8 text-cyan-50/75">
-                    A dark-mode field manual for financial intelligence,
-                    independence, self custody, and Bitcoin-native thinking.
+                    {copy.intro}
                 </p>
                 <div class="flex flex-wrap gap-3">
                     <Link
-                        href={blogIndex.url()}
+                        href={blogUrl}
                         class="border border-neon-cyan bg-neon-cyan px-5 py-3 text-sm font-semibold text-void shadow-[0_0_24px_rgba(35,240,255,0.35)]"
                     >
-                        Enter the archive
+                        {copy.primaryCta}
                     </Link>
                     {#if featuredPost}
                         <Link
                             href={featuredPost.url}
                             class="border border-white/20 px-5 py-3 text-sm font-semibold text-cyan-50 hover:border-bitcoin-orange hover:text-bitcoin-orange"
                         >
-                            Featured brief
+                            {copy.secondaryCta}
                         </Link>
                     {/if}
                 </div>
@@ -91,19 +110,22 @@
             <p
                 class="text-sm font-semibold tracking-[0.22em] text-bitcoin-orange uppercase"
             >
-                Signal paths
+                {copy.signalEyebrow}
             </p>
             <h2 class="mt-3 text-3xl font-black">
-                Learn without the hype cycle.
+                {copy.signalTitle}
             </h2>
         </div>
         <div class="grid gap-4 sm:grid-cols-3">
-            {#each ['Self custody', 'Fiat systems', 'Sovereign planning'] as topic (topic)}
-                <div class="border border-white/10 bg-white/[0.03] p-5">
-                    <p class="text-sm font-semibold text-neon-cyan">{topic}</p>
+            {#each copy.topics as topic (topic.title)}
+                <div
+                    class="pixel-panel border border-white/10 bg-white/[0.03] p-5"
+                >
+                    <p class="text-sm font-semibold text-neon-cyan">
+                        {topic.title}
+                    </p>
                     <p class="mt-3 text-sm leading-6 text-cyan-50/65">
-                        Practical essays for durable decisions in hostile
-                        monetary terrain.
+                        {topic.body}
                     </p>
                 </div>
             {/each}
