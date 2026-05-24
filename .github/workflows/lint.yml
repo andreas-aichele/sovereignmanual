@@ -26,6 +26,9 @@ jobs:
           php-version: '8.5'
           tools: composer:v2
 
+      - name: Prepare Laravel Storage
+        run: mkdir -p storage/framework/cache/data storage/framework/sessions storage/framework/testing storage/framework/views storage/logs bootstrap/cache
+
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
 
