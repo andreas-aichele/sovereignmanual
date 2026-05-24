@@ -1,0 +1,10 @@
+/vendor/
+node_modules/
+
+storage/*
+.env
+
+/public/build
+/storage/pail
+.env
+.env
