@@ -6,6 +6,8 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
 
 /**
  * @extends Factory<User>
@@ -16,6 +18,17 @@ class UserFactory extends Factory
      * The current password being used by the factory.
      */
     protected static ?string $password;
+
+    public function configure(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $this->ensureRolesAndPermissions();
+
+            if (! $user->roles()->exists()) {
+                $user->assignRole('user');
+            }
+        });
+    }
 
     /**
      * Define the model's default state.
@@ -44,6 +57,44 @@ class UserFactory extends Factory
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
         ]);
+    }
+
+    /**
+     * Indicate that the user can administer the CMS.
+     */
+    public function admin(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $this->ensureRolesAndPermissions();
+            $user->syncRoles(['admin']);
+        });
+    }
+
+    /**
+     * Indicate that the user can edit CMS content.
+     */
+    public function editor(): static
+    {
+        return $this->afterCreating(function (User $user): void {
+            $this->ensureRolesAndPermissions();
+            $user->syncRoles(['editor']);
+        });
+    }
+
+    private function ensureRolesAndPermissions(): void
+    {
+        Permission::findOrCreate('access cms', 'web');
+        Permission::findOrCreate('manage content', 'web');
+        Permission::findOrCreate('manage users', 'web');
+        Permission::findOrCreate('view automation', 'web');
+
+        Role::findOrCreate('admin', 'web')
+            ->syncPermissions(['access cms', 'manage content', 'manage users', 'view automation']);
+
+        Role::findOrCreate('editor', 'web')
+            ->syncPermissions(['access cms', 'manage content', 'view automation']);
+
+        Role::findOrCreate('user', 'web');
     }
 
     /**

@@ -9,7 +9,10 @@ use App\Enums\PostStatus;
 use App\Models\AiRun;
 use App\Models\ContentTopic;
 use App\Models\Post;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
+use Laravel\Ai\Image;
 use Throwable;
 
 use function Laravel\Ai\agent;
@@ -31,6 +34,7 @@ class BlogAiPipeline
         $reviewRun = $this->startRun(AiRunType::Review, $topic);
         $review = $this->review($draft);
         $this->finishRun($reviewRun, json_encode($review, JSON_THROW_ON_ERROR), $review);
+        $englishExcerpt = $this->excerpt($draft, 180);
 
         $post = Post::create([
             'content_topic_id' => $topic->id,
@@ -59,10 +63,10 @@ class BlogAiPipeline
             'locale' => 'en',
             'title' => $title,
             'slug' => $englishSlug,
-            'excerpt' => Str::of(strip_tags($draft))->replaceMatches('/[#*_`]/', '')->limit(180)->toString(),
+            'excerpt' => $englishExcerpt,
             'markdown' => $draft,
             'meta_title' => $title,
-            'meta_description' => Str::of(strip_tags($draft))->replaceMatches('/[#*_`]/', '')->limit(155)->toString(),
+            'meta_description' => $this->excerpt($draft, 155),
             'seo' => ['canonical_locale' => 'en'],
         ]);
 
@@ -73,15 +77,17 @@ class BlogAiPipeline
             fallback: $this->fallbackMarkdown($title, 'de'),
         );
         $this->finishRun($translationRun, $germanDraft);
+        $germanTitle = $this->germanTitle($title);
+        $germanSlug = Str::slug($germanTitle, '-', 'de');
 
         $post->translations()->create([
             'locale' => 'de',
-            'title' => $title,
-            'slug' => 'de-'.$englishSlug,
-            'excerpt' => Str::of(strip_tags($germanDraft))->replaceMatches('/[#*_`]/', '')->limit(180)->toString(),
+            'title' => $germanTitle,
+            'slug' => $germanSlug,
+            'excerpt' => $this->excerpt($germanDraft, 180),
             'markdown' => $germanDraft,
-            'meta_title' => $title,
-            'meta_description' => Str::of(strip_tags($germanDraft))->replaceMatches('/[#*_`]/', '')->limit(155)->toString(),
+            'meta_title' => $germanTitle,
+            'meta_description' => $this->excerpt($germanDraft, 155),
             'seo' => ['canonical_locale' => 'de'],
         ]);
 
@@ -101,17 +107,7 @@ class BlogAiPipeline
             'data' => [],
         ]);
 
-        $post->assets()->create([
-            'type' => 'image',
-            'url' => 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d',
-            'locale' => 'en',
-            'provider' => config('blog_ai.provider'),
-            'model' => config('blog_ai.image_model'),
-            'prompt' => "Editorial image for: {$topic->title}",
-            'alt_text' => "Abstract Bitcoin and financial sovereignty visual for {$topic->title}",
-            'status' => 'ready',
-            'metadata' => ['placeholder_until_image_generation_is_configured' => true],
-        ]);
+        $this->generatePostImage($post, $topic);
 
         $topic->update([
             'status' => ContentTopicStatus::Published,
@@ -119,6 +115,53 @@ class BlogAiPipeline
         ]);
 
         return $post;
+    }
+
+    /**
+     * @return Collection<int, ContentTopic>
+     */
+    public function createTopicIdeas(int $count = 2): Collection
+    {
+        $run = $this->startRun(AiRunType::Topic);
+        $response = $this->promptWithFallback(
+            instructions: 'You propose focused editorial topics for a Bitcoin sovereignty learning portal. Return one topic per line.',
+            prompt: "Create {$count} evergreen article ideas about Bitcoin, financial intelligence, independence, and self custody. Avoid market predictions.",
+            fallback: implode("\n", [
+                'Bitcoin self custody threat models for beginners',
+                'Why fiat debasement changes savings behavior',
+                'How to build a personal Bitcoin treasury policy',
+                'Financial independence without yield chasing',
+            ]),
+        );
+
+        $topics = Str::of($response)
+            ->explode("\n")
+            ->map(fn (string $line): string => trim(preg_replace('/^[\-\*\d\.\)\s]+/', '', $line) ?? ''))
+            ->filter()
+            ->take($count)
+            ->values()
+            ->map(fn (string $title, int $index): ContentTopic => ContentTopic::firstOrCreate(
+                ['slug' => Str::slug($title)],
+                [
+                    'title' => $title,
+                    'category' => 'bitcoin',
+                    'status' => ContentTopicStatus::Scheduled,
+                    'priority' => max(1, 10 - $index),
+                    'audience_level' => 'intermediate',
+                    'primary_language' => 'en',
+                    'target_languages' => ['de'],
+                    'scheduled_for' => now(),
+                    'brief' => 'AI-proposed topic for Sovereign Manual with practical, non-hype educational framing.',
+                    'constraints' => [
+                        'tone' => 'clear, practical, non-hype',
+                        'brand' => 'synthwave-cypherpunk editorial',
+                    ],
+                ],
+            ));
+
+        $this->finishRun($run, $response, ['created_topics' => $topics->pluck('id')->all()]);
+
+        return $topics;
     }
 
     public function refreshPost(Post $post): void
@@ -174,7 +217,78 @@ class BlogAiPipeline
         ];
     }
 
-    private function startRun(AiRunType $type, ?ContentTopic $topic = null, ?Post $post = null): AiRun
+    private function generatePostImage(Post $post, ContentTopic $topic): void
+    {
+        $prompt = $this->synthwaveImagePrompt($topic);
+        $run = $this->startRun(AiRunType::Image, $topic, $post, config('blog_ai.image_model'));
+        $metadata = [
+            'style' => 'synthwave-cypherpunk',
+            'prompt_version' => 1,
+            'no_unsplash' => true,
+        ];
+
+        if (! config('ai.providers.'.config('blog_ai.provider').'.key')) {
+            $post->assets()->create([
+                'type' => 'image',
+                'locale' => 'en',
+                'provider' => config('blog_ai.provider'),
+                'model' => config('blog_ai.image_model'),
+                'prompt' => $prompt,
+                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty cover for {$topic->title}",
+                'status' => 'pending',
+                'metadata' => $metadata + ['reason' => 'image_generation_not_configured'],
+            ]);
+
+            $this->finishRun($run, 'Image generation skipped because the configured AI provider has no key.', $metadata);
+
+            return;
+        }
+
+        try {
+            $image = Image::of($prompt)
+                ->landscape()
+                ->quality('medium')
+                ->generate(provider: config('blog_ai.provider'), model: config('blog_ai.image_model'));
+
+            $path = $image->storePubliclyAs("post-assets/{$post->id}", "{$post->slug}.png", 'public');
+
+            $post->assets()->create([
+                'type' => 'image',
+                'disk' => 'public',
+                'path' => $path,
+                'url' => is_string($path) ? Storage::disk('public')->url($path) : null,
+                'locale' => 'en',
+                'provider' => config('blog_ai.provider'),
+                'model' => config('blog_ai.image_model'),
+                'prompt' => $prompt,
+                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty cover for {$topic->title}",
+                'status' => is_string($path) ? 'ready' : 'pending',
+                'metadata' => $metadata,
+            ]);
+
+            $this->finishRun($run, 'Image generated and stored.', $metadata);
+        } catch (Throwable $exception) {
+            $post->assets()->create([
+                'type' => 'image',
+                'locale' => 'en',
+                'provider' => config('blog_ai.provider'),
+                'model' => config('blog_ai.image_model'),
+                'prompt' => $prompt,
+                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty cover for {$topic->title}",
+                'status' => 'pending',
+                'metadata' => $metadata + ['error' => $exception->getMessage()],
+            ]);
+
+            $this->finishRun($run, $exception->getMessage(), $metadata + ['failed' => true]);
+        }
+    }
+
+    private function synthwaveImagePrompt(ContentTopic $topic): string
+    {
+        return "Synthwave cypherpunk editorial cover image for topic: {$topic->title}. Bitcoin financial sovereignty context, neon noir, deep black and navy atmosphere, electric cyan, neon magenta, Bitcoin orange accents, subtle grid lines, terminal ledger details, premium magazine cover composition, no text in image, no logos, no real people, no stock-photo look.";
+    }
+
+    private function startRun(AiRunType $type, ?ContentTopic $topic = null, ?Post $post = null, ?string $model = null): AiRun
     {
         return AiRun::create([
             'content_topic_id' => $topic?->id,
@@ -182,7 +296,7 @@ class BlogAiPipeline
             'type' => $type,
             'status' => AiRunStatus::Running,
             'provider' => config('blog_ai.provider'),
-            'model' => config('blog_ai.text_model'),
+            'model' => $model ?? config('blog_ai.text_model'),
             'started_at' => now(),
         ]);
     }
@@ -200,9 +314,33 @@ class BlogAiPipeline
     private function fallbackMarkdown(string $title, string $locale): string
     {
         if ($locale === 'de') {
-            return "# {$title}\n\nDieser Beitrag erklärt das Thema praxisnah und mit Fokus auf finanzielle Souveränität.\n\n## Kerngedanke\n\nBitcoin kann als Werkzeug zur langfristigen Unabhängigkeit verstanden werden, wenn Risiko, Verwahrung und Zeithorizont sauber eingeordnet werden.\n\n## Praktische Schritte\n\n- Grundlagen lernen.\n- Sicherheitsmodell verstehen.\n- Kleine Beträge testen.\n- Entscheidungen regelmäßig überprüfen.";
+            $germanTitle = $this->germanTitle($title);
+
+            return "# {$germanTitle}\n\nDieser Beitrag erklärt das Thema praxisnah und mit Fokus auf finanzielle Souveränität.\n\n## Kerngedanke\n\nBitcoin kann als Werkzeug zur langfristigen Unabhängigkeit verstanden werden, wenn Risiko, Verwahrung und Zeithorizont sauber eingeordnet werden.\n\n## Praktische Schritte\n\n- Grundlagen lernen.\n- Sicherheitsmodell verstehen.\n- Kleine Beträge testen.\n- Entscheidungen regelmäßig überprüfen.";
         }
 
         return "# {$title}\n\nThis article explains the topic with a practical focus on financial sovereignty.\n\n## Core idea\n\nBitcoin can be understood as a tool for long-term independence when risk, custody, and time horizon are handled carefully.\n\n## Practical steps\n\n- Learn the basics.\n- Understand the security model.\n- Test with small amounts.\n- Review decisions regularly.";
+    }
+
+    private function germanTitle(string $title): string
+    {
+        return match (Str::of($title)->lower()->toString()) {
+            'why bitcoin custody matters' => 'Warum Bitcoin-Verwahrung wichtig ist',
+            'bitcoin self custody threat models for beginners' => 'Bitcoin-Selbstverwahrung: Bedrohungsmodelle fuer Einsteiger',
+            'why fiat debasement changes savings behavior' => 'Warum Fiat-Entwertung das Sparverhalten veraendert',
+            'how to build a personal bitcoin treasury policy' => 'Wie du eine persoenliche Bitcoin-Treasury-Policy entwickelst',
+            'financial independence without yield chasing' => 'Finanzielle Unabhaengigkeit ohne Renditejagd',
+            default => "Souveraene Finanzen: {$title}",
+        };
+    }
+
+    private function excerpt(string $markdown, int $limit): string
+    {
+        return Str::of($markdown)
+            ->replaceMatches('/[#*_`>\[\]\(\)]/', '')
+            ->replaceMatches('/\s+/', ' ')
+            ->trim()
+            ->limit($limit)
+            ->toString();
     }
 }

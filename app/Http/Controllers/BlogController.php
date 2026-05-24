@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\PostStatus;
 use App\Models\Post;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -59,6 +60,7 @@ class BlogController extends Controller
             'post' => [
                 ...$this->serializePostSummary($post, $locale),
                 'markdown' => $translation->markdown,
+                'html' => $this->renderMarkdown($translation->markdown),
                 'blocks' => $post->blocks
                     ->where('locale', $locale)
                     ->values()
@@ -66,6 +68,7 @@ class BlogController extends Controller
                         'id' => $block->id,
                         'type' => $block->type,
                         'markdown' => $block->markdown,
+                        'html' => $this->renderMarkdown($block->markdown),
                         'data' => $block->data,
                         'asset' => $block->asset ? [
                             'url' => $block->asset->url,
@@ -113,5 +116,15 @@ class BlogController extends Controller
         }
 
         return route($alternateLocale === 'de' ? 'blog.de.show' : 'blog.show', $translation->slug);
+    }
+
+    private function renderMarkdown(?string $markdown): string
+    {
+        return Str::of($markdown ?? '')
+            ->markdown([
+                'html_input' => 'strip',
+                'allow_unsafe_links' => false,
+            ])
+            ->toString();
     }
 }

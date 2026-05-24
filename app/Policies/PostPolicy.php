@@ -9,36 +9,36 @@ class PostPolicy
 {
     public function viewAny(User $user): bool
     {
-        return true;
+        return $user->canManageContent();
     }
 
     public function view(User $user, Post $post): bool
     {
-        return true;
+        return $user->canManageContent();
     }
 
     public function create(User $user): bool
     {
-        return true;
+        return $user->canManageContent();
     }
 
     public function update(User $user, Post $post): bool
     {
-        return true;
+        return $user->canManageContent();
     }
 
     public function delete(User $user, Post $post): bool
     {
-        return true;
+        return $user->canManageContent();
     }
 
     public function restore(User $user, Post $post): bool
     {
-        return true;
+        return $user->canManageContent();
     }
 
     public function forceDelete(User $user, Post $post): bool
     {
-        return true;
+        return $user->isAdmin();
     }
 }

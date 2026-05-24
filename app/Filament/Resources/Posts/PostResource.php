@@ -23,7 +23,7 @@ class PostResource extends Resource
 
     protected static ?string $navigationLabel = 'Posts';
 
-    protected static string|UnitEnum|null $navigationGroup = 'Blog CMS';
+    protected static string|UnitEnum|null $navigationGroup = 'Content';
 
     public static function form(Schema $schema): Schema
     {

@@ -1,11 +1,16 @@
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
+    import PublicNav from '@/components/PublicNav.svelte';
+    import SynthwavePoster from '@/components/SynthwavePoster.svelte';
+    import { index as blogIndex } from '@/routes/blog';
+    import { index as germanBlogIndex } from '@/routes/blog/de';
 
     type BlogBlock = {
         id: number;
         type: string;
         markdown: string | null;
+        html: string;
         data: Record<string, unknown> | null;
         asset: {
             url: string | null;
@@ -22,6 +27,7 @@
         published_at: string | null;
         next_review_at: string | null;
         markdown: string;
+        html: string;
         blocks: BlogBlock[];
     };
 
@@ -40,18 +46,23 @@
         };
     } = $props();
 
-    const blogUrl = $derived(locale === 'de' ? '/de/blog' : '/blog');
-
-    function sections(markdown: string | null): string[] {
-        return (markdown ?? '')
-            .split(/\n{2,}/)
-            .map((section) => section.trim())
-            .filter(Boolean);
-    }
-
-    function clean(section: string): string {
-        return section.replace(/^#{1,6}\s*/, '').replace(/\*\*/g, '');
-    }
+    const blogUrl = $derived(
+        locale === 'de' ? germanBlogIndex.url() : blogIndex.url(),
+    );
+    const blocks = $derived(
+        post.blocks.length > 0
+            ? post.blocks
+            : [
+                  {
+                      id: 0,
+                      type: 'markdown',
+                      markdown: post.markdown,
+                      html: post.html,
+                      data: null,
+                      asset: null,
+                  },
+              ],
+    );
 </script>
 
 <AppHead title={meta.title}>
@@ -73,87 +84,67 @@
     {/if}
 </AppHead>
 
-<main class="min-h-screen bg-background text-foreground">
-    <header class="border-b border-border">
-        <div
-            class="mx-auto flex w-full max-w-4xl items-center justify-between gap-6 px-6 py-5"
-        >
-            <Link
-                href={blogUrl}
-                class="text-sm font-semibold tracking-wide uppercase"
-            >
-                Sovereign Manual
-            </Link>
-            <Link
-                href={blogUrl}
-                class="text-sm text-muted-foreground hover:text-foreground"
-            >
-                Back to blog
-            </Link>
-        </div>
-    </header>
+<main class="synthwave-page min-h-screen text-white">
+    <PublicNav {locale} />
 
-    <article class="mx-auto w-full max-w-4xl px-6 py-12">
-        <div class="flex flex-col gap-5">
+    <article>
+        <header class="border-b border-white/10">
             <div
-                class="flex flex-wrap items-center gap-3 text-xs font-medium text-muted-foreground uppercase"
+                class="mx-auto grid w-full max-w-7xl gap-10 px-5 py-12 md:px-8 lg:grid-cols-[0.9fr_1.1fr]"
             >
-                <span>{post.audience_level}</span>
-                {#if post.published_at}
-                    <time datetime={post.published_at}>
-                        {new Date(post.published_at).toLocaleDateString(locale)}
-                    </time>
-                {/if}
-                {#if post.next_review_at}
-                    <span>Reviewed yearly</span>
-                {/if}
+                <div class="flex flex-col justify-end gap-5">
+                    <Link
+                        href={blogUrl}
+                        class="text-sm font-semibold text-neon-cyan hover:text-bitcoin-orange"
+                    >
+                        Back to archive
+                    </Link>
+                    <div
+                        class="flex flex-wrap items-center gap-3 text-xs font-semibold text-cyan-50/55 uppercase"
+                    >
+                        <span>{post.audience_level}</span>
+                        {#if post.published_at}
+                            <time datetime={post.published_at}>
+                                {new Date(post.published_at).toLocaleDateString(
+                                    locale,
+                                )}
+                            </time>
+                        {/if}
+                        {#if post.next_review_at}
+                            <span>Freshness tracked</span>
+                        {/if}
+                    </div>
+                    <h1 class="text-4xl font-black leading-tight md:text-6xl">
+                        {post.title}
+                    </h1>
+                    {#if post.excerpt}
+                        <p class="text-lg leading-8 text-cyan-50/70">
+                            {post.excerpt}
+                        </p>
+                    {/if}
+                </div>
+
+                <SynthwavePoster
+                    title={post.title}
+                    image={post.image}
+                    alt={post.image_alt}
+                />
             </div>
-            <h1
-                class="text-4xl font-semibold tracking-normal text-balance md:text-6xl"
-            >
-                {post.title}
-            </h1>
-            {#if post.excerpt}
-                <p class="text-xl leading-8 text-muted-foreground">
-                    {post.excerpt}
-                </p>
-            {/if}
-        </div>
+        </header>
 
-        {#if post.image}
-            <img
-                src={post.image}
-                alt={post.image_alt ?? post.title}
-                class="mt-10 aspect-[16/9] w-full rounded-md border border-border object-cover"
-            />
-        {/if}
-
-        <div class="mt-12 flex flex-col gap-7 text-lg leading-8">
-            {#each post.blocks.length > 0 ? post.blocks : [{ id: 0, type: 'markdown', markdown: post.markdown, data: null, asset: null }] as block (block.id)}
+        <div class="mx-auto w-full max-w-3xl px-5 py-12 md:px-8">
+            {#each blocks as block (block.id)}
                 {#if block.asset?.url}
                     <img
                         src={block.asset.url}
                         alt={block.asset.alt ?? post.title}
-                        class="rounded-md border border-border"
+                        class="mb-10 border border-white/10"
                     />
                 {/if}
-                {#each sections(block.markdown) as section, sectionIndex (sectionIndex)}
-                    {#if section.startsWith('#')}
-                        <h2 class="pt-4 text-2xl font-semibold leading-9">
-                            {clean(section)}
-                        </h2>
-                    {:else if section.startsWith('- ')}
-                        <ul class="list-disc space-y-2 pl-6">
-                            {#each section
-                                .split('\n')
-                                .filter(Boolean) as item, itemIndex (itemIndex)}
-                                <li>{clean(item.replace(/^- /, ''))}</li>
-                            {/each}
-                        </ul>
-                    {:else}
-                        <p>{clean(section)}</p>
-                    {/if}
-                {/each}
+                <div class="article-markdown">
+                    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
+                    {@html block.html}
+                </div>
             {/each}
         </div>
     </article>

@@ -17,7 +17,7 @@ class AuditResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedShieldCheck;
 
-    protected static string|UnitEnum|null $navigationGroup = 'Automation';
+    protected static string|UnitEnum|null $navigationGroup = 'System';
 
     public static function table(Table $table): Table
     {

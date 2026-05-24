@@ -1,6 +1,10 @@
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
+    import PublicNav from '@/components/PublicNav.svelte';
+    import SynthwavePoster from '@/components/SynthwavePoster.svelte';
+    import { index as blogIndex } from '@/routes/blog';
+    import { index as germanBlogIndex } from '@/routes/blog/de';
 
     type BlogPost = {
         id: number;
@@ -32,8 +36,14 @@
         };
     } = $props();
 
-    const blogUrl = $derived(locale === 'de' ? '/de/blog' : '/blog');
-    const alternateUrl = $derived(locale === 'de' ? '/blog' : '/de/blog');
+    const blogUrl = $derived(
+        locale === 'de' ? germanBlogIndex.url() : blogIndex.url(),
+    );
+    const alternateUrl = $derived(
+        locale === 'de' ? blogIndex.url() : germanBlogIndex.url(),
+    );
+    const featuredPost = $derived(posts.data[0] ?? null);
+    const latestPosts = $derived(posts.data.slice(1));
 </script>
 
 <AppHead title={meta.title}>
@@ -46,72 +56,86 @@
     />
 </AppHead>
 
-<main class="min-h-screen bg-background text-foreground">
-    <header class="border-b border-border">
-        <div
-            class="mx-auto flex w-full max-w-6xl items-center justify-between gap-6 px-6 py-5"
-        >
-            <Link
-                href={blogUrl}
-                class="text-sm font-semibold tracking-wide uppercase"
-            >
-                Sovereign Manual
-            </Link>
-            <nav class="flex items-center gap-4 text-sm text-muted-foreground">
-                <Link href={alternateUrl} class="hover:text-foreground">
-                    {locale === 'de' ? 'English' : 'Deutsch'}
-                </Link>
-                <Link href="/login" class="hover:text-foreground">Admin</Link>
-            </nav>
-        </div>
-    </header>
+<main class="synthwave-page min-h-screen text-white">
+    <PublicNav {locale} />
 
-    <section class="border-b border-border">
+    <section class="border-b border-white/10">
         <div
-            class="mx-auto grid w-full max-w-6xl gap-8 px-6 py-14 lg:grid-cols-[1.1fr_0.9fr] lg:items-end"
+            class="mx-auto grid w-full max-w-7xl gap-8 px-5 py-12 md:px-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-end"
         >
             <div class="flex flex-col gap-5">
-                <p class="text-sm font-medium text-muted-foreground">
-                    Bitcoin, sovereignty, and financial intelligence
+                <p
+                    class="text-sm font-semibold tracking-[0.24em] text-neon-pink uppercase"
+                >
+                    Archive // Research notes
                 </p>
                 <h1
-                    class="max-w-3xl text-4xl font-semibold tracking-normal text-balance md:text-6xl"
+                    class="max-w-3xl text-5xl font-black leading-none md:text-7xl"
                 >
-                    Sovereign Manual
+                    Sovereign Manual Blog
                 </h1>
-                <p class="max-w-2xl text-lg leading-8 text-muted-foreground">
+                <p class="max-w-2xl text-lg leading-8 text-cyan-50/70">
                     {meta.description}
                 </p>
             </div>
-            <div
-                class="aspect-[4/3] overflow-hidden rounded-md border border-border bg-muted"
-            >
-                <img
-                    src="https://images.unsplash.com/photo-1518546305927-5a555bb7020d"
-                    alt="Bitcoin market and sovereignty visual"
-                    class="h-full w-full object-cover"
-                />
-            </div>
+            {#if featuredPost}
+                <Link href={featuredPost.url} class="group block">
+                    <SynthwavePoster
+                        title={featuredPost.title}
+                        image={featuredPost.image}
+                        alt={featuredPost.image_alt}
+                    />
+                </Link>
+            {:else}
+                <SynthwavePoster title="Dispatch queue initializing" />
+            {/if}
         </div>
     </section>
 
-    <section class="mx-auto w-full max-w-6xl px-6 py-12">
-        {#if posts.data.length > 0}
-            <div class="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-                {#each posts.data as post (post.id)}
-                    <article
-                        class="flex min-h-[28rem] flex-col overflow-hidden rounded-md border border-border bg-card"
+    <section class="mx-auto w-full max-w-7xl px-5 py-12 md:px-8">
+        {#if featuredPost}
+            <article
+                class="grid gap-6 border-b border-white/10 pb-10 lg:grid-cols-[0.75fr_1.25fr]"
+            >
+                <div>
+                    <p
+                        class="text-xs font-semibold tracking-[0.22em] text-bitcoin-orange uppercase"
                     >
-                        {#if post.image}
-                            <img
-                                src={post.image}
-                                alt={post.image_alt ?? post.title}
-                                class="aspect-[16/10] w-full object-cover"
-                            />
-                        {/if}
-                        <div class="flex flex-1 flex-col gap-4 p-5">
+                        Featured transmission
+                    </p>
+                    <p class="mt-3 text-sm text-cyan-50/55">
+                        {featuredPost.audience_level}
+                    </p>
+                </div>
+                <div>
+                    <h2 class="text-3xl font-black leading-tight md:text-5xl">
+                        <Link href={featuredPost.url}>{featuredPost.title}</Link
+                        >
+                    </h2>
+                    {#if featuredPost.excerpt}
+                        <p
+                            class="mt-5 max-w-3xl text-base leading-7 text-cyan-50/70"
+                        >
+                            {featuredPost.excerpt}
+                        </p>
+                    {/if}
+                </div>
+            </article>
+        {/if}
+
+        {#if latestPosts.length > 0}
+            <div class="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+                {#each latestPosts as post (post.id)}
+                    <article class="border border-white/10 bg-white/[0.035]">
+                        <SynthwavePoster
+                            title={post.title}
+                            image={post.image}
+                            alt={post.image_alt}
+                            compact
+                        />
+                        <div class="flex min-h-64 flex-col gap-4 p-5">
                             <div
-                                class="flex items-center justify-between gap-3 text-xs text-muted-foreground uppercase"
+                                class="flex items-center justify-between gap-3 text-xs text-cyan-50/55 uppercase"
                             >
                                 <span>{post.audience_level}</span>
                                 {#if post.published_at}
@@ -122,21 +146,19 @@
                                     </time>
                                 {/if}
                             </div>
-                            <h2 class="text-xl font-semibold leading-7">
-                                <Link href={post.url} class="hover:underline"
-                                    >{post.title}</Link
-                                >
+                            <h2 class="text-xl font-bold leading-7">
+                                <Link href={post.url}>{post.title}</Link>
                             </h2>
                             {#if post.excerpt}
                                 <p
-                                    class="line-clamp-4 text-sm leading-6 text-muted-foreground"
+                                    class="line-clamp-4 text-sm leading-6 text-cyan-50/65"
                                 >
                                     {post.excerpt}
                                 </p>
                             {/if}
                             <Link
                                 href={post.url}
-                                class="mt-auto text-sm font-medium hover:underline"
+                                class="mt-auto text-sm font-semibold text-neon-cyan hover:text-bitcoin-orange"
                             >
                                 Read article
                             </Link>
@@ -144,9 +166,9 @@
                     </article>
                 {/each}
             </div>
-        {:else}
-            <div class="border-y border-border py-16">
-                <p class="text-muted-foreground">No published articles yet.</p>
+        {:else if !featuredPost}
+            <div class="border-y border-white/10 py-16">
+                <p class="text-cyan-50/65">No published articles yet.</p>
             </div>
         {/if}
     </section>

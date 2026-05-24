@@ -54,3 +54,24 @@ test('localized german posts render through the german route', function () {
             ->where('locale', 'de')
             ->where('post.title', 'Bitcoin Selbstverwahrung'));
 });
+
+test('markdown is rendered to sanitized html for articles', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Markdown Rendering',
+        'slug' => 'markdown-rendering',
+        'markdown' => "# Markdown Rendering\n\nA **strong** point.\n\n- first\n- second\n\n<script>alert('x')</script>",
+    ]);
+
+    $this->get(route('blog.show', 'markdown-rendering'))
+        ->assertSuccessful()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Blog/Show')
+            ->where('post.html', fn (string $html): bool => str_contains($html, '<h1>Markdown Rendering</h1>')
+                && str_contains($html, '<strong>strong</strong>')
+                && str_contains($html, '<li>first</li>')
+                && ! str_contains($html, '<script>')));
+});

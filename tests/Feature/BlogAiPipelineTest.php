@@ -16,12 +16,29 @@ test('pipeline creates a published post with english and german translations', f
     ]);
 
     $post = app(BlogAiPipeline::class)->generatePost($topic);
+    $germanTranslation = $post->translations()->where('locale', 'de')->firstOrFail();
+    $asset = $post->assets()->firstOrFail();
 
     expect($post->status)->toBe(PostStatus::Published)
         ->and($post->translations()->where('locale', 'en')->exists())->toBeTrue()
         ->and($post->translations()->where('locale', 'de')->exists())->toBeTrue()
+        ->and($germanTranslation->title)->toBe('Warum Bitcoin-Verwahrung wichtig ist')
+        ->and($germanTranslation->slug)->toBe('warum-bitcoin-verwahrung-wichtig-ist')
+        ->and($asset->url)->toBeNull()
+        ->and($asset->prompt)->toContain('Synthwave cypherpunk')
+        ->and($asset->prompt)->toContain('no stock-photo look')
+        ->and($asset->prompt)->not->toContain('unsplash')
         ->and($post->aiRuns()->count())->toBeGreaterThanOrEqual(1)
         ->and($topic->refresh()->status)->toBe(ContentTopicStatus::Published);
+});
+
+test('topic ideation creates scheduled topics', function () {
+    config(['ai.providers.gemini.key' => null]);
+
+    $this->artisan('app:ideate-blog-topics --count=2')->assertSuccessful();
+
+    expect(ContentTopic::query()->count())->toBe(2)
+        ->and(ContentTopic::query()->where('status', ContentTopicStatus::Scheduled)->count())->toBe(2);
 });
 
 test('generation command queues due topics', function () {

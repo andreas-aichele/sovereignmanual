@@ -5,6 +5,9 @@ namespace Database\Seeders;
 use App\Models\User;
 // use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
+use Spatie\Permission\Models\Permission;
+use Spatie\Permission\Models\Role;
+use Spatie\Permission\PermissionRegistrar;
 
 class DatabaseSeeder extends Seeder
 {
@@ -13,11 +16,26 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
+        app(PermissionRegistrar::class)->forgetCachedPermissions();
 
-        User::factory()->create([
-            'name' => 'Test User',
-            'email' => 'test@example.com',
-        ]);
+        Permission::findOrCreate('access cms', 'web');
+        Permission::findOrCreate('manage content', 'web');
+        Permission::findOrCreate('manage users', 'web');
+        Permission::findOrCreate('view automation', 'web');
+
+        Role::findOrCreate('admin', 'web')
+            ->syncPermissions(['access cms', 'manage content', 'manage users', 'view automation']);
+
+        Role::findOrCreate('editor', 'web')
+            ->syncPermissions(['access cms', 'manage content', 'view automation']);
+
+        Role::findOrCreate('user', 'web');
+
+        $admin = User::query()->updateOrCreate(
+            ['email' => 'admin@example.com'],
+            ['name' => 'Admin User', 'password' => 'password'],
+        );
+
+        $admin->syncRoles(['admin']);
     }
 }

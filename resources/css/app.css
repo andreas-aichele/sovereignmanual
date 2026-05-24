@@ -59,6 +59,11 @@
     --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
     --color-sidebar-border: var(--sidebar-border);
     --color-sidebar-ring: var(--sidebar-ring);
+    --color-void: var(--void);
+    --color-deep-navy: var(--deep-navy);
+    --color-neon-pink: var(--neon-pink);
+    --color-neon-cyan: var(--neon-cyan);
+    --color-bitcoin-orange: var(--bitcoin-orange);
 }
 
 /*
@@ -90,6 +95,11 @@
 }
 
 :root {
+    --void: hsl(250 54% 4%);
+    --deep-navy: hsl(235 55% 10%);
+    --neon-pink: hsl(310 100% 58%);
+    --neon-cyan: hsl(184 100% 57%);
+    --bitcoin-orange: hsl(36 100% 50%);
     --background: hsl(0 0% 100%);
     --foreground: hsl(0 0% 3.9%);
     --card: hsl(0 0% 100%);
@@ -168,5 +178,139 @@
     }
     body {
         @apply bg-background text-foreground;
+    }
+}
+
+@layer components {
+    .synthwave-page {
+        background:
+            radial-gradient(
+                circle at 18% 0%,
+                hsl(310 100% 58% / 0.22),
+                transparent 28rem
+            ),
+            radial-gradient(
+                circle at 82% 12%,
+                hsl(184 100% 57% / 0.18),
+                transparent 26rem
+            ),
+            linear-gradient(
+                180deg,
+                var(--void) 0%,
+                hsl(245 60% 7%) 46%,
+                hsl(260 50% 5%) 100%
+            );
+    }
+
+    .synthwave-hero-grid {
+        background-image:
+            linear-gradient(hsl(184 100% 57% / 0.12) 1px, transparent 1px),
+            linear-gradient(
+                90deg,
+                hsl(310 100% 58% / 0.11) 1px,
+                transparent 1px
+            );
+        background-size: 72px 72px;
+        mask-image: linear-gradient(to bottom, black, transparent 78%);
+    }
+
+    .synthwave-poster {
+        box-shadow:
+            inset 0 0 0 1px hsl(310 100% 58% / 0.18),
+            0 0 42px hsl(184 100% 57% / 0.14);
+    }
+
+    .synthwave-sky {
+        background:
+            radial-gradient(
+                circle at 50% 42%,
+                hsl(36 100% 50% / 0.28),
+                transparent 12rem
+            ),
+            linear-gradient(
+                180deg,
+                hsl(246 64% 6%) 0%,
+                hsl(276 62% 14%) 54%,
+                hsl(310 80% 10%) 100%
+            );
+    }
+
+    .synthwave-grid {
+        background-image:
+            linear-gradient(hsl(184 100% 57% / 0.32) 1px, transparent 1px),
+            linear-gradient(
+                90deg,
+                hsl(310 100% 58% / 0.34) 1px,
+                transparent 1px
+            );
+        background-size: 42px 42px;
+        transform: perspective(360px) rotateX(62deg) translateY(20%);
+        transform-origin: bottom;
+    }
+
+    .article-markdown {
+        color: hsl(190 70% 92% / 0.88);
+        font-size: 1.0625rem;
+        line-height: 1.85;
+    }
+
+    .article-markdown > * + * {
+        margin-top: 1.35rem;
+    }
+
+    .article-markdown h1,
+    .article-markdown h2,
+    .article-markdown h3 {
+        color: white;
+        font-weight: 900;
+        line-height: 1.15;
+        margin-top: 2.4rem;
+    }
+
+    .article-markdown h1 {
+        font-size: 2.5rem;
+    }
+
+    .article-markdown h2 {
+        font-size: 1.875rem;
+    }
+
+    .article-markdown h3 {
+        font-size: 1.35rem;
+    }
+
+    .article-markdown a {
+        color: var(--neon-cyan);
+        text-decoration: underline;
+        text-underline-offset: 0.2em;
+    }
+
+    .article-markdown strong {
+        color: white;
+    }
+
+    .article-markdown ul,
+    .article-markdown ol {
+        padding-left: 1.5rem;
+    }
+
+    .article-markdown ul {
+        list-style: disc;
+    }
+
+    .article-markdown ol {
+        list-style: decimal;
+    }
+
+    .article-markdown blockquote {
+        border-left: 2px solid var(--neon-pink);
+        color: hsl(190 70% 92% / 0.72);
+        padding-left: 1rem;
+    }
+
+    .article-markdown code {
+        background: hsl(184 100% 57% / 0.1);
+        color: var(--neon-cyan);
+        padding: 0.1rem 0.3rem;
     }
 }
