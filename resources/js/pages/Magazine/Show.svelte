@@ -127,13 +127,13 @@
             </div>
         </header>
 
-        <div class="mx-auto w-full max-w-3xl px-5 py-12 md:px-8">
+        <div class="mx-auto w-full max-w-4xl px-5 py-12 md:px-8">
             {#each blocks as block (block.id)}
                 {#if block.asset?.url}
                     <img
                         src={block.asset.url}
                         alt={block.asset.alt ?? post.title}
-                        class="mb-10 rounded-box border border-base-content/15"
+                        class="mb-10 w-full rounded-box border border-base-content/15"
                     />
                 {/if}
                 <div class="article-markdown">
