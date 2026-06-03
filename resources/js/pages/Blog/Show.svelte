@@ -2,7 +2,6 @@
     import { Link } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import PublicNav from '@/components/PublicNav.svelte';
-    import SynthwavePoster from '@/components/SynthwavePoster.svelte';
     import { index as blogIndex } from '@/routes/blog';
     import { index as germanBlogIndex } from '@/routes/blog/de';
 
@@ -89,25 +88,25 @@
     {/if}
 </AppHead>
 
-<main class="synthwave-page min-h-screen text-white">
+<main class="synthwave-page min-h-screen text-base-content">
     <PublicNav {locale} />
 
     <article>
-        <header class="border-b border-white/10">
-            <div
-                class="mx-auto grid w-full max-w-7xl gap-10 px-5 py-12 md:px-8 lg:grid-cols-[0.9fr_1.1fr]"
-            >
-                <div class="flex flex-col justify-end gap-5">
+        <header class="border-b border-secondary/15">
+            <div class="mx-auto w-full max-w-4xl px-5 py-12 md:px-8">
+                <div class="flex flex-col gap-5">
                     <Link
                         href={blogUrl}
-                        class="text-sm font-semibold text-neon-cyan hover:text-bitcoin-orange"
+                        class="btn btn-outline btn-secondary btn-sm w-fit"
                     >
                         {copy.back}
                     </Link>
                     <div
-                        class="flex flex-wrap items-center gap-3 text-xs font-semibold text-cyan-50/55 uppercase"
+                        class="flex flex-wrap items-center gap-3 text-xs font-semibold text-base-content/55 uppercase"
                     >
-                        <span>{post.audience_level}</span>
+                        <span class="badge badge-secondary badge-sm">
+                            {post.audience_level}
+                        </span>
                         {#if post.published_at}
                             <time datetime={post.published_at}>
                                 {new Date(post.published_at).toLocaleDateString(
@@ -119,21 +118,17 @@
                             <span>{copy.freshness}</span>
                         {/if}
                     </div>
-                    <h1 class="text-4xl font-black leading-tight md:text-6xl">
+                    <h1
+                        class="text-4xl font-black leading-tight text-base-content md:text-6xl"
+                    >
                         {post.title}
                     </h1>
                     {#if post.excerpt}
-                        <p class="text-lg leading-8 text-cyan-50/70">
+                        <p class="text-lg leading-8 text-base-content/70">
                             {post.excerpt}
                         </p>
                     {/if}
                 </div>
-
-                <SynthwavePoster
-                    title={post.title}
-                    image={post.image}
-                    alt={post.image_alt}
-                />
             </div>
         </header>
 
@@ -143,7 +138,7 @@
                     <img
                         src={block.asset.url}
                         alt={block.asset.alt ?? post.title}
-                        class="mb-10 border border-white/10"
+                        class="mb-10 rounded-box border border-secondary/15"
                     />
                 {/if}
                 <div class="article-markdown">

@@ -3,7 +3,7 @@
 </script>
 
 <div
-    class="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-md bg-void shadow-[0_0_18px_rgba(28,250,255,0.18)]"
+    class="flex aspect-square size-8 items-center justify-center overflow-hidden rounded-box bg-base-200 shadow-lg shadow-primary/15"
 >
     <AppLogoIcon class="size-8" />
 </div>

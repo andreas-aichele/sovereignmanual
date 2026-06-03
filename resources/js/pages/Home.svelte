@@ -2,7 +2,6 @@
     import { Link } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import PublicNav from '@/components/PublicNav.svelte';
-    import SynthwavePoster from '@/components/SynthwavePoster.svelte';
     import { index as blogIndex } from '@/routes/blog';
     import { index as germanBlogIndex } from '@/routes/blog/de';
 
@@ -54,52 +53,42 @@
     <meta name="description" content={meta.description} />
 </AppHead>
 
-<main class="synthwave-page min-h-screen text-white">
+<main class="synthwave-page min-h-screen text-base-content">
     <PublicNav {locale} />
 
-    <section class="relative overflow-hidden border-b border-white/10">
+    <section class="relative overflow-hidden border-b border-secondary/15">
         <div class="absolute inset-0 synthwave-hero-grid"></div>
         <div
-            class="relative mx-auto grid min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center gap-10 px-5 py-16 md:px-8 lg:grid-cols-[1fr_0.92fr]"
+            class="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center px-5 py-14 md:px-8"
         >
-            <div class="flex flex-col gap-7">
+            <div class="flex max-w-4xl flex-col gap-7">
                 <p
-                    class="text-sm font-semibold tracking-[0.28em] text-neon-cyan uppercase"
+                    class="badge badge-secondary badge-lg font-semibold tracking-[0.18em] uppercase"
                 >
                     {copy.eyebrow}
                 </p>
                 <h1
-                    class="max-w-4xl text-5xl font-black leading-[0.95] md:text-7xl"
+                    class="max-w-4xl text-5xl font-black leading-[0.95] text-base-content md:text-7xl"
                 >
                     Sovereign Manual
                 </h1>
-                <p class="max-w-2xl text-lg leading-8 text-cyan-50/75">
+                <p class="max-w-2xl text-lg leading-8 text-base-content/75">
                     {copy.intro}
                 </p>
                 <div class="flex flex-wrap gap-3">
-                    <Link
-                        href={blogUrl}
-                        class="border border-neon-cyan bg-neon-cyan px-5 py-3 text-sm font-semibold text-void shadow-[0_0_24px_rgba(35,240,255,0.35)]"
-                    >
+                    <Link href={blogUrl} class="btn btn-primary">
                         {copy.primaryCta}
                     </Link>
                     {#if featuredPost}
                         <Link
                             href={featuredPost.url}
-                            class="border border-white/20 px-5 py-3 text-sm font-semibold text-cyan-50 hover:border-bitcoin-orange hover:text-bitcoin-orange"
+                            class="btn btn-outline btn-secondary"
                         >
                             {copy.secondaryCta}
                         </Link>
                     {/if}
                 </div>
             </div>
-
-            <SynthwavePoster
-                title={featuredPost?.title ??
-                    'Bitcoin sovereignty operating manual'}
-                image={featuredPost?.image ?? null}
-                alt={featuredPost?.image_alt ?? null}
-            />
         </div>
     </section>
 
@@ -108,25 +97,27 @@
     >
         <div>
             <p
-                class="text-sm font-semibold tracking-[0.22em] text-bitcoin-orange uppercase"
+                class="text-sm font-semibold tracking-[0.22em] text-accent uppercase"
             >
                 {copy.signalEyebrow}
             </p>
-            <h2 class="mt-3 text-3xl font-black">
+            <h2 class="mt-3 text-3xl font-black text-base-content">
                 {copy.signalTitle}
             </h2>
         </div>
         <div class="grid gap-4 sm:grid-cols-3">
             {#each copy.topics as topic (topic.title)}
                 <div
-                    class="pixel-panel border border-white/10 bg-white/[0.03] p-5"
+                    class="card border border-secondary/15 bg-base-200/70 shadow-xl shadow-primary/5"
                 >
-                    <p class="text-sm font-semibold text-neon-cyan">
-                        {topic.title}
-                    </p>
-                    <p class="mt-3 text-sm leading-6 text-cyan-50/65">
-                        {topic.body}
-                    </p>
+                    <div class="card-body gap-3 p-5">
+                        <p class="text-sm font-semibold text-secondary">
+                            {topic.title}
+                        </p>
+                        <p class="text-sm leading-6 text-base-content/65">
+                            {topic.body}
+                        </p>
+                    </div>
                 </div>
             {/each}
         </div>
@@ -136,17 +127,11 @@
         <section class="mx-auto w-full max-w-7xl px-5 pb-16 md:px-8">
             <div class="grid gap-5 md:grid-cols-3">
                 {#each latestPosts as post (post.id)}
-                    <article class="border border-white/10 bg-white/[0.035]">
-                        <SynthwavePoster
-                            title={post.title}
-                            image={post.image}
-                            alt={post.image_alt}
-                            compact
-                        />
-                        <div class="p-5">
-                            <p
-                                class="text-xs tracking-[0.2em] text-neon-pink uppercase"
-                            >
+                    <article
+                        class="card overflow-hidden border border-secondary/15 bg-base-200/80 shadow-xl shadow-primary/5"
+                    >
+                        <div class="card-body p-5">
+                            <p class="badge badge-primary badge-sm">
                                 {post.audience_level}
                             </p>
                             <h3 class="mt-3 text-xl font-bold leading-7">

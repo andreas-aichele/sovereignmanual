@@ -17,31 +17,32 @@
 </script>
 
 <header
-    class="sticky top-0 z-50 border-b border-white/10 bg-void/85 backdrop-blur-xl"
+    class="sticky top-0 z-50 border-b border-secondary/15 bg-base-100/82 backdrop-blur-xl"
 >
-    <div
-        class="mx-auto flex w-full max-w-7xl items-center justify-between gap-6 px-5 py-4 md:px-8"
-    >
+    <div class="navbar mx-auto min-h-16 w-full max-w-7xl px-5 md:px-8">
         <Link
             href={homeUrl}
-            class="flex items-center gap-3 text-sm font-semibold"
+            class="flex min-w-0 flex-1 items-center gap-3 text-sm font-semibold"
         >
+            <img src="/logo.svg" alt="" class="size-8 shrink-0" />
             <span
-                class="h-3 w-3 border border-neon-cyan bg-bitcoin-orange shadow-[0_0_18px_rgba(255,153,0,0.85)]"
-            ></span>
-            <span class="tracking-[0.22em] text-white uppercase">
+                class="truncate tracking-[0.18em] text-base-content uppercase"
+            >
                 Sovereign Manual
             </span>
         </Link>
 
-        <nav class="flex items-center gap-5 text-sm text-cyan-100/75">
-            <Link href={homeUrl} class="hover:text-neon-cyan">
+        <nav class="flex items-center gap-1 text-sm">
+            <Link href={homeUrl} class="btn btn-ghost btn-sm">
                 {locale === 'de' ? 'Start' : 'Home'}
             </Link>
-            <Link href={blogUrl} class="hover:text-neon-cyan">
+            <Link href={blogUrl} class="btn btn-ghost btn-sm">
                 {locale === 'de' ? 'Blog' : 'Blog'}
             </Link>
-            <Link href={alternateUrl} class="hover:text-bitcoin-orange">
+            <Link
+                href={alternateUrl}
+                class="btn btn-outline btn-secondary btn-sm"
+            >
                 {locale === 'de' ? 'English' : 'Deutsch'}
             </Link>
         </nav>
