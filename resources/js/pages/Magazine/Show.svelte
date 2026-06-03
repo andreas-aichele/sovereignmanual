@@ -114,7 +114,7 @@
                         {/if}
                     </div>
                     <h1
-                        class="text-4xl font-black leading-tight text-base-content md:text-6xl"
+                        class="wrap-anywhere text-4xl font-black leading-tight text-base-content md:text-6xl"
                     >
                         {post.title}
                     </h1>

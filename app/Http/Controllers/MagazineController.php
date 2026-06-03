@@ -79,7 +79,7 @@ class MagazineController extends Controller
                     ]),
             ],
             'copy' => [
-                'back' => $locale === 'de' ? 'Zurueck ins Archiv' : 'Back to archive',
+                'back' => $locale === 'de' ? 'Zurück ins Archiv' : 'Back to archive',
             ],
             'meta' => [
                 'title' => $translation->meta_title ?: $translation->title,
@@ -121,7 +121,7 @@ class MagazineController extends Controller
             ],
             'financial-independence' => [
                 'en' => 'Financial independence',
-                'de' => 'Finanzielle Unabhaengigkeit',
+                'de' => 'Finanzielle Unabhängigkeit',
             ],
             'self-custody' => [
                 'en' => 'Self custody',
@@ -177,9 +177,9 @@ class MagazineController extends Controller
             return [
                 'eyebrow' => 'Archiv // Research Notes',
                 'heading' => 'Sovereign Manual Magazine',
-                'featured' => 'Ausgewaehlte Transmission',
+                'featured' => 'Ausgewählte Transmission',
                 'read' => 'Artikel lesen',
-                'empty' => 'Noch keine veroeffentlichten Artikel.',
+                'empty' => 'Noch keine veröffentlichten Artikel.',
             ];
         }
 

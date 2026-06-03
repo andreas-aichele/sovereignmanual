@@ -31,6 +31,19 @@ test('pipeline creates a published post with english and german translations', f
         ->and($topic->refresh()->status)->toBe(ContentTopicStatus::Published);
 });
 
+test('pipeline fallback german titles use correct umlauts', function () {
+    config(['ai.providers.gemini.key' => null]);
+
+    $topic = ContentTopic::factory()->due()->create([
+        'title' => 'Bitcoin self custody threat models for beginners',
+    ]);
+
+    $post = app(MagazineAiPipeline::class)->generatePost($topic);
+    $germanTranslation = $post->translations()->where('locale', 'de')->firstOrFail();
+
+    expect($germanTranslation->title)->toBe('Bitcoin-Selbstverwahrung: Bedrohungsmodelle für Einsteiger');
+});
+
 test('topic ideation creates scheduled topics', function () {
     config(['ai.providers.gemini.key' => null]);
 

@@ -68,6 +68,7 @@
         font-weight: 900;
         line-height: 1.15;
         margin-top: 2.4rem;
+        overflow-wrap: anywhere;
     }
 
     .article-markdown h1 {

@@ -90,7 +90,31 @@ test('localized german posts render through the german route', function () {
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Magazine/Show')
             ->where('locale', 'de')
-            ->where('post.title', 'Bitcoin Selbstverwahrung'));
+            ->where('post.title', 'Bitcoin Selbstverwahrung')
+            ->where('copy.back', 'Zurück ins Archiv'));
+});
+
+test('german category labels use correct umlauts', function () {
+    $topic = ContentTopic::factory()->create([
+        'category' => 'financial-independence',
+    ]);
+
+    $post = Post::factory()->published()->create([
+        'content_topic_id' => $topic->id,
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'de',
+        'title' => 'Finanzielle Unabhängigkeit',
+        'slug' => 'finanzielle-unabhaengigkeit',
+    ]);
+
+    $this->get(route('magazine.de.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Magazine/Index')
+            ->where('posts.data.0.category_label', 'Finanzielle Unabhängigkeit'));
 });
 
 test('markdown is rendered to sanitized html for articles', function () {

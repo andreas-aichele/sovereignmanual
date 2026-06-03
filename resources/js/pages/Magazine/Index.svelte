@@ -117,7 +117,7 @@
                         </span>
                     </div>
                     <h2
-                        class="max-w-4xl text-4xl font-black leading-tight text-base-content md:text-7xl"
+                        class="max-w-4xl wrap-anywhere text-4xl font-black leading-tight text-base-content md:text-7xl"
                     >
                         <Link href={featuredPost.url}>{featuredPost.title}</Link
                         >
@@ -176,7 +176,7 @@
                                     {copy.eyebrow}
                                 </p>
                                 <h2
-                                    class="mt-2 text-3xl font-black text-base-content"
+                                    class="mt-2 wrap-anywhere text-3xl font-black text-base-content"
                                 >
                                     {section.label}
                                 </h2>
@@ -219,7 +219,9 @@
                                                 </time>
                                             {/if}
                                         </div>
-                                        <h3 class="text-xl font-bold leading-7">
+                                        <h3
+                                            class="wrap-anywhere text-xl font-bold leading-7"
+                                        >
                                             <Link href={post.url}>
                                                 {post.title}
                                             </Link>

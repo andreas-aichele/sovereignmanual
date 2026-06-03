@@ -299,11 +299,11 @@ class MagazineAiPipeline
     {
         return match (Str::of($title)->lower()->toString()) {
             'why bitcoin custody matters' => 'Warum Bitcoin-Verwahrung wichtig ist',
-            'bitcoin self custody threat models for beginners' => 'Bitcoin-Selbstverwahrung: Bedrohungsmodelle fuer Einsteiger',
-            'why fiat debasement changes savings behavior' => 'Warum Fiat-Entwertung das Sparverhalten veraendert',
-            'how to build a personal bitcoin treasury policy' => 'Wie du eine persoenliche Bitcoin-Treasury-Policy entwickelst',
-            'financial independence without yield chasing' => 'Finanzielle Unabhaengigkeit ohne Renditejagd',
-            default => "Souveraene Finanzen: {$title}",
+            'bitcoin self custody threat models for beginners' => 'Bitcoin-Selbstverwahrung: Bedrohungsmodelle für Einsteiger',
+            'why fiat debasement changes savings behavior' => 'Warum Fiat-Entwertung das Sparverhalten verändert',
+            'how to build a personal bitcoin treasury policy' => 'Wie du eine persönliche Bitcoin-Treasury-Policy entwickelst',
+            'financial independence without yield chasing' => 'Finanzielle Unabhängigkeit ohne Renditejagd',
+            default => "Souveräne Finanzen: {$title}",
         };
     }
 

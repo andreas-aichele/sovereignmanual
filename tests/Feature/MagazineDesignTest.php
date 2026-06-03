@@ -17,7 +17,9 @@ test('german magazine index is the localized public start page', function () {
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Magazine/Index')
             ->where('locale', 'de')
-            ->where('copy.read', 'Artikel lesen'));
+            ->where('copy.featured', 'Ausgewählte Transmission')
+            ->where('copy.read', 'Artikel lesen')
+            ->where('copy.empty', 'Noch keine veröffentlichten Artikel.'));
 });
 
 test('magazine article urls are available', function () {
@@ -31,6 +33,18 @@ test('public pages are not wrapped in the starterkit app layout', function () {
     expect($contents)->toContain("case name.startsWith('Magazine/'):")
         ->and($contents)->not->toContain("case name === 'Home':")
         ->and($contents)->not->toContain("case name === 'Welcome':");
+});
+
+test('magazine headings can break long words', function () {
+    $index = file_get_contents(resource_path('js/pages/Magazine/Index.svelte'));
+    $show = file_get_contents(resource_path('js/pages/Magazine/Show.svelte'));
+    $css = file_get_contents(resource_path('css/background.css'));
+
+    expect($index)->toContain('wrap-anywhere text-4xl')
+        ->and($index)->toContain('wrap-anywhere text-3xl')
+        ->and($index)->toContain('wrap-anywhere text-xl')
+        ->and($show)->toContain('wrap-anywhere text-4xl')
+        ->and($css)->toContain('overflow-wrap: anywhere;');
 });
 
 test('public magazine frontend does not link login admin or unsplash', function () {
