@@ -17,7 +17,7 @@ test('german magazine index is the localized public start page', function () {
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Magazine/Index')
             ->where('locale', 'de')
-            ->where('copy.featured', 'Ausgewählte Transmission')
+            ->where('copy.featured', 'Neuer Artikel')
             ->where('copy.read', 'Artikel lesen')
             ->where('copy.empty', 'Noch keine veröffentlichten Artikel.'));
 });
@@ -45,10 +45,10 @@ test('magazine localization strings live in language files', function () {
         ->and($englishTranslations)->toHaveKeys(['index', 'show', 'categories', 'meta', 'routes'])
         ->and($germanTranslations)->toHaveKeys(['index', 'show', 'categories', 'meta', 'routes'])
         ->and($controller)->not->toContain("locale === 'de'")
-        ->and($controller)->not->toContain('Zurück ins Archiv')
-        ->and($controller)->not->toContain('Back to archive')
-        ->and($controller)->not->toContain('Ausgewählte Transmission')
-        ->and($controller)->not->toContain('Featured transmission');
+        ->and($controller)->not->toContain('Zurück zum Magazin')
+        ->and($controller)->not->toContain('Back to magazine')
+        ->and($controller)->not->toContain('Neuer Artikel')
+        ->and($controller)->not->toContain('Latest article');
 });
 
 test('magazine headings can break long words', function () {

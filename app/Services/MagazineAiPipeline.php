@@ -32,6 +32,8 @@ class MagazineAiPipeline
         $this->finishRun($draftRun, $draft);
 
         $englishExcerpt = $this->excerpt($draft, 180);
+        $englishBlocks = $this->articleBlocks($topic, 'en', $title, $draft);
+        $englishMarkdown = $this->markdownFromBlocks($englishBlocks, $draft);
 
         $post = Post::create([
             'content_topic_id' => $topic->id,
@@ -57,48 +59,41 @@ class MagazineAiPipeline
             'title' => $title,
             'slug' => $englishSlug,
             'excerpt' => $englishExcerpt,
-            'markdown' => $draft,
+            'markdown' => $englishMarkdown,
             'meta_title' => $title,
-            'meta_description' => $this->excerpt($draft, 155),
+            'meta_description' => $this->excerpt($englishMarkdown, 155),
             'seo' => ['canonical_locale' => 'en'],
         ]);
 
         $translationRun = $this->startRun(AiRunType::Translation, $topic, $post);
-        $germanDraft = $this->promptWithFallback(
-            instructions: 'Translate educational finance content into precise, natural German while preserving Markdown.',
-            prompt: $draft,
-            fallback: $this->fallbackMarkdown($title, 'de'),
+        $germanArticle = $this->promptJsonWithFallback(
+            instructions: 'Translate Bitcoin magazine articles into precise, natural German. Return only valid JSON. Use real German umlauts and ß. Never leave English headings or UI-like labels untranslated unless they are proper nouns.',
+            prompt: json_encode([
+                'title' => $title,
+                'excerpt' => $englishExcerpt,
+                'blocks' => $englishBlocks,
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            fallback: $this->fallbackTranslatedArticle($title, $englishBlocks),
         );
-        $this->finishRun($translationRun, $germanDraft);
-        $germanTitle = $this->germanTitle($title);
+        $germanTitle = $this->cleanText((string) ($germanArticle['title'] ?? $this->germanTitle($title)), $this->germanTitle($title));
+        $germanBlocks = $this->sanitizeBlocks($germanArticle['blocks'] ?? null, 'de', $germanTitle, $this->fallbackMarkdown($title, 'de'));
+        $germanDraft = $this->markdownFromBlocks($germanBlocks, $this->fallbackMarkdown($title, 'de'));
+        $this->finishRun($translationRun, $germanDraft, ['title' => $germanTitle]);
         $germanSlug = Str::slug($germanTitle, '-', 'de');
 
         $post->translations()->create([
             'locale' => 'de',
             'title' => $germanTitle,
             'slug' => $germanSlug,
-            'excerpt' => $this->excerpt($germanDraft, 180),
+            'excerpt' => $this->cleanText((string) ($germanArticle['excerpt'] ?? $this->excerpt($germanDraft, 180)), $this->excerpt($germanDraft, 180)),
             'markdown' => $germanDraft,
             'meta_title' => $germanTitle,
             'meta_description' => $this->excerpt($germanDraft, 155),
             'seo' => ['canonical_locale' => 'de'],
         ]);
 
-        $post->blocks()->create([
-            'locale' => 'en',
-            'type' => 'markdown',
-            'sort_order' => 0,
-            'markdown' => $draft,
-            'data' => [],
-        ]);
-
-        $post->blocks()->create([
-            'locale' => 'de',
-            'type' => 'markdown',
-            'sort_order' => 0,
-            'markdown' => $germanDraft,
-            'data' => [],
-        ]);
+        $this->createBlocks($post, 'en', $englishBlocks);
+        $this->createBlocks($post, 'de', $germanBlocks);
 
         $this->generatePostImage($post, $topic);
 
@@ -190,12 +185,185 @@ class MagazineAiPipeline
         }
     }
 
+    /**
+     * @param  array<string, mixed>  $fallback
+     * @return array<string, mixed>
+     */
+    private function promptJsonWithFallback(string $instructions, string $prompt, array $fallback): array
+    {
+        if (! config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key')) {
+            return $fallback;
+        }
+
+        try {
+            $response = (string) agent($instructions)
+                ->prompt($prompt, provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.text_model', 'gemini-2.5-flash'));
+
+            $json = Str::of($response)
+                ->replaceMatches('/^```(?:json)?\s*/', '')
+                ->replaceMatches('/\s*```$/', '')
+                ->trim()
+                ->toString();
+
+            $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+
+            return is_array($decoded) ? $decoded : $fallback;
+        } catch (Throwable) {
+            return $fallback;
+        }
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function articleBlocks(ContentTopic $topic, string $locale, string $title, string $markdown): array
+    {
+        $fallback = [
+            'blocks' => $this->fallbackBlocks($title, $locale, $markdown),
+        ];
+
+        $response = $this->promptJsonWithFallback(
+            instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Use these block types only: markdown, insight, checklist, flow_diagram, sketch. Do not include raw HTML or raw SVG.',
+            prompt: json_encode([
+                'locale' => $locale,
+                'topic' => $topic->title,
+                'audience_level' => $topic->audience_level,
+                'brief' => $topic->brief,
+                'markdown' => $markdown,
+                'schema' => [
+                    'blocks' => [
+                        [
+                            'type' => 'markdown',
+                            'markdown' => 'Markdown section text',
+                            'data' => [],
+                        ],
+                        [
+                            'type' => 'insight',
+                            'markdown' => null,
+                            'data' => ['title' => 'Short label', 'body' => 'One focused insight'],
+                        ],
+                        [
+                            'type' => 'checklist',
+                            'markdown' => null,
+                            'data' => ['title' => 'Checklist title', 'items' => ['Action one', 'Action two']],
+                        ],
+                        [
+                            'type' => 'flow_diagram',
+                            'markdown' => null,
+                            'data' => ['title' => 'Flow title', 'steps' => ['Step one', 'Step two', 'Step three']],
+                        ],
+                        [
+                            'type' => 'sketch',
+                            'markdown' => null,
+                            'data' => ['title' => 'Sketch title', 'caption' => 'Short caption', 'labels' => ['Label one', 'Label two']],
+                        ],
+                    ],
+                ],
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            fallback: $fallback,
+        );
+
+        return $this->sanitizeBlocks($response['blocks'] ?? null, $locale, $title, $markdown);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function sanitizeBlocks(mixed $blocks, string $locale, string $title, string $markdown): array
+    {
+        if (! is_array($blocks)) {
+            return $this->fallbackBlocks($title, $locale, $markdown);
+        }
+
+        $allowedTypes = ['markdown', 'insight', 'checklist', 'flow_diagram', 'sketch'];
+        $sanitized = collect($blocks)
+            ->filter(fn (mixed $block): bool => is_array($block))
+            ->map(function (array $block) use ($allowedTypes): array {
+                $type = in_array($block['type'] ?? null, $allowedTypes, true) ? $block['type'] : 'markdown';
+                $data = is_array($block['data'] ?? null) ? $this->sanitizeBlockData($block['data']) : [];
+
+                return [
+                    'type' => $type,
+                    'markdown' => $type === 'markdown' ? $this->cleanMarkdown($block['markdown'] ?? null) : null,
+                    'data' => $data,
+                ];
+            })
+            ->filter(fn (array $block): bool => $block['type'] !== 'markdown' || filled($block['markdown']))
+            ->take(8)
+            ->values()
+            ->all();
+
+        if ($sanitized === []) {
+            return $this->fallbackBlocks($title, $locale, $markdown);
+        }
+
+        if (! collect($sanitized)->contains(fn (array $block): bool => in_array($block['type'], ['insight', 'checklist', 'flow_diagram', 'sketch'], true))) {
+            $sanitized[] = $this->fallbackVisualBlock($locale);
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function sanitizeBlockData(array $data): array
+    {
+        return collect($data)
+            ->map(function (mixed $value): mixed {
+                if (is_array($value)) {
+                    return collect($value)
+                        ->filter(fn (mixed $item): bool => is_scalar($item))
+                        ->map(fn (mixed $item): string => $this->cleanText((string) $item, ''))
+                        ->filter()
+                        ->take(6)
+                        ->values()
+                        ->all();
+                }
+
+                return is_scalar($value) ? $this->cleanText((string) $value, '') : null;
+            })
+            ->filter(fn (mixed $value): bool => $value !== null && $value !== '' && $value !== [])
+            ->all();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $blocks
+     */
+    private function markdownFromBlocks(array $blocks, string $fallback): string
+    {
+        $markdown = collect($blocks)
+            ->pluck('markdown')
+            ->filter(fn (mixed $markdown): bool => filled($markdown))
+            ->implode("\n\n");
+
+        return filled($markdown) ? $markdown : $fallback;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $blocks
+     */
+    private function createBlocks(Post $post, string $locale, array $blocks): void
+    {
+        foreach ($blocks as $index => $block) {
+            $post->blocks()->create([
+                'locale' => $locale,
+                'type' => $block['type'],
+                'sort_order' => $index,
+                'markdown' => $block['markdown'],
+                'data' => $block['data'],
+            ]);
+        }
+    }
+
     private function generatePostImage(Post $post, ContentTopic $topic): void
     {
         $prompt = $this->synthwaveImagePrompt($topic);
         $run = $this->startRun(AiRunType::Image, $topic, $post, config('magazine_ai.image_model', 'gemini-2.5-flash-image'));
         $metadata = [
             'style' => 'synthwave-cypherpunk',
+            'role' => 'header',
             'prompt_version' => 1,
             'no_unsplash' => true,
         ];
@@ -258,7 +426,7 @@ class MagazineAiPipeline
 
     private function synthwaveImagePrompt(ContentTopic $topic): string
     {
-        return "Synthwave cypherpunk editorial cover image for topic: {$topic->title}. Bitcoin financial sovereignty context, neon noir, deep black and navy atmosphere, electric cyan, neon magenta, Bitcoin orange accents, subtle grid lines, terminal ledger details, premium magazine cover composition, no text in image, no logos, no real people, no stock-photo look.";
+        return "Premium synthwave editorial header image for article topic: {$topic->title}. Audience level: {$topic->audience_level}. Bitcoin financial sovereignty context, dark readable magazine composition, Bitcoin orange focal light, restrained neon cyan and magenta accents, subtle grid lines, abstract ledger details, no text in image, no logos, no real people, no stock-photo look.";
     }
 
     private function startRun(AiRunType $type, ?ContentTopic $topic = null, ?Post $post = null, ?string $model = null): AiRun
@@ -295,6 +463,108 @@ class MagazineAiPipeline
         return "# {$title}\n\nThis article explains the topic with a practical focus on financial sovereignty.\n\n## Core idea\n\nBitcoin can be understood as a tool for long-term independence when risk, custody, and time horizon are handled carefully.\n\n## Practical steps\n\n- Learn the basics.\n- Understand the security model.\n- Test with small amounts.\n- Update decisions regularly.";
     }
 
+    /**
+     * @param  array<int, array<string, mixed>>  $englishBlocks
+     * @return array<string, mixed>
+     */
+    private function fallbackTranslatedArticle(string $title, array $englishBlocks): array
+    {
+        $germanTitle = $this->germanTitle($title);
+
+        return [
+            'title' => $germanTitle,
+            'excerpt' => 'Ein praxisnaher Magazinbeitrag über Bitcoin, Selbstverwahrung und finanzielle Souveränität.',
+            'blocks' => $this->fallbackBlocks($germanTitle, 'de', $this->fallbackMarkdown($title, 'de')),
+            'source_blocks' => count($englishBlocks),
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fallbackBlocks(string $title, string $locale, string $markdown): array
+    {
+        if ($locale === 'de') {
+            return [
+                [
+                    'type' => 'markdown',
+                    'markdown' => $markdown,
+                    'data' => [],
+                ],
+                [
+                    'type' => 'insight',
+                    'markdown' => null,
+                    'data' => [
+                        'title' => 'Kernaussage',
+                        'body' => 'Souveränität entsteht nicht durch Tempo, sondern durch klare Regeln, kleine Tests und wiederholbare Entscheidungen.',
+                    ],
+                ],
+                [
+                    'type' => 'flow_diagram',
+                    'markdown' => null,
+                    'data' => [
+                        'title' => 'Entscheidungspfad',
+                        'steps' => ['Ziel klären', 'Risiko bewerten', 'Verwahrung testen', 'Regelmäßig prüfen'],
+                    ],
+                ],
+                [
+                    'type' => 'checklist',
+                    'markdown' => null,
+                    'data' => [
+                        'title' => 'Prüfliste',
+                        'items' => ['Zeithorizont notieren', 'Seed-Aufbewahrung planen', 'Kleine Testtransaktion senden', 'Dokumentation aktualisieren'],
+                    ],
+                ],
+            ];
+        }
+
+        return [
+            [
+                'type' => 'markdown',
+                'markdown' => $markdown,
+                'data' => [],
+            ],
+            [
+                'type' => 'insight',
+                'markdown' => null,
+                'data' => [
+                    'title' => 'Core insight',
+                    'body' => 'Sovereignty improves when decisions are explicit, tested at small scale, and reviewed on a schedule.',
+                ],
+            ],
+            [
+                'type' => 'flow_diagram',
+                'markdown' => null,
+                'data' => [
+                    'title' => 'Decision path',
+                    'steps' => ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly'],
+                ],
+            ],
+            [
+                'type' => 'checklist',
+                'markdown' => null,
+                'data' => [
+                    'title' => 'Field checklist',
+                    'items' => ['Write the time horizon', 'Plan seed storage', 'Send a small test transaction', 'Update the policy note'],
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fallbackVisualBlock(string $locale): array
+    {
+        return [
+            'type' => 'flow_diagram',
+            'markdown' => null,
+            'data' => $locale === 'de'
+                ? ['title' => 'Entscheidungspfad', 'steps' => ['Ziel', 'Risiko', 'Test', 'Review']]
+                : ['title' => 'Decision path', 'steps' => ['Goal', 'Risk', 'Test', 'Review']],
+        ];
+    }
+
     private function germanTitle(string $title): string
     {
         return match (Str::of($title)->lower()->toString()) {
@@ -303,8 +573,33 @@ class MagazineAiPipeline
             'why fiat debasement changes savings behavior' => 'Warum Fiat-Entwertung das Sparverhalten verändert',
             'how to build a personal bitcoin treasury policy' => 'Wie du eine persönliche Bitcoin-Treasury-Policy entwickelst',
             'financial independence without yield chasing' => 'Finanzielle Unabhängigkeit ohne Renditejagd',
-            default => "Souveräne Finanzen: {$title}",
+            default => 'Souveräne Finanzstrategie',
         };
+    }
+
+    private function cleanMarkdown(mixed $markdown): string
+    {
+        if (! is_scalar($markdown)) {
+            return '';
+        }
+
+        return Str::of((string) $markdown)
+            ->replaceMatches('/<[^>]+>/', '')
+            ->trim()
+            ->limit(6000, '')
+            ->toString();
+    }
+
+    private function cleanText(string $value, string $fallback): string
+    {
+        $cleaned = Str::of($value)
+            ->replaceMatches('/<[^>]+>/', '')
+            ->replaceMatches('/\s+/', ' ')
+            ->trim()
+            ->limit(240, '')
+            ->toString();
+
+        return filled($cleaned) ? $cleaned : $fallback;
     }
 
     private function excerpt(string $markdown, int $limit): string

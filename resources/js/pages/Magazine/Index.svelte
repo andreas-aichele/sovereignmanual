@@ -1,9 +1,18 @@
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
+    import MagazineImageFallback from '@/components/MagazineImageFallback.svelte';
     import PublicNav from '@/components/PublicNav.svelte';
     import { index as magazineIndex } from '@/routes/magazine';
     import { index as germanMagazineIndex } from '@/routes/magazine/de';
+
+    type ImagePlaceholder = {
+        title: string;
+        category: string;
+        accent: string;
+        secondary: string;
+        seed: string;
+    };
 
     type MagazinePost = {
         id: number;
@@ -12,6 +21,7 @@
         url: string;
         image: string | null;
         image_alt: string | null;
+        image_placeholder: ImagePlaceholder;
         audience_level: string;
         category: string;
         category_label: string;
@@ -61,21 +71,24 @@
     const categorySections = $derived(groupPostsByCategory(latestPosts));
 
     function groupPostsByCategory(posts: MagazinePost[]): CategorySection[] {
-        const sections = new Map<string, CategorySection>();
+        const sections: CategorySection[] = [];
 
         for (const post of posts) {
-            if (!sections.has(post.category)) {
-                sections.set(post.category, {
+            let section = sections.find((section) => section.key === post.category);
+
+            if (!section) {
+                section = {
                     key: post.category,
                     label: post.category_label,
                     posts: [],
-                });
+                };
+                sections.push(section);
             }
 
-            sections.get(post.category)?.posts.push(post);
+            section.posts.push(post);
         }
 
-        return Array.from(sections.values());
+        return sections;
     }
 
     function formatDate(date: string | null): string | null {
@@ -103,7 +116,7 @@
     <section class="mx-auto w-full max-w-7xl px-5 py-10 md:px-8 md:py-14">
         {#if featuredPost}
             <article
-                class={`grid overflow-hidden rounded-box border border-primary/35 bg-base-200/90 shadow-2xl shadow-primary/10 ${featuredPost.image ? 'lg:grid-cols-[1.2fr_0.8fr]' : ''}`}
+                class="grid overflow-hidden rounded-box border border-primary/35 bg-base-200/90 shadow-2xl shadow-primary/10 lg:grid-cols-[1.2fr_0.8fr]"
             >
                 <div
                     class="flex min-h-[28rem] flex-col justify-end gap-6 p-6 md:p-10"
@@ -154,6 +167,12 @@
                         alt={featuredPost.image_alt ?? featuredPost.title}
                         class="h-full min-h-80 w-full object-cover"
                     />
+                {:else}
+                    <MagazineImageFallback
+                        placeholder={featuredPost.image_placeholder}
+                        title={featuredPost.title}
+                        class="h-full min-h-80 w-full"
+                    />
                 {/if}
             </article>
         {:else}
@@ -196,6 +215,12 @@
                                             src={post.image}
                                             alt={post.image_alt ?? post.title}
                                             class="aspect-[16/9] w-full object-cover"
+                                        />
+                                    {:else}
+                                        <MagazineImageFallback
+                                            placeholder={post.image_placeholder}
+                                            title={post.title}
+                                            class="aspect-[16/9] w-full"
                                         />
                                     {/if}
                                     <div

@@ -1,11 +1,13 @@
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
+    import MagazineBlock from '@/components/MagazineBlock.svelte';
+    import MagazineImageFallback from '@/components/MagazineImageFallback.svelte';
     import PublicNav from '@/components/PublicNav.svelte';
     import { index as magazineIndex } from '@/routes/magazine';
     import { index as germanMagazineIndex } from '@/routes/magazine/de';
 
-    type MagazineBlock = {
+    type MagazineContentBlock = {
         id: number;
         type: string;
         markdown: string | null;
@@ -17,16 +19,25 @@
         } | null;
     };
 
+    type ImagePlaceholder = {
+        title: string;
+        category: string;
+        accent: string;
+        secondary: string;
+        seed: string;
+    };
+
     type MagazinePost = {
         title: string;
         excerpt: string | null;
         image: string | null;
         image_alt: string | null;
+        image_placeholder: ImagePlaceholder;
         audience_level: string;
         published_at: string | null;
         markdown: string;
         html: string;
-        blocks: MagazineBlock[];
+        blocks: MagazineContentBlock[];
     };
 
     let {
@@ -123,23 +134,26 @@
                             {post.excerpt}
                         </p>
                     {/if}
+                    {#if post.image}
+                        <img
+                            src={post.image}
+                            alt={post.image_alt ?? post.title}
+                            class="mt-4 aspect-[16/9] w-full rounded-box border border-base-content/15 object-cover shadow-2xl shadow-primary/10"
+                        />
+                    {:else}
+                        <MagazineImageFallback
+                            placeholder={post.image_placeholder}
+                            title={post.title}
+                            class="mt-4 aspect-[16/9] w-full rounded-box border border-base-content/15 shadow-2xl shadow-primary/10"
+                        />
+                    {/if}
                 </div>
             </div>
         </header>
 
         <div class="mx-auto w-full max-w-4xl px-5 py-12 md:px-8">
             {#each blocks as block (block.id)}
-                {#if block.asset?.url}
-                    <img
-                        src={block.asset.url}
-                        alt={block.asset.alt ?? post.title}
-                        class="mb-10 w-full rounded-box border border-base-content/15"
-                    />
-                {/if}
-                <div class="article-markdown">
-                    <!-- eslint-disable-next-line svelte/no-at-html-tags -->
-                    {@html block.html}
-                </div>
+                <MagazineBlock {block} fallbackAlt={post.title} />
             {/each}
         </div>
     </article>

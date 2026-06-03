@@ -87,21 +87,24 @@ class MagazineController extends Controller
     private function serializePostSummary(Post $post, string $locale): array
     {
         $translation = $post->translation($locale);
+        $category = $post->contentTopic?->category ?? 'bitcoin';
+        $coverImage = $this->coverImage($post);
 
         return [
             'id' => $post->id,
             'topic' => $post->topic,
             'status' => $post->status->value,
             'audience_level' => $post->audience_level,
-            'category' => $post->contentTopic?->category ?? 'bitcoin',
-            'category_label' => $this->categoryLabel($post->contentTopic?->category, $locale),
+            'category' => $category,
+            'category_label' => $this->categoryLabel($category, $locale),
             'published_at' => $post->published_at?->toAtomString(),
             'title' => $translation?->title ?? $post->topic,
             'slug' => $translation?->slug ?? $post->slug,
             'excerpt' => $translation?->excerpt,
             'url' => route($this->translation('routes.show', $locale), $translation?->slug ?? $post->slug),
-            'image' => $this->coverImage($post)?->url,
-            'image_alt' => $this->coverImage($post)?->alt_text,
+            'image' => $coverImage?->url,
+            'image_alt' => $coverImage?->alt_text,
+            'image_placeholder' => $this->imagePlaceholder($post, $translation?->title ?? $post->topic, $category),
         ];
     }
 
@@ -124,7 +127,32 @@ class MagazineController extends Controller
     {
         return $post->assets
             ->where('status', 'ready')
-            ->first(fn (PostAsset $asset): bool => ($asset->metadata['style'] ?? null) === 'synthwave-cypherpunk');
+            ->first(fn (PostAsset $asset): bool => ($asset->metadata['role'] ?? null) === 'header')
+            ?? $post->assets
+                ->where('status', 'ready')
+                ->first(fn (PostAsset $asset): bool => ($asset->metadata['style'] ?? null) === 'synthwave-cypherpunk');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function imagePlaceholder(Post $post, string $title, string $category): array
+    {
+        $palettes = [
+            'bitcoin' => ['accent' => '#F7931A', 'secondary' => '#26D9FF'],
+            'financial-independence' => ['accent' => '#F7931A', 'secondary' => '#FF4FD8'],
+            'self-custody' => ['accent' => '#F7931A', 'secondary' => '#42F5C8'],
+        ];
+
+        $palette = $palettes[$category] ?? $palettes['bitcoin'];
+
+        return [
+            'title' => $title,
+            'category' => $category,
+            'accent' => $palette['accent'],
+            'secondary' => $palette['secondary'],
+            'seed' => (string) $post->id,
+        ];
     }
 
     private function alternateUrl(Post $post, string $locale): ?string

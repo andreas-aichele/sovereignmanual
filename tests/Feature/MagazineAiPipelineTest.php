@@ -17,14 +17,20 @@ test('pipeline creates a published post with english and german translations', f
     $post = app(MagazineAiPipeline::class)->generatePost($topic);
     $germanTranslation = $post->translations()->where('locale', 'de')->firstOrFail();
     $asset = $post->assets()->firstOrFail();
+    $englishBlockTypes = $post->blocks()->where('locale', 'en')->pluck('type')->all();
 
     expect($post->status)->toBe(PostStatus::Published)
         ->and($post->translations()->where('locale', 'en')->exists())->toBeTrue()
         ->and($post->translations()->where('locale', 'de')->exists())->toBeTrue()
         ->and($germanTranslation->title)->toBe('Warum Bitcoin-Verwahrung wichtig ist')
         ->and($germanTranslation->slug)->toBe('warum-bitcoin-verwahrung-wichtig-ist')
+        ->and($post->blocks()->where('locale', 'en')->count())->toBeGreaterThan(1)
+        ->and($post->blocks()->where('locale', 'de')->count())->toBeGreaterThan(1)
+        ->and($englishBlockTypes)->toContain('flow_diagram')
         ->and($asset->url)->toBeNull()
-        ->and($asset->prompt)->toContain('Synthwave cypherpunk')
+        ->and($asset->metadata['role'])->toBe('header')
+        ->and($asset->metadata['reason'])->toBe('image_generation_not_configured')
+        ->and($asset->prompt)->toContain('Premium synthwave editorial header image')
         ->and($asset->prompt)->toContain('no stock-photo look')
         ->and($asset->prompt)->not->toContain('unsplash')
         ->and($post->aiRuns()->count())->toBeGreaterThanOrEqual(1)
@@ -40,8 +46,12 @@ test('pipeline fallback german titles use correct umlauts', function () {
 
     $post = app(MagazineAiPipeline::class)->generatePost($topic);
     $germanTranslation = $post->translations()->where('locale', 'de')->firstOrFail();
+    $germanInsight = $post->blocks()->where('locale', 'de')->where('type', 'insight')->firstOrFail();
 
-    expect($germanTranslation->title)->toBe('Bitcoin-Selbstverwahrung: Bedrohungsmodelle für Einsteiger');
+    expect($germanTranslation->title)->toBe('Bitcoin-Selbstverwahrung: Bedrohungsmodelle für Einsteiger')
+        ->and($germanInsight->data['title'])->toBe('Kernaussage')
+        ->and($germanTranslation->markdown)->not->toContain('Souveraene')
+        ->and($germanTranslation->markdown)->not->toContain('Unabhaengigkeit');
 });
 
 test('topic ideation creates scheduled topics', function () {

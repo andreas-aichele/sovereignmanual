@@ -28,7 +28,9 @@ test('published posts appear on the magazine index', function () {
             ->component('Magazine/Index')
             ->where('posts.data.0.title', 'Bitcoin self custody basics')
             ->where('posts.data.0.category', 'self-custody')
-            ->where('posts.data.0.category_label', 'Self custody'));
+            ->where('posts.data.0.category_label', 'Self custody')
+            ->where('posts.data.0.image_placeholder.category', 'self-custody')
+            ->where('posts.data.0.image_placeholder.accent', '#F7931A'));
 });
 
 test('newest published post leads the magazine index', function () {
@@ -75,7 +77,13 @@ test('unpublished posts are hidden from the public magazine', function () {
 });
 
 test('localized german posts render through the german route', function () {
-    $post = Post::factory()->published()->create();
+    $topic = ContentTopic::factory()->create([
+        'category' => 'bitcoin',
+    ]);
+
+    $post = Post::factory()->published()->create([
+        'content_topic_id' => $topic->id,
+    ]);
 
     PostTranslation::factory()->create([
         'post_id' => $post->id,
@@ -91,7 +99,8 @@ test('localized german posts render through the german route', function () {
             ->component('Magazine/Show')
             ->where('locale', 'de')
             ->where('post.title', 'Bitcoin Selbstverwahrung')
-            ->where('copy.back', 'Zurück ins Archiv'));
+            ->where('post.image_placeholder.category', 'bitcoin')
+            ->where('copy.back', 'Zurück zum Magazin'));
 });
 
 test('german category labels use correct umlauts', function () {
