@@ -3,18 +3,28 @@
         background:
             radial-gradient(
                 circle at 18% 0%,
-                color-mix(in oklch, var(--color-primary) 26%, transparent),
-                transparent 28rem
+                color-mix(in oklch, var(--color-primary) 10%, transparent),
+                transparent 30rem
             ),
             radial-gradient(
                 circle at 82% 12%,
-                color-mix(in oklch, var(--color-secondary) 22%, transparent),
-                transparent 26rem
+                color-mix(in oklch, var(--color-accent) 10%, transparent),
+                transparent 30rem
+            ),
+            radial-gradient(
+                circle at 50% 100%,
+                color-mix(in oklch, var(--color-info) 8%, transparent),
+                transparent 36rem
             ),
             linear-gradient(
                 180deg,
                 var(--color-base-100) 0%,
-                var(--color-base-200) 52%,
+                color-mix(
+                        in oklch,
+                        var(--color-base-100) 76%,
+                        var(--color-base-200)
+                    )
+                    58%,
                 var(--color-base-100) 100%
             );
     }
@@ -22,16 +32,16 @@
     .synthwave-hero-grid {
         background-image:
             linear-gradient(
-                color-mix(in oklch, var(--color-secondary) 18%, transparent) 1px,
+                color-mix(in oklch, var(--color-info) 8%, transparent) 1px,
                 transparent 1px
             ),
             linear-gradient(
                 90deg,
-                color-mix(in oklch, var(--color-primary) 17%, transparent) 1px,
+                color-mix(in oklch, var(--color-accent) 8%, transparent) 1px,
                 transparent 1px
             ),
             linear-gradient(
-                color-mix(in oklch, var(--color-accent) 10%, transparent) 2px,
+                color-mix(in oklch, var(--color-primary) 5%, transparent) 2px,
                 transparent 2px
             );
         background-size:
@@ -42,7 +52,7 @@
     }
 
     .article-markdown {
-        color: color-mix(in oklch, var(--color-base-content) 88%, transparent);
+        color: color-mix(in oklch, var(--color-base-content) 94%, transparent);
         font-size: 1.0625rem;
         line-height: 1.85;
     }
@@ -73,7 +83,7 @@
     }
 
     .article-markdown a {
-        color: var(--color-secondary);
+        color: var(--color-primary);
         text-decoration: underline;
         text-underline-offset: 0.2em;
     }
@@ -97,17 +107,13 @@
 
     .article-markdown blockquote {
         border-left: 2px solid var(--color-primary);
-        color: color-mix(in oklch, var(--color-base-content) 72%, transparent);
+        color: color-mix(in oklch, var(--color-base-content) 82%, transparent);
         padding-left: 1rem;
     }
 
     .article-markdown code {
-        background: color-mix(
-            in oklch,
-            var(--color-secondary) 10%,
-            transparent
-        );
-        color: var(--color-secondary);
+        background: color-mix(in oklch, var(--color-primary) 12%, transparent);
+        color: var(--color-primary);
         padding: 0.1rem 0.3rem;
     }
 }

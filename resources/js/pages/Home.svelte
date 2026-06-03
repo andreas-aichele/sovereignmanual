@@ -56,7 +56,7 @@
 <main class="synthwave-page min-h-screen text-base-content">
     <PublicNav {locale} />
 
-    <section class="relative overflow-hidden border-b border-secondary/15">
+    <section class="relative overflow-hidden border-b border-base-content/15">
         <div class="absolute inset-0 synthwave-hero-grid"></div>
         <div
             class="relative mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center px-5 py-14 md:px-8"
@@ -72,7 +72,7 @@
                 >
                     Sovereign Manual
                 </h1>
-                <p class="max-w-2xl text-lg leading-8 text-base-content/75">
+                <p class="max-w-2xl text-lg leading-8 text-base-content/85">
                     {copy.intro}
                 </p>
                 <div class="flex flex-wrap gap-3">
@@ -82,7 +82,7 @@
                     {#if featuredPost}
                         <Link
                             href={featuredPost.url}
-                            class="btn btn-outline btn-secondary"
+                            class="btn btn-outline btn-primary"
                         >
                             {copy.secondaryCta}
                         </Link>
@@ -108,13 +108,13 @@
         <div class="grid gap-4 sm:grid-cols-3">
             {#each copy.topics as topic (topic.title)}
                 <div
-                    class="card border border-secondary/15 bg-base-200/70 shadow-xl shadow-primary/5"
+                    class="card border border-base-content/15 bg-base-200/85 shadow-xl shadow-primary/5"
                 >
                     <div class="card-body gap-3 p-5">
-                        <p class="text-sm font-semibold text-secondary">
+                        <p class="text-sm font-semibold text-primary">
                             {topic.title}
                         </p>
-                        <p class="text-sm leading-6 text-base-content/65">
+                        <p class="text-sm leading-6 text-base-content/80">
                             {topic.body}
                         </p>
                     </div>
@@ -128,7 +128,7 @@
             <div class="grid gap-5 md:grid-cols-3">
                 {#each latestPosts as post (post.id)}
                     <article
-                        class="card overflow-hidden border border-secondary/15 bg-base-200/80 shadow-xl shadow-primary/5"
+                        class="card overflow-hidden border border-base-content/15 bg-base-200/85 shadow-xl shadow-primary/5"
                     >
                         <div class="card-body p-5">
                             <p class="badge badge-primary badge-sm">

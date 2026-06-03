@@ -92,17 +92,17 @@
     <PublicNav {locale} />
 
     <article>
-        <header class="border-b border-secondary/15">
+        <header class="border-b border-base-content/15">
             <div class="mx-auto w-full max-w-4xl px-5 py-12 md:px-8">
                 <div class="flex flex-col gap-5">
                     <Link
                         href={blogUrl}
-                        class="btn btn-outline btn-secondary btn-sm w-fit"
+                        class="btn btn-outline btn-primary btn-sm w-fit"
                     >
                         {copy.back}
                     </Link>
                     <div
-                        class="flex flex-wrap items-center gap-3 text-xs font-semibold text-base-content/55 uppercase"
+                        class="flex flex-wrap items-center gap-3 text-xs font-semibold text-base-content/75 uppercase"
                     >
                         <span class="badge badge-secondary badge-sm">
                             {post.audience_level}
@@ -124,7 +124,7 @@
                         {post.title}
                     </h1>
                     {#if post.excerpt}
-                        <p class="text-lg leading-8 text-base-content/70">
+                        <p class="text-lg leading-8 text-base-content/85">
                             {post.excerpt}
                         </p>
                     {/if}
@@ -138,7 +138,7 @@
                     <img
                         src={block.asset.url}
                         alt={block.asset.alt ?? post.title}
-                        class="mb-10 rounded-box border border-secondary/15"
+                        class="mb-10 rounded-box border border-base-content/15"
                     />
                 {/if}
                 <div class="article-markdown">

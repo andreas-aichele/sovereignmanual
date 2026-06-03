@@ -17,22 +17,33 @@
 </script>
 
 <header
-    class="sticky top-0 z-50 border-b border-secondary/15 bg-base-100/82 backdrop-blur-xl"
+    class="sticky top-0 z-50 border-b border-primary/35 bg-base-100/95 shadow-lg shadow-primary/10 backdrop-blur-xl"
 >
-    <div class="navbar mx-auto min-h-16 w-full max-w-7xl px-5 md:px-8">
+    <div class="navbar mx-auto min-h-20 w-full max-w-7xl px-5 md:px-8">
         <Link
             href={homeUrl}
-            class="flex min-w-0 flex-1 items-center gap-3 text-sm font-semibold"
+            class="flex min-w-0 flex-1 items-center gap-4 font-semibold"
         >
-            <img src="/logo.svg" alt="" class="size-8 shrink-0" />
             <span
-                class="truncate tracking-[0.18em] text-base-content uppercase"
+                class="flex size-11 shrink-0 items-center justify-center rounded-box border border-primary/35 bg-base-200 shadow-md shadow-primary/20"
             >
-                Sovereign Manual
+                <img src="/logo.svg" alt="" class="size-8" />
+            </span>
+            <span class="flex min-w-0 flex-col">
+                <span
+                    class="truncate text-base tracking-[0.16em] text-base-content uppercase md:text-lg"
+                >
+                    Sovereign Manual
+                </span>
+                <span
+                    class="hidden text-xs font-medium tracking-[0.22em] text-primary uppercase sm:block"
+                >
+                    Bitcoin sovereignty
+                </span>
             </span>
         </Link>
 
-        <nav class="flex items-center gap-1 text-sm">
+        <nav class="flex items-center gap-2 text-sm">
             <Link href={homeUrl} class="btn btn-ghost btn-sm">
                 {locale === 'de' ? 'Start' : 'Home'}
             </Link>
@@ -41,7 +52,7 @@
             </Link>
             <Link
                 href={alternateUrl}
-                class="btn btn-outline btn-secondary btn-sm"
+                class="btn btn-outline btn-primary btn-sm"
             >
                 {locale === 'de' ? 'English' : 'Deutsch'}
             </Link>

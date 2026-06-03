@@ -9,18 +9,18 @@
     default: false;
     prefersdark: false;
     color-scheme: 'dark';
-    --color-base-100: oklch(15% 0.09 281.288);
-    --color-base-200: oklch(20% 0.09 281.288);
-    --color-base-300: oklch(25% 0.09 281.288);
-    --color-base-content: oklch(78% 0.115 274.713);
-    --color-primary: oklch(71% 0.202 349.761);
-    --color-primary-content: oklch(28% 0.109 3.907);
-    --color-secondary: oklch(82% 0.111 230.318);
-    --color-secondary-content: oklch(29% 0.066 243.157);
-    --color-accent: oklch(75% 0.183 55.934);
-    --color-accent-content: oklch(26% 0.079 36.259);
-    --color-neutral: oklch(45% 0.24 277.023);
-    --color-neutral-content: oklch(87% 0.065 274.039);
+    --color-base-100: oklch(11% 0.07 281.288);
+    --color-base-200: oklch(16% 0.075 281.288);
+    --color-base-300: oklch(22% 0.08 281.288);
+    --color-base-content: oklch(92% 0.045 274.713);
+    --color-primary: #f7931a;
+    --color-primary-content: #1c0d00;
+    --color-secondary: #4d4d4d;
+    --color-secondary-content: #f5f5f5;
+    --color-accent: oklch(76% 0.22 326);
+    --color-accent-content: oklch(18% 0.08 326);
+    --color-neutral: #4d4d4d;
+    --color-neutral-content: #f5f5f5;
     --color-info: oklch(74% 0.16 232.661);
     --color-info-content: oklch(29% 0.066 243.157);
     --color-success: oklch(77% 0.152 181.912);
@@ -34,7 +34,7 @@
     --radius-box: 1rem;
     --size-selector: 0.28125rem;
     --size-field: 0.28125rem;
-    --border: 1px;
+    --border: 2px;
     --depth: 1;
     --noise: 1;
 }
@@ -65,15 +65,15 @@
     --color-muted: var(--color-base-300);
     --color-muted-foreground: color-mix(
         in oklch,
-        var(--color-base-content) 72%,
+        var(--color-base-content) 78%,
         transparent
     );
-    --color-accent-foreground: var(--color-secondary-content);
+    --color-accent-foreground: var(--color-accent-content);
     --color-destructive: var(--color-error);
     --color-destructive-foreground: var(--color-error-content);
     --color-border: color-mix(
         in oklch,
-        var(--color-secondary) 22%,
+        var(--color-base-content) 18%,
         transparent
     );
     --color-input: var(--color-base-300);
@@ -86,7 +86,7 @@
     --color-sidebar-accent-foreground: var(--color-base-content);
     --color-sidebar-border: color-mix(
         in oklch,
-        var(--color-secondary) 18%,
+        var(--color-base-content) 16%,
         transparent
     );
     --color-sidebar-ring: var(--color-secondary);

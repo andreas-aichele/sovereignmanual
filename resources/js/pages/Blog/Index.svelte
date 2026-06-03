@@ -66,7 +66,7 @@
 <main class="synthwave-page min-h-screen text-base-content">
     <PublicNav {locale} />
 
-    <section class="border-b border-secondary/15">
+    <section class="border-b border-base-content/15">
         <div class="mx-auto flex w-full max-w-7xl px-5 py-12 md:px-8">
             <div class="flex max-w-3xl flex-col gap-5">
                 <p
@@ -79,7 +79,7 @@
                 >
                     {copy.heading}
                 </h1>
-                <p class="max-w-2xl text-lg leading-8 text-base-content/70">
+                <p class="max-w-2xl text-lg leading-8 text-base-content/85">
                     {meta.description}
                 </p>
             </div>
@@ -89,7 +89,7 @@
     <section class="mx-auto w-full max-w-7xl px-5 py-12 md:px-8">
         {#if featuredPost}
             <article
-                class="grid gap-6 border-b border-secondary/15 pb-10 lg:grid-cols-[0.75fr_1.25fr]"
+                class="grid gap-6 border-b border-base-content/15 pb-10 lg:grid-cols-[0.75fr_1.25fr]"
             >
                 <div>
                     <p
@@ -97,7 +97,7 @@
                     >
                         {copy.featured}
                     </p>
-                    <p class="mt-3 text-sm text-base-content/55">
+                    <p class="mt-3 text-sm text-base-content/75">
                         {featuredPost.audience_level}
                     </p>
                 </div>
@@ -110,7 +110,7 @@
                     </h2>
                     {#if featuredPost.excerpt}
                         <p
-                            class="mt-5 max-w-3xl text-base leading-7 text-base-content/70"
+                            class="mt-5 max-w-3xl text-base leading-7 text-base-content/85"
                         >
                             {featuredPost.excerpt}
                         </p>
@@ -123,11 +123,11 @@
             <div class="mt-10 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {#each latestPosts as post (post.id)}
                     <article
-                        class="card overflow-hidden border border-secondary/15 bg-base-200/80 shadow-xl shadow-primary/5"
+                        class="card overflow-hidden border border-base-content/15 bg-base-200/85 shadow-xl shadow-primary/5"
                     >
                         <div class="flex min-h-64 flex-col gap-4 p-5">
                             <div
-                                class="flex items-center justify-between gap-3 text-xs text-base-content/55 uppercase"
+                                class="flex items-center justify-between gap-3 text-xs text-base-content/75 uppercase"
                             >
                                 <span class="badge badge-secondary badge-sm">
                                     {post.audience_level}
@@ -145,14 +145,14 @@
                             </h2>
                             {#if post.excerpt}
                                 <p
-                                    class="line-clamp-4 text-sm leading-6 text-base-content/65"
+                                    class="line-clamp-4 text-sm leading-6 text-base-content/80"
                                 >
                                     {post.excerpt}
                                 </p>
                             {/if}
                             <Link
                                 href={post.url}
-                                class="btn btn-outline btn-secondary btn-sm mt-auto w-fit"
+                                class="btn btn-outline btn-primary btn-sm mt-auto w-fit"
                             >
                                 {copy.read}
                             </Link>
@@ -161,8 +161,8 @@
                 {/each}
             </div>
         {:else if !featuredPost}
-            <div class="alert border-secondary/15 bg-base-200 py-6">
-                <p class="text-base-content/65">{copy.empty}</p>
+            <div class="alert border-base-content/15 bg-base-200 py-6">
+                <p class="text-base-content/80">{copy.empty}</p>
             </div>
         {/if}
     </section>
