@@ -35,6 +35,22 @@ test('public pages are not wrapped in the starterkit app layout', function () {
         ->and($contents)->not->toContain("case name === 'Welcome':");
 });
 
+test('magazine localization strings live in language files', function () {
+    $controller = file_get_contents(app_path('Http/Controllers/MagazineController.php'));
+    $englishTranslations = require lang_path('en/magazine.php');
+    $germanTranslations = require lang_path('de/magazine.php');
+
+    expect(lang_path('en/magazine.php'))->toBeReadableFile()
+        ->and(lang_path('de/magazine.php'))->toBeReadableFile()
+        ->and($englishTranslations)->toHaveKeys(['index', 'show', 'categories', 'meta', 'routes'])
+        ->and($germanTranslations)->toHaveKeys(['index', 'show', 'categories', 'meta', 'routes'])
+        ->and($controller)->not->toContain("locale === 'de'")
+        ->and($controller)->not->toContain('Zurück ins Archiv')
+        ->and($controller)->not->toContain('Back to archive')
+        ->and($controller)->not->toContain('Ausgewählte Transmission')
+        ->and($controller)->not->toContain('Featured transmission');
+});
+
 test('magazine headings can break long words', function () {
     $index = file_get_contents(resource_path('js/pages/Magazine/Index.svelte'));
     $show = file_get_contents(resource_path('js/pages/Magazine/Show.svelte'));

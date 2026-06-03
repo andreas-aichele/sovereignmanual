@@ -6,6 +6,7 @@ use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\PostAsset;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -27,15 +28,10 @@ class MagazineController extends Controller
 
         return Inertia::render('Magazine/Index', [
             'locale' => $locale,
-            'alternateLocale' => $locale === 'de' ? 'en' : 'de',
+            'alternateLocale' => $this->translation('alternate_locale', $locale),
             'posts' => $posts,
-            'copy' => $this->indexCopy($locale),
-            'meta' => [
-                'title' => 'Sovereign Manual Magazine',
-                'description' => $locale === 'de'
-                    ? 'Bitcoin, finanzielle Bildung und souveräne Unabhängigkeit.'
-                    : 'Bitcoin, financial intelligence, and sovereign independence.',
-            ],
+            'copy' => $this->translationArray('index', $locale),
+            'meta' => $this->translationArray('meta', $locale),
         ]);
     }
 
@@ -78,13 +74,11 @@ class MagazineController extends Controller
                         ] : null,
                     ]),
             ],
-            'copy' => [
-                'back' => $locale === 'de' ? 'Zurück ins Archiv' : 'Back to archive',
-            ],
+            'copy' => $this->translationArray('show', $locale),
             'meta' => [
                 'title' => $translation->meta_title ?: $translation->title,
                 'description' => $translation->meta_description ?: $translation->excerpt,
-                'canonical' => route($locale === 'de' ? 'magazine.de.show' : 'magazine.show', $translation->slug),
+                'canonical' => route($this->translation('routes.show', $locale), $translation->slug),
                 'alternate' => $this->alternateUrl($post, $locale),
             ],
         ]);
@@ -93,7 +87,6 @@ class MagazineController extends Controller
     private function serializePostSummary(Post $post, string $locale): array
     {
         $translation = $post->translation($locale);
-        $routeName = $locale === 'de' ? 'magazine.de.show' : 'magazine.show';
 
         return [
             'id' => $post->id,
@@ -106,7 +99,7 @@ class MagazineController extends Controller
             'title' => $translation?->title ?? $post->topic,
             'slug' => $translation?->slug ?? $post->slug,
             'excerpt' => $translation?->excerpt,
-            'url' => route($routeName, $translation?->slug ?? $post->slug),
+            'url' => route($this->translation('routes.show', $locale), $translation?->slug ?? $post->slug),
             'image' => $this->coverImage($post)?->url,
             'image_alt' => $this->coverImage($post)?->alt_text,
         ];
@@ -114,26 +107,14 @@ class MagazineController extends Controller
 
     private function categoryLabel(?string $category, string $locale): string
     {
-        $labels = [
-            'bitcoin' => [
-                'en' => 'Bitcoin',
-                'de' => 'Bitcoin',
-            ],
-            'financial-independence' => [
-                'en' => 'Financial independence',
-                'de' => 'Finanzielle Unabhängigkeit',
-            ],
-            'self-custody' => [
-                'en' => 'Self custody',
-                'de' => 'Selbstverwahrung',
-            ],
-        ];
+        $category ??= 'bitcoin';
+        $translationKey = "magazine.categories.{$category}";
 
-        if ($category !== null && isset($labels[$category][$locale])) {
-            return $labels[$category][$locale];
+        if (Lang::has($translationKey, $locale, false)) {
+            return $this->translation("categories.{$category}", $locale);
         }
 
-        return Str::of($category ?? 'bitcoin')
+        return Str::of($category)
             ->replace('-', ' ')
             ->title()
             ->toString();
@@ -148,14 +129,14 @@ class MagazineController extends Controller
 
     private function alternateUrl(Post $post, string $locale): ?string
     {
-        $alternateLocale = $locale === 'de' ? 'en' : 'de';
+        $alternateLocale = $this->translation('alternate_locale', $locale);
         $translation = $post->translation($alternateLocale);
 
         if ($translation === null) {
             return null;
         }
 
-        return route($alternateLocale === 'de' ? 'magazine.de.show' : 'magazine.show', $translation->slug);
+        return route($this->translation('routes.show', $alternateLocale), $translation->slug);
     }
 
     private function renderMarkdown(?string $markdown): string
@@ -168,27 +149,19 @@ class MagazineController extends Controller
             ->toString();
     }
 
+    private function translation(string $key, string $locale): string
+    {
+        return (string) Lang::get("magazine.{$key}", [], $locale);
+    }
+
     /**
      * @return array<string, string>
      */
-    private function indexCopy(string $locale): array
+    private function translationArray(string $key, string $locale): array
     {
-        if ($locale === 'de') {
-            return [
-                'eyebrow' => 'Archiv // Research Notes',
-                'heading' => 'Sovereign Manual Magazine',
-                'featured' => 'Ausgewählte Transmission',
-                'read' => 'Artikel lesen',
-                'empty' => 'Noch keine veröffentlichten Artikel.',
-            ];
-        }
+        /** @var array<string, string> $translation */
+        $translation = Lang::get("magazine.{$key}", [], $locale);
 
-        return [
-            'eyebrow' => 'Archive // Research notes',
-            'heading' => 'Sovereign Manual Magazine',
-            'featured' => 'Featured transmission',
-            'read' => 'Read article',
-            'empty' => 'No published articles yet.',
-        ];
+        return $translation;
     }
 }
