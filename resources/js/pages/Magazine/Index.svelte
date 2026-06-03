@@ -2,10 +2,10 @@
     import { Link } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import PublicNav from '@/components/PublicNav.svelte';
-    import { index as blogIndex } from '@/routes/blog';
-    import { index as germanBlogIndex } from '@/routes/blog/de';
+    import { index as magazineIndex } from '@/routes/magazine';
+    import { index as germanMagazineIndex } from '@/routes/magazine/de';
 
-    type BlogPost = {
+    type MagazinePost = {
         id: number;
         title: string;
         excerpt: string | null;
@@ -20,13 +20,13 @@
     };
 
     type PaginatedPosts = {
-        data: BlogPost[];
+        data: MagazinePost[];
     };
 
     type CategorySection = {
         key: string;
         label: string;
-        posts: BlogPost[];
+        posts: MagazinePost[];
     };
 
     let {
@@ -51,17 +51,17 @@
         };
     } = $props();
 
-    const blogUrl = $derived(
-        locale === 'de' ? germanBlogIndex.url() : blogIndex.url(),
+    const magazineUrl = $derived(
+        locale === 'de' ? germanMagazineIndex.url() : magazineIndex.url(),
     );
     const alternateUrl = $derived(
-        locale === 'de' ? blogIndex.url() : germanBlogIndex.url(),
+        locale === 'de' ? magazineIndex.url() : germanMagazineIndex.url(),
     );
     const featuredPost = $derived(posts.data[0] ?? null);
     const latestPosts = $derived(posts.data.slice(1));
     const categorySections = $derived(groupPostsByCategory(latestPosts));
 
-    function groupPostsByCategory(posts: BlogPost[]): CategorySection[] {
+    function groupPostsByCategory(posts: MagazinePost[]): CategorySection[] {
         const sections = new Map<string, CategorySection>();
 
         for (const post of posts) {
@@ -90,7 +90,7 @@
 
 <AppHead title={meta.title}>
     <meta name="description" content={meta.description} />
-    <link rel="canonical" href={blogUrl} />
+    <link rel="canonical" href={magazineUrl} />
     <link
         rel="alternate"
         hreflang={locale === 'de' ? 'en' : 'de'}
@@ -106,7 +106,9 @@
             <article
                 class={`grid overflow-hidden rounded-box border border-primary/35 bg-base-200/90 shadow-2xl shadow-primary/10 ${featuredPost.image ? 'lg:grid-cols-[1.2fr_0.8fr]' : ''}`}
             >
-                <div class="flex min-h-[28rem] flex-col justify-end gap-6 p-6 md:p-10">
+                <div
+                    class="flex min-h-[28rem] flex-col justify-end gap-6 p-6 md:p-10"
+                >
                     <div class="flex flex-wrap items-center gap-3">
                         <span class="badge badge-primary badge-lg">
                             {copy.featured}
@@ -197,7 +199,9 @@
                                             class="aspect-[16/9] w-full object-cover"
                                         />
                                     {/if}
-                                    <div class="flex min-h-64 flex-col gap-4 p-5">
+                                    <div
+                                        class="flex min-h-64 flex-col gap-4 p-5"
+                                    >
                                         <div
                                             class="flex items-center justify-between gap-3 text-xs text-base-content/75 uppercase"
                                         >
@@ -207,8 +211,12 @@
                                                 {post.audience_level}
                                             </span>
                                             {#if formatDate(post.published_at)}
-                                                <time datetime={post.published_at}>
-                                                    {formatDate(post.published_at)}
+                                                <time
+                                                    datetime={post.published_at}
+                                                >
+                                                    {formatDate(
+                                                        post.published_at,
+                                                    )}
                                                 </time>
                                             {/if}
                                         </div>

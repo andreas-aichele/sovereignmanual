@@ -2,19 +2,19 @@
 
 namespace App\Console\Commands;
 
-use App\Services\BlogAiPipeline;
+use App\Services\MagazineAiPipeline;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
-#[Signature('app:ideate-blog-topics {--count=1 : Number of topic ideas to create}')]
-#[Description('Create AI-generated blog topic ideas for scheduled publication')]
-class IdeateBlogTopics extends Command
+#[Signature('app:ideate-magazine-topics {--count=1 : Number of topic ideas to create}')]
+#[Description('Create AI-generated magazine topic ideas for scheduled publication')]
+class IdeateMagazineTopics extends Command
 {
     /**
      * Execute the console command.
      */
-    public function handle(BlogAiPipeline $pipeline): int
+    public function handle(MagazineAiPipeline $pipeline): int
     {
         $topics = $pipeline->createTopicIdeas((int) $this->option('count'));
 

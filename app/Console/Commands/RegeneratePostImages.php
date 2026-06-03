@@ -3,7 +3,7 @@
 namespace App\Console\Commands;
 
 use App\Models\Post;
-use App\Services\BlogAiPipeline;
+use App\Services\MagazineAiPipeline;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
@@ -15,7 +15,7 @@ class RegeneratePostImages extends Command
     /**
      * Execute the console command.
      */
-    public function handle(BlogAiPipeline $pipeline): int
+    public function handle(MagazineAiPipeline $pipeline): int
     {
         $posts = Post::query()
             ->with(['assets', 'contentTopic'])

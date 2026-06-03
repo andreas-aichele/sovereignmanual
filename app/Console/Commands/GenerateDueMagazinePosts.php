@@ -9,9 +9,9 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
-#[Signature('app:generate-due-blog-posts')]
-#[Description('Queue AI generation for due blog topics.')]
-class GenerateDueBlogPosts extends Command
+#[Signature('app:generate-due-magazine-posts')]
+#[Description('Queue AI generation for due magazine topics.')]
+class GenerateDueMagazinePosts extends Command
 {
     public function handle(): int
     {

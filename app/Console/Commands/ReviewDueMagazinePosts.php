@@ -9,9 +9,9 @@ use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 
-#[Signature('app:review-due-blog-posts')]
-#[Description('Queue AI freshness reviews for published blog posts.')]
-class ReviewDueBlogPosts extends Command
+#[Signature('app:review-due-magazine-posts')]
+#[Description('Queue AI freshness reviews for published magazine posts.')]
+class ReviewDueMagazinePosts extends Command
 {
     public function handle(): int
     {

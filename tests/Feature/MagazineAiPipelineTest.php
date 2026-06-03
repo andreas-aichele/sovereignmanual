@@ -5,7 +5,7 @@ use App\Enums\PostStatus;
 use App\Jobs\GeneratePostFromTopic;
 use App\Models\ContentTopic;
 use App\Models\Post;
-use App\Services\BlogAiPipeline;
+use App\Services\MagazineAiPipeline;
 use Illuminate\Support\Facades\Queue;
 
 test('pipeline creates a published post with english and german translations', function () {
@@ -15,7 +15,7 @@ test('pipeline creates a published post with english and german translations', f
         'title' => 'Why Bitcoin custody matters',
     ]);
 
-    $post = app(BlogAiPipeline::class)->generatePost($topic);
+    $post = app(MagazineAiPipeline::class)->generatePost($topic);
     $germanTranslation = $post->translations()->where('locale', 'de')->firstOrFail();
     $asset = $post->assets()->firstOrFail();
 
@@ -35,7 +35,7 @@ test('pipeline creates a published post with english and german translations', f
 test('topic ideation creates scheduled topics', function () {
     config(['ai.providers.gemini.key' => null]);
 
-    $this->artisan('app:ideate-blog-topics --count=2')->assertSuccessful();
+    $this->artisan('app:ideate-magazine-topics --count=2')->assertSuccessful();
 
     expect(ContentTopic::query()->count())->toBe(2)
         ->and(ContentTopic::query()->where('status', ContentTopicStatus::Scheduled)->count())->toBe(2);
@@ -46,7 +46,7 @@ test('generation command queues due topics', function () {
 
     $topic = ContentTopic::factory()->due()->create();
 
-    $this->artisan('app:generate-due-blog-posts')->assertSuccessful();
+    $this->artisan('app:generate-due-magazine-posts')->assertSuccessful();
 
     Queue::assertPushed(GeneratePostFromTopic::class, fn (GeneratePostFromTopic $job): bool => $job->topic->is($topic));
 });
@@ -56,7 +56,7 @@ test('freshness review updates the next review date', function () {
         'next_review_at' => now()->subDay(),
     ]);
 
-    app(BlogAiPipeline::class)->refreshPost($post);
+    app(MagazineAiPipeline::class)->refreshPost($post);
 
     expect($post->refresh()->next_review_at->isFuture())->toBeTrue();
 });

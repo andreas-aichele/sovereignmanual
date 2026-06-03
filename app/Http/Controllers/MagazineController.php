@@ -10,7 +10,7 @@ use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
-class BlogController extends Controller
+class MagazineController extends Controller
 {
     public function index(Request $request, ?string $locale = null): Response
     {
@@ -25,7 +25,7 @@ class BlogController extends Controller
             ->paginate(12)
             ->through(fn (Post $post): array => $this->serializePostSummary($post, $locale));
 
-        return Inertia::render('Blog/Index', [
+        return Inertia::render('Magazine/Index', [
             'locale' => $locale,
             'alternateLocale' => $locale === 'de' ? 'en' : 'de',
             'posts' => $posts,
@@ -57,7 +57,7 @@ class BlogController extends Controller
 
         abort_if($translation === null, 404);
 
-        return Inertia::render('Blog/Show', [
+        return Inertia::render('Magazine/Show', [
             'locale' => $locale,
             'post' => [
                 ...$this->serializePostSummary($post, $locale),
@@ -85,7 +85,7 @@ class BlogController extends Controller
             'meta' => [
                 'title' => $translation->meta_title ?: $translation->title,
                 'description' => $translation->meta_description ?: $translation->excerpt,
-                'canonical' => route($locale === 'de' ? 'blog.de.show' : 'blog.show', $translation->slug),
+                'canonical' => route($locale === 'de' ? 'magazine.de.show' : 'magazine.show', $translation->slug),
                 'alternate' => $this->alternateUrl($post, $locale),
             ],
         ]);
@@ -94,7 +94,7 @@ class BlogController extends Controller
     private function serializePostSummary(Post $post, string $locale): array
     {
         $translation = $post->translation($locale);
-        $routeName = $locale === 'de' ? 'blog.de.show' : 'blog.show';
+        $routeName = $locale === 'de' ? 'magazine.de.show' : 'magazine.show';
 
         return [
             'id' => $post->id,
@@ -157,7 +157,7 @@ class BlogController extends Controller
             return null;
         }
 
-        return route($alternateLocale === 'de' ? 'blog.de.show' : 'blog.show', $translation->slug);
+        return route($alternateLocale === 'de' ? 'magazine.de.show' : 'magazine.show', $translation->slug);
     }
 
     private function renderMarkdown(?string $markdown): string

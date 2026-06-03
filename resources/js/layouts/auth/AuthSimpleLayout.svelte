@@ -2,7 +2,7 @@
     import { Link } from '@inertiajs/svelte';
     import type { Snippet } from 'svelte';
     import AppLogoIcon from '@/components/AppLogoIcon.svelte';
-    import { index as blogIndex } from '@/routes/blog';
+    import { index as magazineIndex } from '@/routes/magazine';
 
     let {
         title = '',
@@ -22,7 +22,7 @@
         <div class="flex flex-col gap-8">
             <div class="flex flex-col items-center gap-4">
                 <Link
-                    href={blogIndex()}
+                    href={magazineIndex()}
                     class="flex flex-col items-center gap-2 font-medium"
                 >
                     <div

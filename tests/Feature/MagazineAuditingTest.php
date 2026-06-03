@@ -4,7 +4,7 @@ use App\Models\ContentTopic;
 use App\Models\Post;
 use OwenIt\Auditing\Models\Audit;
 
-test('blog models record audit entries', function () {
+test('magazine models record audit entries', function () {
     config(['audit.enabled' => true]);
     config(['audit.console' => true]);
 

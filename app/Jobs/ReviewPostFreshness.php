@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\Post;
-use App\Services\BlogAiPipeline;
+use App\Services\MagazineAiPipeline;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
@@ -24,7 +24,7 @@ class ReviewPostFreshness implements ShouldQueue
         return [(new WithoutOverlapping('post-freshness-'.$this->post->id))->expireAfter(1800)];
     }
 
-    public function handle(BlogAiPipeline $pipeline): void
+    public function handle(MagazineAiPipeline $pipeline): void
     {
         $pipeline->refreshPost($this->post);
     }

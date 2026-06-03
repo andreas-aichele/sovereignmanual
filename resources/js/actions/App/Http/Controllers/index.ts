@@ -1,8 +1,8 @@
-import BlogController from './BlogController'
+import MagazineController from './MagazineController'
 import Settings from './Settings'
 
 const Controllers = {
-    BlogController: Object.assign(BlogController, BlogController),
+    MagazineController: Object.assign(MagazineController, MagazineController),
     Settings: Object.assign(Settings, Settings),
 }
 

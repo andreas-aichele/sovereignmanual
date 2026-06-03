@@ -5,7 +5,7 @@ use App\Models\Post;
 use App\Models\PostTranslation;
 use Inertia\Testing\AssertableInertia;
 
-test('published posts appear on the blog index', function () {
+test('published posts appear on the magazine index', function () {
     $topic = ContentTopic::factory()->create([
         'category' => 'self-custody',
     ]);
@@ -22,10 +22,10 @@ test('published posts appear on the blog index', function () {
         'slug' => 'bitcoin-self-custody-basics',
     ]);
 
-    $this->get(route('blog.index'))
+    $this->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('Blog/Index')
+            ->component('Magazine/Index')
             ->where('posts.data.0.title', 'Bitcoin self custody basics')
             ->where('posts.data.0.category', 'self-custody')
             ->where('posts.data.0.category_label', 'Self custody'));
@@ -53,15 +53,15 @@ test('newest published post leads the magazine index', function () {
         'slug' => 'newest-article',
     ]);
 
-    $this->get(route('blog.index'))
+    $this->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('Blog/Index')
+            ->component('Magazine/Index')
             ->where('posts.data.0.title', 'Newest article')
             ->where('posts.data.1.title', 'Older article'));
 });
 
-test('unpublished posts are hidden from the public blog', function () {
+test('unpublished posts are hidden from the public magazine', function () {
     $post = Post::factory()->create();
 
     PostTranslation::factory()->create([
@@ -71,7 +71,7 @@ test('unpublished posts are hidden from the public blog', function () {
         'slug' => 'hidden-draft',
     ]);
 
-    $this->get(route('blog.show', 'hidden-draft'))->assertNotFound();
+    $this->get(route('magazine.show', 'hidden-draft'))->assertNotFound();
 });
 
 test('localized german posts render through the german route', function () {
@@ -85,10 +85,10 @@ test('localized german posts render through the german route', function () {
         'markdown' => '# Bitcoin Selbstverwahrung',
     ]);
 
-    $this->get(route('blog.de.show', 'bitcoin-selbstverwahrung'))
+    $this->get(route('magazine.de.show', 'bitcoin-selbstverwahrung'))
         ->assertSuccessful()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('Blog/Show')
+            ->component('Magazine/Show')
             ->where('locale', 'de')
             ->where('post.title', 'Bitcoin Selbstverwahrung'));
 });
@@ -104,10 +104,10 @@ test('markdown is rendered to sanitized html for articles', function () {
         'markdown' => "# Markdown Rendering\n\nA **strong** point.\n\n- first\n- second\n\n<script>alert('x')</script>",
     ]);
 
-    $this->get(route('blog.show', 'markdown-rendering'))
+    $this->get(route('magazine.show', 'markdown-rendering'))
         ->assertSuccessful()
         ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('Blog/Show')
+            ->component('Magazine/Show')
             ->where('post.html', fn (string $html): bool => str_contains($html, '<h1>Markdown Rendering</h1>')
                 && str_contains($html, '<strong>strong</strong>')
                 && str_contains($html, '<li>first</li>')

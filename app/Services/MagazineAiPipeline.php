@@ -17,7 +17,7 @@ use Throwable;
 
 use function Laravel\Ai\agent;
 
-class BlogAiPipeline
+class MagazineAiPipeline
 {
     public function generatePost(ContentTopic $topic): Post
     {
@@ -45,7 +45,7 @@ class BlogAiPipeline
             'primary_language' => $topic->primary_language,
             'published_at' => $review['publish'] ? now() : null,
             'scheduled_for' => $topic->scheduled_for,
-            'next_review_at' => now()->addDays(config('blog_ai.default_review_interval_days')),
+            'next_review_at' => now()->addDays(config('magazine_ai.default_review_interval_days', 365)),
             'last_reviewed_at' => now(),
             'review_score' => $review['score'],
             'review_summary' => $review,
@@ -53,8 +53,8 @@ class BlogAiPipeline
                 'keywords' => ['bitcoin', 'financial intelligence', 'self custody'],
             ],
             'ai_metadata' => [
-                'provider' => config('blog_ai.provider'),
-                'model' => config('blog_ai.text_model'),
+                'provider' => config('magazine_ai.provider', 'gemini'),
+                'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
                 'auto_generated' => true,
             ],
         ]);
@@ -177,7 +177,7 @@ class BlogAiPipeline
 
         $post->update([
             'last_reviewed_at' => now(),
-            'next_review_at' => now()->addDays(config('blog_ai.default_review_interval_days')),
+            'next_review_at' => now()->addDays(config('magazine_ai.default_review_interval_days', 365)),
             'review_summary' => $review,
             'review_score' => $review['score'],
         ]);
@@ -206,13 +206,13 @@ class BlogAiPipeline
 
     private function promptWithFallback(string $instructions, string $prompt, string $fallback): string
     {
-        if (! config('ai.providers.'.config('blog_ai.provider').'.key')) {
+        if (! config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key')) {
             return $fallback;
         }
 
         try {
             return (string) agent($instructions)
-                ->prompt($prompt, provider: config('blog_ai.provider'), model: config('blog_ai.text_model'));
+                ->prompt($prompt, provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.text_model', 'gemini-2.5-flash'));
         } catch (Throwable) {
             return $fallback;
         }
@@ -227,7 +227,7 @@ class BlogAiPipeline
 
         return [
             'score' => $score,
-            'publish' => $score >= config('blog_ai.auto_publish_minimum_score'),
+            'publish' => $score >= config('magazine_ai.auto_publish_minimum_score', 85),
             'accuracy_risk' => 'medium',
             'clarity' => 'good',
             'financial_safety_risk' => 'low',
@@ -239,19 +239,19 @@ class BlogAiPipeline
     private function generatePostImage(Post $post, ContentTopic $topic): void
     {
         $prompt = $this->synthwaveImagePrompt($topic);
-        $run = $this->startRun(AiRunType::Image, $topic, $post, config('blog_ai.image_model'));
+        $run = $this->startRun(AiRunType::Image, $topic, $post, config('magazine_ai.image_model', 'gemini-2.5-flash-image'));
         $metadata = [
             'style' => 'synthwave-cypherpunk',
             'prompt_version' => 1,
             'no_unsplash' => true,
         ];
 
-        if (! config('ai.providers.'.config('blog_ai.provider').'.key')) {
+        if (! config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key')) {
             $post->assets()->create([
                 'type' => 'image',
                 'locale' => 'en',
-                'provider' => config('blog_ai.provider'),
-                'model' => config('blog_ai.image_model'),
+                'provider' => config('magazine_ai.provider', 'gemini'),
+                'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
                 'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty cover for {$topic->title}",
                 'status' => 'pending',
@@ -267,7 +267,7 @@ class BlogAiPipeline
             $image = Image::of($prompt)
                 ->landscape()
                 ->quality('medium')
-                ->generate(provider: config('blog_ai.provider'), model: config('blog_ai.image_model'));
+                ->generate(provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.image_model', 'gemini-2.5-flash-image'));
 
             $path = $image->storePubliclyAs("post-assets/{$post->id}", "{$post->slug}.png", 'public');
 
@@ -277,8 +277,8 @@ class BlogAiPipeline
                 'path' => $path,
                 'url' => is_string($path) ? Storage::disk('public')->url($path) : null,
                 'locale' => 'en',
-                'provider' => config('blog_ai.provider'),
-                'model' => config('blog_ai.image_model'),
+                'provider' => config('magazine_ai.provider', 'gemini'),
+                'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
                 'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty cover for {$topic->title}",
                 'status' => is_string($path) ? 'ready' : 'pending',
@@ -290,8 +290,8 @@ class BlogAiPipeline
             $post->assets()->create([
                 'type' => 'image',
                 'locale' => 'en',
-                'provider' => config('blog_ai.provider'),
-                'model' => config('blog_ai.image_model'),
+                'provider' => config('magazine_ai.provider', 'gemini'),
+                'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
                 'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty cover for {$topic->title}",
                 'status' => 'pending',
@@ -314,8 +314,8 @@ class BlogAiPipeline
             'post_id' => $post?->id,
             'type' => $type,
             'status' => AiRunStatus::Running,
-            'provider' => config('blog_ai.provider'),
-            'model' => $model ?? config('blog_ai.text_model'),
+            'provider' => config('magazine_ai.provider', 'gemini'),
+            'model' => $model ?? config('magazine_ai.text_model', 'gemini-2.5-flash'),
             'started_at' => now(),
         ]);
     }

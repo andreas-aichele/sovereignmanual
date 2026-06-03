@@ -4,7 +4,7 @@ namespace App\Filament\Resources\Posts\Tables;
 
 use App\Enums\PostStatus;
 use App\Models\Post;
-use App\Services\BlogAiPipeline;
+use App\Services\MagazineAiPipeline;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -48,7 +48,7 @@ class PostsTable
                         'published_at' => null,
                     ])),
                 Action::make('review freshness')
-                    ->action(fn (Post $record, BlogAiPipeline $pipeline) => $pipeline->refreshPost($record)),
+                    ->action(fn (Post $record, MagazineAiPipeline $pipeline) => $pipeline->refreshPost($record)),
                 EditAction::make(),
             ])
             ->toolbarActions([

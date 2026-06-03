@@ -1,14 +1,12 @@
 <?php
 
-use App\Http\Controllers\BlogController;
+use App\Http\Controllers\MagazineController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', [BlogController::class, 'index'])->name('blog.index');
-Route::get('/de', [BlogController::class, 'index'])->defaults('locale', 'de')->name('blog.de.index');
-Route::redirect('blog', '/');
-Route::redirect('de/blog', '/de');
-Route::get('blog/{slug}', [BlogController::class, 'show'])->name('blog.show');
-Route::get('de/blog/{slug}', [BlogController::class, 'show'])->defaults('locale', 'de')->name('blog.de.show');
+Route::get('/', [MagazineController::class, 'index'])->name('magazine.index');
+Route::get('/de', [MagazineController::class, 'index'])->defaults('locale', 'de')->name('magazine.de.index');
+Route::get('magazine/{slug}', [MagazineController::class, 'show'])->name('magazine.show');
+Route::get('de/magazine/{slug}', [MagazineController::class, 'show'])->defaults('locale', 'de')->name('magazine.de.show');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::inertia('dashboard', 'Dashboard')->name('dashboard');

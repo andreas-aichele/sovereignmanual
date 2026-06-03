@@ -2,10 +2,10 @@
     import { Link } from '@inertiajs/svelte';
     import AppHead from '@/components/AppHead.svelte';
     import PublicNav from '@/components/PublicNav.svelte';
-    import { index as blogIndex } from '@/routes/blog';
-    import { index as germanBlogIndex } from '@/routes/blog/de';
+    import { index as magazineIndex } from '@/routes/magazine';
+    import { index as germanMagazineIndex } from '@/routes/magazine/de';
 
-    type BlogBlock = {
+    type MagazineBlock = {
         id: number;
         type: string;
         markdown: string | null;
@@ -17,7 +17,7 @@
         } | null;
     };
 
-    type BlogPost = {
+    type MagazinePost = {
         title: string;
         excerpt: string | null;
         image: string | null;
@@ -27,7 +27,7 @@
         next_review_at: string | null;
         markdown: string;
         html: string;
-        blocks: BlogBlock[];
+        blocks: MagazineBlock[];
     };
 
     let {
@@ -37,7 +37,7 @@
         meta,
     }: {
         locale: string;
-        post: BlogPost;
+        post: MagazinePost;
         copy: {
             back: string;
             freshness: string;
@@ -50,8 +50,8 @@
         };
     } = $props();
 
-    const blogUrl = $derived(
-        locale === 'de' ? germanBlogIndex.url() : blogIndex.url(),
+    const magazineUrl = $derived(
+        locale === 'de' ? germanMagazineIndex.url() : magazineIndex.url(),
     );
     const blocks = $derived(
         post.blocks.length > 0
@@ -96,7 +96,7 @@
             <div class="mx-auto w-full max-w-4xl px-5 py-12 md:px-8">
                 <div class="flex flex-col gap-5">
                     <Link
-                        href={blogUrl}
+                        href={magazineUrl}
                         class="btn btn-outline btn-primary btn-sm w-fit"
                     >
                         {copy.back}
