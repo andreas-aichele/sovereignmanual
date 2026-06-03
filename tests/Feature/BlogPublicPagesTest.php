@@ -1,11 +1,17 @@
 <?php
 
+use App\Models\ContentTopic;
 use App\Models\Post;
 use App\Models\PostTranslation;
 use Inertia\Testing\AssertableInertia;
 
 test('published posts appear on the blog index', function () {
+    $topic = ContentTopic::factory()->create([
+        'category' => 'self-custody',
+    ]);
+
     $post = Post::factory()->published()->create([
+        'content_topic_id' => $topic->id,
         'topic' => 'Bitcoin self custody basics',
     ]);
 
@@ -20,7 +26,39 @@ test('published posts appear on the blog index', function () {
         ->assertSuccessful()
         ->assertInertia(fn (AssertableInertia $page) => $page
             ->component('Blog/Index')
-            ->where('posts.data.0.title', 'Bitcoin self custody basics'));
+            ->where('posts.data.0.title', 'Bitcoin self custody basics')
+            ->where('posts.data.0.category', 'self-custody')
+            ->where('posts.data.0.category_label', 'Self custody'));
+});
+
+test('newest published post leads the magazine index', function () {
+    $olderPost = Post::factory()->published()->create([
+        'published_at' => now()->subDays(2),
+    ]);
+    $newerPost = Post::factory()->published()->create([
+        'published_at' => now()->subHour(),
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $olderPost->id,
+        'locale' => 'en',
+        'title' => 'Older article',
+        'slug' => 'older-article',
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $newerPost->id,
+        'locale' => 'en',
+        'title' => 'Newest article',
+        'slug' => 'newest-article',
+    ]);
+
+    $this->get(route('blog.index'))
+        ->assertSuccessful()
+        ->assertInertia(fn (AssertableInertia $page) => $page
+            ->component('Blog/Index')
+            ->where('posts.data.0.title', 'Newest article')
+            ->where('posts.data.1.title', 'Older article'));
 });
 
 test('unpublished posts are hidden from the public blog', function () {

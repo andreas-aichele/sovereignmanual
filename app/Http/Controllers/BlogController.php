@@ -17,7 +17,7 @@ class BlogController extends Controller
         $locale ??= 'en';
 
         $posts = Post::query()
-            ->with(['translations', 'assets'])
+            ->with(['contentTopic', 'translations', 'assets'])
             ->where('status', PostStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())
@@ -31,7 +31,7 @@ class BlogController extends Controller
             'posts' => $posts,
             'copy' => $this->indexCopy($locale),
             'meta' => [
-                'title' => 'Sovereign Manual Blog',
+                'title' => 'Sovereign Manual Magazine',
                 'description' => $locale === 'de'
                     ? 'Bitcoin, finanzielle Bildung und souveräne Unabhängigkeit.'
                     : 'Bitcoin, financial intelligence, and sovereign independence.',
@@ -101,6 +101,8 @@ class BlogController extends Controller
             'topic' => $post->topic,
             'status' => $post->status->value,
             'audience_level' => $post->audience_level,
+            'category' => $post->contentTopic?->category ?? 'bitcoin',
+            'category_label' => $this->categoryLabel($post->contentTopic?->category, $locale),
             'published_at' => $post->published_at?->toAtomString(),
             'next_review_at' => $post->next_review_at?->toDateString(),
             'title' => $translation?->title ?? $post->topic,
@@ -110,6 +112,33 @@ class BlogController extends Controller
             'image' => $this->coverImage($post)?->url,
             'image_alt' => $this->coverImage($post)?->alt_text,
         ];
+    }
+
+    private function categoryLabel(?string $category, string $locale): string
+    {
+        $labels = [
+            'bitcoin' => [
+                'en' => 'Bitcoin',
+                'de' => 'Bitcoin',
+            ],
+            'financial-independence' => [
+                'en' => 'Financial independence',
+                'de' => 'Finanzielle Unabhaengigkeit',
+            ],
+            'self-custody' => [
+                'en' => 'Self custody',
+                'de' => 'Selbstverwahrung',
+            ],
+        ];
+
+        if ($category !== null && isset($labels[$category][$locale])) {
+            return $labels[$category][$locale];
+        }
+
+        return Str::of($category ?? 'bitcoin')
+            ->replace('-', ' ')
+            ->title()
+            ->toString();
     }
 
     private function coverImage(Post $post): ?PostAsset
@@ -149,7 +178,7 @@ class BlogController extends Controller
         if ($locale === 'de') {
             return [
                 'eyebrow' => 'Archiv // Research Notes',
-                'heading' => 'Sovereign Manual Blog',
+                'heading' => 'Sovereign Manual Magazine',
                 'featured' => 'Ausgewaehlte Transmission',
                 'read' => 'Artikel lesen',
                 'empty' => 'Noch keine veroeffentlichten Artikel.',
@@ -158,7 +187,7 @@ class BlogController extends Controller
 
         return [
             'eyebrow' => 'Archive // Research notes',
-            'heading' => 'Sovereign Manual Blog',
+            'heading' => 'Sovereign Manual Magazine',
             'featured' => 'Featured transmission',
             'read' => 'Read article',
             'empty' => 'No published articles yet.',

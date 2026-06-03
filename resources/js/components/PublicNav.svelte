@@ -1,13 +1,10 @@
 <script lang="ts">
     import { Link } from '@inertiajs/svelte';
-    import { home } from '@/routes';
     import { index as blogIndex } from '@/routes/blog';
     import { index as germanBlogIndex } from '@/routes/blog/de';
-    import { de as germanHome } from '@/routes/home';
 
     let { locale = 'en' }: { locale?: string } = $props();
 
-    const homeUrl = $derived(locale === 'de' ? germanHome.url() : home.url());
     const blogUrl = $derived(
         locale === 'de' ? germanBlogIndex.url() : blogIndex.url(),
     );
@@ -21,7 +18,7 @@
 >
     <div class="navbar mx-auto min-h-20 w-full max-w-7xl px-5 md:px-8">
         <Link
-            href={homeUrl}
+            href={blogUrl}
             class="flex min-w-0 flex-1 items-center gap-4 font-semibold"
         >
             <span
@@ -44,12 +41,6 @@
         </Link>
 
         <nav class="flex items-center gap-2 text-sm">
-            <Link href={homeUrl} class="btn btn-ghost btn-sm">
-                {locale === 'de' ? 'Start' : 'Home'}
-            </Link>
-            <Link href={blogUrl} class="btn btn-ghost btn-sm">
-                {locale === 'de' ? 'Blog' : 'Blog'}
-            </Link>
             <Link
                 href={alternateUrl}
                 class="btn btn-outline btn-primary btn-sm"
