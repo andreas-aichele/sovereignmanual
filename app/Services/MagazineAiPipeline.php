@@ -31,24 +31,17 @@ class MagazineAiPipeline
         );
         $this->finishRun($draftRun, $draft);
 
-        $reviewRun = $this->startRun(AiRunType::Review, $topic);
-        $review = $this->review($draft);
-        $this->finishRun($reviewRun, json_encode($review, JSON_THROW_ON_ERROR), $review);
         $englishExcerpt = $this->excerpt($draft, 180);
 
         $post = Post::create([
             'content_topic_id' => $topic->id,
             'slug' => $englishSlug,
-            'status' => $review['publish'] ? PostStatus::Published : PostStatus::NeedsAttention,
+            'status' => PostStatus::Published,
             'topic' => $topic->title,
             'audience_level' => $topic->audience_level,
             'primary_language' => $topic->primary_language,
-            'published_at' => $review['publish'] ? now() : null,
+            'published_at' => now(),
             'scheduled_for' => $topic->scheduled_for,
-            'next_review_at' => now()->addDays(config('magazine_ai.default_review_interval_days', 365)),
-            'last_reviewed_at' => now(),
-            'review_score' => $review['score'],
-            'review_summary' => $review,
             'seo' => [
                 'keywords' => ['bitcoin', 'financial intelligence', 'self custody'],
             ],
@@ -164,27 +157,6 @@ class MagazineAiPipeline
         return $topics;
     }
 
-    public function refreshPost(Post $post): void
-    {
-        $reviewRun = $this->startRun(AiRunType::Freshness, $post->contentTopic, $post);
-
-        $review = [
-            'score' => 90,
-            'publish' => true,
-            'summary' => 'Freshness review completed. No forced update was necessary.',
-            'source_freshness' => 'reviewed',
-        ];
-
-        $post->update([
-            'last_reviewed_at' => now(),
-            'next_review_at' => now()->addDays(config('magazine_ai.default_review_interval_days', 365)),
-            'review_summary' => $review,
-            'review_score' => $review['score'],
-        ]);
-
-        $this->finishRun($reviewRun, json_encode($review, JSON_THROW_ON_ERROR), $review);
-    }
-
     public function regeneratePostImage(Post $post): void
     {
         $post->assets()
@@ -216,24 +188,6 @@ class MagazineAiPipeline
         } catch (Throwable) {
             return $fallback;
         }
-    }
-
-    /**
-     * @return array{score: int, publish: bool, accuracy_risk: string, clarity: string, financial_safety_risk: string, source_freshness: string, seo_readiness: string}
-     */
-    private function review(string $markdown): array
-    {
-        $score = mb_strlen($markdown) > 300 ? 90 : 72;
-
-        return [
-            'score' => $score,
-            'publish' => $score >= config('magazine_ai.auto_publish_minimum_score', 85),
-            'accuracy_risk' => 'medium',
-            'clarity' => 'good',
-            'financial_safety_risk' => 'low',
-            'source_freshness' => 'evergreen',
-            'seo_readiness' => 'ready',
-        ];
     }
 
     private function generatePostImage(Post $post, ContentTopic $topic): void
@@ -335,10 +289,10 @@ class MagazineAiPipeline
         if ($locale === 'de') {
             $germanTitle = $this->germanTitle($title);
 
-            return "# {$germanTitle}\n\nDieser Beitrag erklärt das Thema praxisnah und mit Fokus auf finanzielle Souveränität.\n\n## Kerngedanke\n\nBitcoin kann als Werkzeug zur langfristigen Unabhängigkeit verstanden werden, wenn Risiko, Verwahrung und Zeithorizont sauber eingeordnet werden.\n\n## Praktische Schritte\n\n- Grundlagen lernen.\n- Sicherheitsmodell verstehen.\n- Kleine Beträge testen.\n- Entscheidungen regelmäßig überprüfen.";
+            return "# {$germanTitle}\n\nDieser Beitrag erklärt das Thema praxisnah und mit Fokus auf finanzielle Souveränität.\n\n## Kerngedanke\n\nBitcoin kann als Werkzeug zur langfristigen Unabhängigkeit verstanden werden, wenn Risiko, Verwahrung und Zeithorizont sauber eingeordnet werden.\n\n## Praktische Schritte\n\n- Grundlagen lernen.\n- Sicherheitsmodell verstehen.\n- Kleine Beträge testen.\n- Entscheidungen regelmäßig aktualisieren.";
         }
 
-        return "# {$title}\n\nThis article explains the topic with a practical focus on financial sovereignty.\n\n## Core idea\n\nBitcoin can be understood as a tool for long-term independence when risk, custody, and time horizon are handled carefully.\n\n## Practical steps\n\n- Learn the basics.\n- Understand the security model.\n- Test with small amounts.\n- Review decisions regularly.";
+        return "# {$title}\n\nThis article explains the topic with a practical focus on financial sovereignty.\n\n## Core idea\n\nBitcoin can be understood as a tool for long-term independence when risk, custody, and time horizon are handled carefully.\n\n## Practical steps\n\n- Learn the basics.\n- Understand the security model.\n- Test with small amounts.\n- Update decisions regularly.";
     }
 
     private function germanTitle(string $title): string

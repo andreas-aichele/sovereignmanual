@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Posts\Tables;
 
 use App\Enums\PostStatus;
 use App\Models\Post;
-use App\Services\MagazineAiPipeline;
 use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
@@ -22,9 +21,7 @@ class PostsTable
                 TextColumn::make('topic')->searchable()->sortable(),
                 TextColumn::make('status')->badge()->sortable(),
                 TextColumn::make('audience_level')->badge(),
-                TextColumn::make('review_score')->sortable(),
                 TextColumn::make('published_at')->dateTime()->sortable(),
-                TextColumn::make('next_review_at')->date()->sortable(),
             ])
             ->filters([
                 SelectFilter::make('status')
@@ -47,8 +44,6 @@ class PostsTable
                         'status' => PostStatus::Draft,
                         'published_at' => null,
                     ])),
-                Action::make('review freshness')
-                    ->action(fn (Post $record, MagazineAiPipeline $pipeline) => $pipeline->refreshPost($record)),
                 EditAction::make(),
             ])
             ->toolbarActions([

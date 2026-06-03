@@ -24,7 +24,6 @@
         image_alt: string | null;
         audience_level: string;
         published_at: string | null;
-        next_review_at: string | null;
         markdown: string;
         html: string;
         blocks: MagazineBlock[];
@@ -40,7 +39,6 @@
         post: MagazinePost;
         copy: {
             back: string;
-            freshness: string;
         };
         meta: {
             title: string;
@@ -113,9 +111,6 @@
                                     locale,
                                 )}
                             </time>
-                        {/if}
-                        {#if post.next_review_at}
-                            <span>{copy.freshness}</span>
                         {/if}
                     </div>
                     <h1

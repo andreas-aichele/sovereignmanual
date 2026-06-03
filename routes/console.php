@@ -27,7 +27,3 @@ Schedule::command('app:generate-due-magazine-posts')
     ->weeklyOn(4, '08:10')
     ->timezone(config('app.timezone'))
     ->withoutOverlapping(30);
-
-Schedule::command('app:review-due-magazine-posts')
-    ->dailyAt('03:15')
-    ->withoutOverlapping(60);

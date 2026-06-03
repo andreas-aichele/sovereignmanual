@@ -80,7 +80,6 @@ class MagazineController extends Controller
             ],
             'copy' => [
                 'back' => $locale === 'de' ? 'Zurueck ins Archiv' : 'Back to archive',
-                'freshness' => $locale === 'de' ? 'Aktualitaet getrackt' : 'Freshness tracked',
             ],
             'meta' => [
                 'title' => $translation->meta_title ?: $translation->title,
@@ -104,7 +103,6 @@ class MagazineController extends Controller
             'category' => $post->contentTopic?->category ?? 'bitcoin',
             'category_label' => $this->categoryLabel($post->contentTopic?->category, $locale),
             'published_at' => $post->published_at?->toAtomString(),
-            'next_review_at' => $post->next_review_at?->toDateString(),
             'title' => $translation?->title ?? $post->topic,
             'slug' => $translation?->slug ?? $post->slug,
             'excerpt' => $translation?->excerpt,

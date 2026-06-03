@@ -16,7 +16,6 @@
         category: string;
         category_label: string;
         published_at: string | null;
-        next_review_at: string | null;
     };
 
     type PaginatedPosts = {

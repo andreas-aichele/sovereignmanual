@@ -35,7 +35,6 @@ class PostForm
                         TextInput::make('primary_language')->required()->maxLength(5),
                         DateTimePicker::make('scheduled_for'),
                         DateTimePicker::make('published_at'),
-                        DateTimePicker::make('next_review_at'),
                     ])
                     ->columns(2),
                 Section::make('Translations')
@@ -53,10 +52,8 @@ class PostForm
                             ->columns(2)
                             ->columnSpanFull(),
                     ]),
-                Section::make('Review and AI')
+                Section::make('AI')
                     ->components([
-                        TextInput::make('review_score')->numeric(),
-                        KeyValue::make('review_summary')->columnSpanFull(),
                         KeyValue::make('seo')->columnSpanFull(),
                         KeyValue::make('ai_metadata')->columnSpanFull(),
                     ])

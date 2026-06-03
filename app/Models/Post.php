@@ -20,10 +20,6 @@ use OwenIt\Auditing\Contracts\Auditable;
     'primary_language',
     'published_at',
     'scheduled_for',
-    'next_review_at',
-    'last_reviewed_at',
-    'review_score',
-    'review_summary',
     'seo',
     'ai_metadata',
 ])]
@@ -96,10 +92,6 @@ class Post extends Model implements Auditable
             'status' => PostStatus::class,
             'published_at' => 'datetime',
             'scheduled_for' => 'datetime',
-            'next_review_at' => 'datetime',
-            'last_reviewed_at' => 'datetime',
-            'review_score' => 'decimal:2',
-            'review_summary' => 'array',
             'seo' => 'array',
             'ai_metadata' => 'array',
         ];

@@ -4,7 +4,6 @@ use App\Enums\ContentTopicStatus;
 use App\Enums\PostStatus;
 use App\Jobs\GeneratePostFromTopic;
 use App\Models\ContentTopic;
-use App\Models\Post;
 use App\Services\MagazineAiPipeline;
 use Illuminate\Support\Facades\Queue;
 
@@ -49,14 +48,4 @@ test('generation command queues due topics', function () {
     $this->artisan('app:generate-due-magazine-posts')->assertSuccessful();
 
     Queue::assertPushed(GeneratePostFromTopic::class, fn (GeneratePostFromTopic $job): bool => $job->topic->is($topic));
-});
-
-test('freshness review updates the next review date', function () {
-    $post = Post::factory()->published()->create([
-        'next_review_at' => now()->subDay(),
-    ]);
-
-    app(MagazineAiPipeline::class)->refreshPost($post);
-
-    expect($post->refresh()->next_review_at->isFuture())->toBeTrue();
 });

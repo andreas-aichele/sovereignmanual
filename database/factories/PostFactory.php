@@ -30,7 +30,6 @@ class PostFactory extends Factory
             'audience_level' => 'beginner',
             'primary_language' => 'en',
             'scheduled_for' => now()->addDay(),
-            'next_review_at' => now()->addYear(),
             'seo' => ['keywords' => ['bitcoin', 'financial independence']],
             'ai_metadata' => ['provider' => 'gemini'],
         ];

@@ -32,7 +32,7 @@ class AiRunFactory extends Factory
             'response' => fake()->paragraphs(2, true),
             'input' => ['locale' => 'en'],
             'output' => ['publish' => true],
-            'metrics' => ['review_score' => 92],
+            'metrics' => ['score' => 92],
             'started_at' => now()->subMinute(),
             'finished_at' => now(),
         ];
