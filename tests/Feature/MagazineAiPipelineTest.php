@@ -5,6 +5,7 @@ use App\Enums\PostStatus;
 use App\Jobs\GeneratePostFromTopic;
 use App\Models\ContentTopic;
 use App\Services\MagazineAiPipeline;
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Psr\Log\LoggerInterface;
@@ -104,4 +105,11 @@ test('generation job failure writes useful queue log context', function () {
         ));
 
     (new GeneratePostFromTopic($topic))->failed(new RuntimeException('Queue worker stopped unexpectedly'));
+});
+
+test('generation job discards retries when the topic was deleted', function () {
+    $attributes = (new ReflectionClass(GeneratePostFromTopic::class))
+        ->getAttributes(DeleteWhenMissingModels::class);
+
+    expect($attributes)->not->toBeEmpty();
 });

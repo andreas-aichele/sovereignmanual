@@ -6,11 +6,13 @@ use App\Models\ContentTopic;
 use App\Services\MagazineAiPipeline;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\FailOnTimeout;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Log;
 use Throwable;
 
+#[DeleteWhenMissingModels]
 #[FailOnTimeout]
 class GeneratePostFromTopic implements ShouldQueue
 {
