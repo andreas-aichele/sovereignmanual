@@ -10,6 +10,7 @@ use App\Models\AiRun;
 use App\Models\ContentTopic;
 use App\Models\Post;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Ai\Image;
@@ -180,7 +181,14 @@ class MagazineAiPipeline
         try {
             return (string) agent($instructions)
                 ->prompt($prompt, provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.text_model', 'gemini-2.5-flash'));
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            Log::channel('queue')->warning('Magazine AI text prompt failed; using fallback response.', [
+                'provider' => config('magazine_ai.provider', 'gemini'),
+                'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
+                'exception_class' => $exception::class,
+                'exception_message' => $exception->getMessage(),
+            ]);
+
             return $fallback;
         }
     }
@@ -208,7 +216,14 @@ class MagazineAiPipeline
             $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
             return is_array($decoded) ? $decoded : $fallback;
-        } catch (Throwable) {
+        } catch (Throwable $exception) {
+            Log::channel('queue')->warning('Magazine AI JSON prompt failed; using fallback response.', [
+                'provider' => config('magazine_ai.provider', 'gemini'),
+                'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
+                'exception_class' => $exception::class,
+                'exception_message' => $exception->getMessage(),
+            ]);
+
             return $fallback;
         }
     }
@@ -409,6 +424,15 @@ class MagazineAiPipeline
 
             $this->finishRun($run, 'Image generated and stored.', $metadata);
         } catch (Throwable $exception) {
+            Log::channel('queue')->error('Magazine AI image generation failed; using pending asset placeholder.', [
+                'post_id' => $post->id,
+                'content_topic_id' => $topic->id,
+                'provider' => config('magazine_ai.provider', 'gemini'),
+                'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
+                'exception_class' => $exception::class,
+                'exception_message' => $exception->getMessage(),
+            ]);
+
             $post->assets()->create([
                 'type' => 'image',
                 'locale' => 'en',
@@ -431,7 +455,7 @@ class MagazineAiPipeline
 
     private function startRun(AiRunType $type, ?ContentTopic $topic = null, ?Post $post = null, ?string $model = null): AiRun
     {
-        return AiRun::create([
+        $run = AiRun::create([
             'content_topic_id' => $topic?->id,
             'post_id' => $post?->id,
             'type' => $type,
@@ -440,6 +464,10 @@ class MagazineAiPipeline
             'model' => $model ?? config('magazine_ai.text_model', 'gemini-2.5-flash'),
             'started_at' => now(),
         ]);
+
+        Log::channel('queue')->info('Magazine AI run started.', $this->aiRunLogContext($run));
+
+        return $run;
     }
 
     private function finishRun(AiRun $run, string $response, array $output = []): void
@@ -450,6 +478,28 @@ class MagazineAiPipeline
             'output' => $output,
             'finished_at' => now(),
         ]);
+
+        Log::channel('queue')->info('Magazine AI run completed.', $this->aiRunLogContext($run->refresh()));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function aiRunLogContext(AiRun $run): array
+    {
+        return [
+            'ai_run_id' => $run->id,
+            'ai_run_type' => $run->type->value,
+            'ai_run_status' => $run->status->value,
+            'content_topic_id' => $run->content_topic_id,
+            'post_id' => $run->post_id,
+            'provider' => $run->provider,
+            'model' => $run->model,
+            'duration_seconds' => $run->finished_at !== null && $run->started_at !== null
+                ? $run->started_at->diffInSeconds($run->finished_at)
+                : null,
+            'memory_peak_mb' => round(memory_get_peak_usage(true) / 1024 / 1024, 2),
+        ];
     }
 
     private function fallbackMarkdown(string $title, string $locale): string

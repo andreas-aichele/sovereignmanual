@@ -5,7 +5,9 @@ use App\Enums\PostStatus;
 use App\Jobs\GeneratePostFromTopic;
 use App\Models\ContentTopic;
 use App\Services\MagazineAiPipeline;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
+use Psr\Log\LoggerInterface;
 
 test('pipeline creates a published post with english and german translations', function () {
     config(['ai.providers.gemini.key' => null]);
@@ -71,4 +73,35 @@ test('generation command queues due topics', function () {
     $this->artisan('app:generate-due-magazine-posts')->assertSuccessful();
 
     Queue::assertPushed(GeneratePostFromTopic::class, fn (GeneratePostFromTopic $job): bool => $job->topic->is($topic));
+});
+
+test('queue logs are written to a dedicated daily log file', function () {
+    expect(config('logging.channels.queue.driver'))->toBe('daily')
+        ->and(config('logging.channels.queue.path'))->toBe(storage_path('logs/queue.log'));
+});
+
+test('generation job failure writes useful queue log context', function () {
+    $topic = ContentTopic::factory()->due()->create([
+        'title' => 'Queue diagnostics topic',
+    ]);
+    $logger = Mockery::mock(LoggerInterface::class);
+
+    Log::shouldReceive('channel')
+        ->once()
+        ->with('queue')
+        ->andReturn($logger);
+
+    $logger->shouldReceive('error')
+        ->once()
+        ->with('Magazine post generation job failed.', Mockery::on(
+            fn (array $context): bool => $context['content_topic_id'] === $topic->id
+                && $context['content_topic_title'] === 'Queue diagnostics topic'
+                && $context['max_tries'] === 3
+                && $context['timeout'] === 1200
+                && $context['exception_class'] === RuntimeException::class
+                && $context['exception_message'] === 'Queue worker stopped unexpectedly'
+                && array_key_exists('memory_peak_mb', $context)
+        ));
+
+    (new GeneratePostFromTopic($topic))->failed(new RuntimeException('Queue worker stopped unexpectedly'));
 });
