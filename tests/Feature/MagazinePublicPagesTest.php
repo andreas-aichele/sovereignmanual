@@ -94,7 +94,8 @@ test('localized german posts render through the german route', function () {
         ->assertSee('Bitcoin Selbstverwahrung')
         ->assertSee('fallback.jpg')
         ->assertSee('bitcoin')
-        ->assertSee('Zurück zum Magazin');
+        ->assertSee('Magazin')
+        ->assertSee('Artikeldetails');
 });
 
 test('german category labels use correct umlauts', function () {

@@ -36,6 +36,8 @@ test('magazine localization strings live in language files', function () {
         ->and(lang_path('de/magazine.php'))->toBeReadableFile()
         ->and($englishTranslations)->toHaveKeys(['index', 'show', 'categories', 'meta', 'routes'])
         ->and($germanTranslations)->toHaveKeys(['index', 'show', 'categories', 'meta', 'routes'])
+        ->and($englishTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'details', 'language', 'magazine'])
+        ->and($germanTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'details', 'language', 'magazine'])
         ->and($controller)->not->toContain("locale === 'de'")
         ->and($controller)->not->toContain('Zurück zum Magazin')
         ->and($controller)->not->toContain('Back to magazine')
@@ -63,8 +65,18 @@ test('magazine article layout keeps public container width and readable article 
 
     expect($index)->toContain('max-w-6xl px-4 py-10 sm:px-6 lg:px-8')
         ->and($show)->toContain('max-w-6xl px-4 py-10 sm:px-6 lg:px-8')
-        ->and($show)->toContain('header class="max-w-4xl"')
-        ->and($show)->toContain('content-body mt-10 max-w-4xl');
+        ->and($show)->toContain('header class="max-w-3xl"')
+        ->and($show)->toContain('lg:grid-cols-[minmax(0,48rem)_16rem]')
+        ->and($show)->toContain('lg:sticky lg:top-8')
+        ->and($show)->toContain('content-body max-w-none');
+});
+
+test('magazine article navigation uses breadcrumbs instead of a back button', function () {
+    $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
+
+    expect($show)->toContain('<nav aria-label="{{ $copy[\'breadcrumb_label\'] }}"')
+        ->and($show)->toContain('aria-current="page"')
+        ->and($show)->not->toContain('$copy[\'back\']');
 });
 
 test('magazine article tables have readable cell spacing', function () {

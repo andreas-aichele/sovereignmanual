@@ -18,7 +18,12 @@ return [
         'empty' => 'Noch keine veröffentlichten Artikel.',
     ],
     'show' => [
-        'back' => 'Zurück zum Magazin',
+        'alternate' => 'Auf Englisch lesen',
+        'breadcrumb_label' => 'Breadcrumb',
+        'category' => 'Kategorie',
+        'details' => 'Artikeldetails',
+        'language' => 'Sprache',
+        'magazine' => 'Magazin',
     ],
     'categories' => [
         'bitcoin' => 'Bitcoin',

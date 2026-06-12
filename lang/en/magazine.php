@@ -18,7 +18,12 @@ return [
         'empty' => 'No published articles yet.',
     ],
     'show' => [
-        'back' => 'Back to magazine',
+        'alternate' => 'Read in German',
+        'breadcrumb_label' => 'Breadcrumb',
+        'category' => 'Category',
+        'details' => 'Article details',
+        'language' => 'Language',
+        'magazine' => 'Magazine',
     ],
     'categories' => [
         'bitcoin' => 'Bitcoin',
