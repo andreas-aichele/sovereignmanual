@@ -57,6 +57,26 @@ test('magazine headings can break long words', function () {
         ->and($css)->toContain('overflow-wrap: anywhere;');
 });
 
+test('magazine article layout keeps public container width and readable article content', function () {
+    $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
+    $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
+
+    expect($index)->toContain('max-w-6xl px-4 py-10 sm:px-6 lg:px-8')
+        ->and($show)->toContain('max-w-6xl px-4 py-10 sm:px-6 lg:px-8')
+        ->and($show)->toContain('header class="max-w-4xl"')
+        ->and($show)->toContain('content-body mt-10 max-w-4xl');
+});
+
+test('magazine article tables have readable cell spacing', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect($css)->toContain('.content-body table')
+        ->and($css)->toContain('overflow-x-auto')
+        ->and($css)->toContain('.content-body th,')
+        ->and($css)->toContain('.content-body td')
+        ->and($css)->toContain('px-4 py-3');
+});
+
 test('public magazine frontend does not link login admin or unsplash', function () {
     $publicFiles = [
         resource_path('views/components/public-nav.blade.php'),
