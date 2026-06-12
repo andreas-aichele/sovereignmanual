@@ -26,7 +26,7 @@ test('published posts appear on the magazine index', function () {
         ->assertViewIs('magazine.index')
         ->assertSee('Bitcoin self custody basics')
         ->assertSee('Self custody')
-        ->assertSee('#F7931A', false);
+        ->assertSee('fallback.jpg');
 });
 
 test('newest published post leads the magazine index', function () {
@@ -92,6 +92,7 @@ test('localized german posts render through the german route', function () {
         ->assertViewIs('magazine.show')
         ->assertViewHas('locale', 'de')
         ->assertSee('Bitcoin Selbstverwahrung')
+        ->assertSee('fallback.jpg')
         ->assertSee('bitcoin')
         ->assertSee('Zurück zum Magazin');
 });

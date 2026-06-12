@@ -88,6 +88,7 @@ class MagazineController extends Controller
         $translation = $post->translation($locale);
         $category = $post->contentTopic?->category ?? 'bitcoin';
         $coverImage = $this->coverImage($post);
+        $title = $translation?->title ?? $post->topic;
 
         return [
             'id' => $post->id,
@@ -97,13 +98,13 @@ class MagazineController extends Controller
             'category' => $category,
             'category_label' => $this->categoryLabel($category, $locale),
             'published_at' => $post->published_at?->toAtomString(),
-            'title' => $translation?->title ?? $post->topic,
+            'title' => $title,
             'slug' => $translation?->slug ?? $post->slug,
             'excerpt' => $translation?->excerpt,
             'url' => route($this->translation('routes.show', $locale), $translation?->slug ?? $post->slug),
-            'image' => $coverImage?->url,
-            'image_alt' => $coverImage?->alt_text,
-            'image_placeholder' => $this->imagePlaceholder($post, $translation?->title ?? $post->topic, $category),
+            'image' => $coverImage?->url ?? asset('fallback.jpg'),
+            'image_alt' => $coverImage?->alt_text ?? $title,
+            'image_placeholder' => $this->imagePlaceholder($post, $title, $category),
         ];
     }
 
