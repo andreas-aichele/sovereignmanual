@@ -80,16 +80,15 @@ class MagazineAiPipeline
         ]);
 
         $translationRun = $this->startRun(AiRunType::Translation, $topic, $post);
-        $germanArticle = $this->promptJsonWithFallback(
+        $germanArticle = $this->promptJson(
             instructions: 'Translate Bitcoin magazine articles into precise, natural German. Return only valid JSON. Use real German umlauts and ß. Keep article and section headings compact. Never leave English headings or UI-like labels untranslated unless they are proper nouns.',
             prompt: json_encode([
                 'title' => $englishTitle,
                 'excerpt' => $englishExcerpt,
                 'blocks' => $englishBlocks,
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            fallback: $this->fallbackTranslatedArticle($englishTitle, $englishBlocks),
-        );
-        $germanTitle = $this->compactTitle($this->cleanText((string) ($germanArticle['title'] ?? $this->germanTitle($title)), $this->germanTitle($title)), 'de');
+        ) ?? $this->fallbackTranslatedArticle($title, $englishBlocks);
+        $germanTitle = $this->cleanText((string) ($germanArticle['title'] ?? $this->germanTitle($title)), $this->germanTitle($title));
         $germanBlocks = $this->sanitizeBlocks($germanArticle['blocks'] ?? null, 'de', $germanTitle, $this->fallbackMarkdown($title, 'de'));
         $germanInternalLinks = $this->internalLinkCandidates('de', $post->id);
         $germanBlocks = $this->withInternalLinks($germanBlocks, $germanInternalLinks, 'de');
@@ -194,7 +193,7 @@ class MagazineAiPipeline
 
     private function promptWithFallback(string $instructions, string $prompt, string $fallback): string
     {
-        if (! config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key')) {
+        if (! $this->hasAiProviderKey()) {
             return $fallback;
         }
 
@@ -214,13 +213,12 @@ class MagazineAiPipeline
     }
 
     /**
-     * @param  array<string, mixed>  $fallback
-     * @return array<string, mixed>
+     * @return array<string, mixed>|null
      */
-    private function promptJsonWithFallback(string $instructions, string $prompt, array $fallback): array
+    private function promptJson(string $instructions, string $prompt): ?array
     {
-        if (! config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key')) {
-            return $fallback;
+        if (! $this->hasAiProviderKey()) {
+            return null;
         }
 
         try {
@@ -235,17 +233,22 @@ class MagazineAiPipeline
 
             $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
-            return is_array($decoded) ? $decoded : $fallback;
+            return is_array($decoded) ? $decoded : null;
         } catch (Throwable $exception) {
-            Log::channel('queue')->warning('Magazine AI JSON prompt failed; using fallback response.', [
+            Log::channel('queue')->warning('Magazine AI JSON prompt failed.', [
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
                 'exception_class' => $exception::class,
                 'exception_message' => $exception->getMessage(),
             ]);
 
-            return $fallback;
+            return null;
         }
+    }
+
+    private function hasAiProviderKey(): bool
+    {
+        return filled(config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key'));
     }
 
     /**
@@ -259,7 +262,7 @@ class MagazineAiPipeline
             'blocks' => $this->fallbackBlocks($title, $locale, $markdown),
         ];
 
-        $response = $this->promptJsonWithFallback(
+        $response = $this->promptJson(
             instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Keep every section heading compact, ideally 3 to 7 words. Naturally use the provided SEO keywords in headings and body text where they fit. Add relevant internal Markdown links from the provided candidates. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for article sections with a heading, anchor, and markdown body that does not repeat the heading. Visual blocks may supplement the article, but must not replace section text. Do not include raw HTML or raw SVG.',
             prompt: json_encode([
                 'locale' => $locale,
@@ -301,8 +304,7 @@ class MagazineAiPipeline
                     ],
                 ],
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            fallback: $fallback,
-        );
+        ) ?? $fallback;
 
         return $this->sanitizeBlocks($response['blocks'] ?? null, $locale, $title, $markdown);
     }
@@ -322,7 +324,9 @@ class MagazineAiPipeline
             ->map(function (array $block) use ($allowedTypes, $locale): array {
                 $type = in_array($block['type'] ?? null, $allowedTypes, true) ? $block['type'] : 'markdown';
                 $data = is_array($block['data'] ?? null) ? $this->sanitizeBlockData($block['data']) : [];
-                $heading = $type === 'section' ? $this->compactHeading($this->cleanText((string) ($block['heading'] ?? ''), ''), $locale) : null;
+                $heading = $type === 'section'
+                    ? $this->seoText((string) ($block['heading'] ?? ''), $locale === 'de' ? 'Praxis' : 'Practice', 72)
+                    : null;
                 $anchor = filled($heading) ? Str::slug((string) ($block['anchor'] ?? $heading)) : null;
 
                 return [
@@ -502,53 +506,92 @@ class MagazineAiPipeline
     private function seoPlan(ContentTopic $topic, string $locale, string $title, string $markdown, array $internalLinks): array
     {
         $fallback = $this->fallbackSeoPlan($topic, $locale, $title, $markdown);
-        $response = $this->promptJsonWithFallback(
-            instructions: 'Create SEO metadata for an educational Bitcoin magazine article. Return only valid JSON. Keep titles compact, avoid hype, and identify relevant keywords that should appear naturally in headings, body copy, and meta tags.',
-            prompt: json_encode([
-                'locale' => $locale,
-                'topic' => $topic->title,
-                'brief' => $topic->brief,
-                'article_title_candidate' => $title,
-                'markdown' => $this->excerpt($markdown, 1200),
-                'internal_link_candidates' => $internalLinks,
-                'limits' => [
-                    'article_title' => 70,
-                    'meta_title' => 60,
-                    'meta_description' => 160,
-                    'slug_words' => 6,
-                    'keywords' => 8,
-                ],
-                'schema' => [
-                    'article_title' => 'Compact visible H1 title',
-                    'meta_title' => 'SEO title up to 60 characters',
-                    'meta_description' => 'SEO description up to 160 characters',
-                    'slug' => 'short-hyphenated-url-slug',
-                    'keywords' => ['keyword one', 'keyword two'],
-                ],
-            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            fallback: $fallback,
-        );
 
-        $keywords = collect($response['keywords'] ?? $fallback['keywords'])
-            ->filter(fn (mixed $keyword): bool => is_scalar($keyword))
-            ->map(fn (mixed $keyword): string => Str::of((string) $keyword)->lower()->replaceMatches('/\s+/', ' ')->trim()->limit(48, '')->toString())
-            ->filter()
-            ->unique()
-            ->take(8)
-            ->values()
-            ->all();
-
-        if ($keywords === []) {
-            $keywords = $fallback['keywords'];
+        if (! $this->hasAiProviderKey()) {
+            return $fallback;
         }
 
-        return [
-            'article_title' => $this->compactTitle($this->cleanText((string) ($response['article_title'] ?? $fallback['article_title']), $fallback['article_title']), $locale),
-            'meta_title' => $this->seoText((string) ($response['meta_title'] ?? $fallback['meta_title']), $fallback['meta_title'], 60),
-            'meta_description' => $this->seoText((string) ($response['meta_description'] ?? $fallback['meta_description']), $fallback['meta_description'], 160),
-            'slug' => $this->shortSlug((string) ($response['slug'] ?? $fallback['slug']), $locale),
-            'keywords' => $keywords,
-        ];
+        $feedback = null;
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $response = $this->promptJson(
+                instructions: 'Create SEO metadata for an educational Bitcoin magazine article. Return only valid JSON. Generate the visible H1 article_title and the browser/search meta_title directly at the correct length. They may differ slightly. Do not return an overlong title for PHP to shorten later. Keep article_title readable and specific, up to 70 characters. Keep meta_title compelling and specific, up to 60 characters. Keep meta_description up to 160 characters. Avoid hype. Identify relevant keywords that should appear naturally in headings, body copy, and meta tags.',
+                prompt: json_encode([
+                    'locale' => $locale,
+                    'topic' => $topic->title,
+                    'brief' => $topic->brief,
+                    'article_title_candidate' => $title,
+                    'markdown' => $this->excerpt($markdown, 1200),
+                    'internal_link_candidates' => $internalLinks,
+                    'previous_attempt_feedback' => $feedback,
+                    'limits' => [
+                        'article_title' => 70,
+                        'meta_title' => 60,
+                        'meta_description' => 160,
+                        'slug_words' => 6,
+                        'keywords' => 8,
+                    ],
+                    'schema' => [
+                        'article_title' => 'Natural visible H1 title up to 70 characters',
+                        'meta_title' => 'Natural SEO title up to 60 characters, may differ from H1',
+                        'meta_description' => 'SEO description up to 160 characters',
+                        'slug' => 'short-hyphenated-url-slug',
+                        'keywords' => ['keyword one', 'keyword two'],
+                    ],
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            );
+
+            if ($response === null) {
+                $feedback = 'Return valid JSON matching the requested schema.';
+
+                continue;
+            }
+
+            $keywords = collect($response['keywords'] ?? $fallback['keywords'])
+                ->filter(fn (mixed $keyword): bool => is_scalar($keyword))
+                ->map(fn (mixed $keyword): string => Str::of((string) $keyword)->lower()->replaceMatches('/\s+/', ' ')->trim()->limit(48, '')->toString())
+                ->filter()
+                ->unique()
+                ->take(8)
+                ->values()
+                ->all();
+
+            $plan = [
+                'article_title' => $this->cleanText((string) ($response['article_title'] ?? ''), ''),
+                'meta_title' => $this->cleanText((string) ($response['meta_title'] ?? ''), ''),
+                'meta_description' => $this->cleanText((string) ($response['meta_description'] ?? ''), ''),
+                'slug' => $this->shortSlug((string) ($response['slug'] ?? $fallback['slug']), $locale),
+                'keywords' => $keywords === [] ? $fallback['keywords'] : $keywords,
+            ];
+
+            $problems = [];
+
+            if ($plan['article_title'] === '' || mb_strlen($plan['article_title']) > 70) {
+                $problems[] = 'article_title must be present and at most 70 characters';
+            }
+
+            if ($plan['meta_title'] === '' || mb_strlen($plan['meta_title']) > 60) {
+                $problems[] = 'meta_title must be present and at most 60 characters';
+            }
+
+            if ($plan['meta_description'] === '' || mb_strlen($plan['meta_description']) > 160) {
+                $problems[] = 'meta_description must be present and at most 160 characters';
+            }
+
+            $feedback = implode('; ', $problems);
+
+            if ($feedback === '') {
+                return $plan;
+            }
+        }
+
+        Log::channel('queue')->warning('Magazine AI SEO metadata did not satisfy length constraints; using fallback response.', [
+            'content_topic_id' => $topic->id,
+            'locale' => $locale,
+            'feedback' => $feedback,
+        ]);
+
+        return $fallback;
     }
 
     /**
@@ -556,7 +599,7 @@ class MagazineAiPipeline
      */
     private function fallbackSeoPlan(ContentTopic $topic, string $locale, string $title, string $markdown): array
     {
-        $articleTitle = $this->compactTitle($title, $locale);
+        $articleTitle = $this->seoText($title, $locale === 'de' ? 'Bitcoin-Strategie' : 'Bitcoin strategy', 70);
         $keywords = $this->keywordsFor($topic, $locale);
 
         return [
@@ -648,6 +691,10 @@ class MagazineAiPipeline
         $heading = $locale === 'de' ? 'Weitere Lektüre' : 'Related reading';
         $anchor = $locale === 'de' ? 'weitere-lektuere' : 'related-reading';
 
+        if (count($blocks) >= 12) {
+            array_pop($blocks);
+        }
+
         $blocks[] = [
             'type' => 'section',
             'heading' => $heading,
@@ -674,22 +721,12 @@ class MagazineAiPipeline
         return $slug;
     }
 
-    private function compactTitle(string $title, string $locale): string
-    {
-        return $this->seoText($title, $locale === 'de' ? 'Bitcoin-Strategie' : 'Bitcoin strategy', 70);
-    }
-
-    private function compactHeading(string $heading, string $locale): string
-    {
-        return $this->seoText($heading, $locale === 'de' ? 'Praxis' : 'Practice', 72);
-    }
-
     private function seoText(string $value, string $fallback, int $limit): string
     {
         $cleaned = $this->cleanText($value, $fallback);
 
         return Str::of($cleaned)
-            ->limit($limit, '')
+            ->limit($limit, '', true)
             ->rtrim(' ,.;:-')
             ->toString();
     }
@@ -786,47 +823,23 @@ class MagazineAiPipeline
      */
     private function fallbackBlocks(string $title, string $locale, string $markdown): array
     {
-        if ($locale === 'de') {
-            return [
-                [
-                    'type' => 'section',
-                    'heading' => $title,
-                    'anchor' => Str::slug($title, '-', 'de'),
-                    'markdown' => $this->markdownWithoutLeadingHeading($markdown),
-                    'data' => [],
-                ],
-                [
-                    'type' => 'insight',
-                    'markdown' => null,
-                    'data' => [
-                        'title' => 'Kernaussage',
-                        'body' => 'Souveränität entsteht nicht durch Tempo, sondern durch klare Regeln, kleine Tests und wiederholbare Entscheidungen.',
-                    ],
-                ],
-                [
-                    'type' => 'flow_diagram',
-                    'markdown' => null,
-                    'data' => [
-                        'title' => 'Entscheidungspfad',
-                        'steps' => ['Ziel klären', 'Risiko bewerten', 'Verwahrung testen', 'Regelmäßig prüfen'],
-                    ],
-                ],
-                [
-                    'type' => 'checklist',
-                    'markdown' => null,
-                    'data' => [
-                        'title' => 'Prüfliste',
-                        'items' => ['Zeithorizont notieren', 'Seed-Aufbewahrung planen', 'Kleine Testtransaktion senden', 'Dokumentation aktualisieren'],
-                    ],
-                ],
+        $copy = $locale === 'de'
+            ? [
+                'insight' => ['Kernaussage', 'Souveränität entsteht nicht durch Tempo, sondern durch klare Regeln, kleine Tests und wiederholbare Entscheidungen.'],
+                'flow' => ['Entscheidungspfad', ['Ziel klären', 'Risiko bewerten', 'Verwahrung testen', 'Regelmäßig prüfen']],
+                'checklist' => ['Prüfliste', ['Zeithorizont notieren', 'Seed-Aufbewahrung planen', 'Kleine Testtransaktion senden', 'Dokumentation aktualisieren']],
+            ]
+            : [
+                'insight' => ['Core insight', 'Sovereignty improves when decisions are explicit, tested at small scale, and reviewed on a schedule.'],
+                'flow' => ['Decision path', ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly']],
+                'checklist' => ['Field checklist', ['Write the time horizon', 'Plan seed storage', 'Send a small test transaction', 'Update the policy note']],
             ];
-        }
 
         return [
             [
                 'type' => 'section',
                 'heading' => $title,
-                'anchor' => Str::slug($title),
+                'anchor' => Str::slug($title, '-', $locale),
                 'markdown' => $this->markdownWithoutLeadingHeading($markdown),
                 'data' => [],
             ],
@@ -834,24 +847,24 @@ class MagazineAiPipeline
                 'type' => 'insight',
                 'markdown' => null,
                 'data' => [
-                    'title' => 'Core insight',
-                    'body' => 'Sovereignty improves when decisions are explicit, tested at small scale, and reviewed on a schedule.',
+                    'title' => $copy['insight'][0],
+                    'body' => $copy['insight'][1],
                 ],
             ],
             [
                 'type' => 'flow_diagram',
                 'markdown' => null,
                 'data' => [
-                    'title' => 'Decision path',
-                    'steps' => ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly'],
+                    'title' => $copy['flow'][0],
+                    'steps' => $copy['flow'][1],
                 ],
             ],
             [
                 'type' => 'checklist',
                 'markdown' => null,
                 'data' => [
-                    'title' => 'Field checklist',
-                    'items' => ['Write the time horizon', 'Plan seed storage', 'Send a small test transaction', 'Update the policy note'],
+                    'title' => $copy['checklist'][0],
+                    'items' => $copy['checklist'][1],
                 ],
             ],
         ];

@@ -79,6 +79,53 @@ test('pipeline adds relevant internal links when published articles exist', func
         ->and($englishTranslation->seo['internal_links'][0]['slug'])->toBe('bitcoin-wallet-backups');
 });
 
+test('pipeline keeps h1 title fallback within limits without cutting words', function () {
+    config(['ai.providers.gemini.key' => null]);
+
+    $topic = ContentTopic::factory()->due()->create([
+        'title' => 'Bitcoin self custody threat models for beginners who want practical security without relying on custodians',
+    ]);
+
+    $post = app(MagazineAiPipeline::class)->generatePost($topic);
+    $englishTranslation = $post->translations()->where('locale', 'en')->firstOrFail();
+
+    expect(mb_strlen($englishTranslation->title))->toBeLessThanOrEqual(70)
+        ->and($englishTranslation->markdown)->toContain('## Bitcoin self custody threat models')
+        ->and($englishTranslation->title)->toEndWith('practical')
+        ->and($englishTranslation->title)->not->toEndWith('practic');
+});
+
+test('pipeline retries seo title generation until length requirements pass', function () {
+    $pipeline = file_get_contents(app_path('Services/MagazineAiPipeline.php'));
+
+    expect($pipeline)->toContain('Generate the visible H1 article_title and the browser/search meta_title directly at the correct length')
+        ->and($pipeline)->toContain('Do not return an overlong title for PHP to shorten later')
+        ->and($pipeline)->toContain('previous_attempt_feedback')
+        ->and($pipeline)->toContain('$problems = []')
+        ->and($pipeline)->toContain('for ($attempt = 1; $attempt <= 3; $attempt++)');
+});
+
+test('pipeline keeps internal link blocks within the twelve block limit', function () {
+    $pipeline = app(MagazineAiPipeline::class);
+    $method = new ReflectionMethod(MagazineAiPipeline::class, 'withInternalLinks');
+    $blocks = collect(range(1, 12))
+        ->map(fn (int $index): array => [
+            'type' => 'section',
+            'heading' => "Section {$index}",
+            'anchor' => "section-{$index}",
+            'markdown' => "Text {$index}",
+            'data' => [],
+        ])
+        ->all();
+
+    $result = $method->invoke($pipeline, $blocks, [
+        ['title' => 'Bitcoin wallet backups', 'url' => '/magazine/bitcoin-wallet-backups', 'slug' => 'bitcoin-wallet-backups'],
+    ], 'en');
+
+    expect($result)->toHaveCount(12)
+        ->and($result[11]['heading'])->toBe('Related reading');
+});
+
 test('pipeline fallback german titles use correct umlauts', function () {
     config(['ai.providers.gemini.key' => null]);
 
