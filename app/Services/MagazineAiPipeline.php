@@ -47,11 +47,10 @@ class MagazineAiPipeline
         $post = Post::create([
             'content_topic_id' => $topic->id,
             'slug' => $englishSlug,
-            'status' => PostStatus::Published,
+            'status' => PostStatus::Draft,
             'topic' => $topic->title,
             'audience_level' => $topic->audience_level,
             'primary_language' => $topic->primary_language,
-            'published_at' => now(),
             'scheduled_for' => $topic->scheduled_for,
             'seo' => [
                 'keywords' => $englishSeo['keywords'],
@@ -116,6 +115,11 @@ class MagazineAiPipeline
         $this->createBlocks($post, 'de', $germanBlocks);
 
         $this->generatePostImage($post, $topic);
+
+        $post->update([
+            'status' => PostStatus::Published,
+            'published_at' => now(),
+        ]);
 
         $topic->update([
             'status' => ContentTopicStatus::Published,

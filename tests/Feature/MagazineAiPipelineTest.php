@@ -14,6 +14,13 @@ use Psr\Log\LoggerInterface;
 
 test('pipeline creates a published post with english and german translations', function () {
     config(['ai.providers.gemini.key' => null]);
+    $createdStatus = null;
+    $createdPublishedAt = null;
+
+    Post::created(function (Post $post) use (&$createdStatus, &$createdPublishedAt): void {
+        $createdStatus = $post->status;
+        $createdPublishedAt = $post->published_at;
+    });
 
     $topic = ContentTopic::factory()->due()->create([
         'title' => 'Why Bitcoin custody matters',
@@ -27,6 +34,8 @@ test('pipeline creates a published post with english and german translations', f
     $englishSection = $post->blocks()->where('locale', 'en')->where('type', 'section')->firstOrFail();
 
     expect($post->status)->toBe(PostStatus::Published)
+        ->and($createdStatus)->toBe(PostStatus::Draft)
+        ->and($createdPublishedAt)->toBeNull()
         ->and($post->translations()->where('locale', 'en')->exists())->toBeTrue()
         ->and($post->translations()->where('locale', 'de')->exists())->toBeTrue()
         ->and(mb_strlen($englishTranslation->meta_title))->toBeLessThanOrEqual(60)
