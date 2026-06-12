@@ -141,6 +141,55 @@ test('markdown is rendered to sanitized html for articles', function () {
         ->assertDontSee('<script>', false);
 });
 
+test('article pages render seo meta tags with limits and keywords', function () {
+    $post = Post::factory()->published()->create([
+        'seo' => ['keywords' => ['bitcoin', 'self custody']],
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Bitcoin Custody',
+        'slug' => 'bitcoin-custody',
+        'meta_title' => str_repeat('Long title ', 10),
+        'meta_description' => str_repeat('Long description ', 20),
+        'seo' => ['keywords' => ['bitcoin', 'wallet security']],
+    ]);
+
+    $response = $this->get(route('magazine.show', 'bitcoin-custody'))
+        ->assertSuccessful()
+        ->assertSee('name="keywords" content="bitcoin, wallet security"', false);
+
+    expect(mb_strlen($response->viewData('meta')['title']))->toBeLessThanOrEqual(60)
+        ->and(mb_strlen($response->viewData('meta')['description']))->toBeLessThanOrEqual(160);
+});
+
+test('sitemap lists public magazine urls for all translations', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Bitcoin Basics',
+        'slug' => 'bitcoin-basics',
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'de',
+        'title' => 'Bitcoin Grundlagen',
+        'slug' => 'bitcoin-grundlagen',
+    ]);
+
+    $this->get('/sitemap.xml')
+        ->assertSuccessful()
+        ->assertHeader('Content-Type', 'application/xml')
+        ->assertSee('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', false)
+        ->assertSee(route('magazine.index'), false)
+        ->assertSee(route('magazine.show', 'bitcoin-basics'), false)
+        ->assertSee(route('magazine.de.show', 'bitcoin-grundlagen'), false);
+});
+
 test('article headings render table of contents anchor links', function () {
     $post = Post::factory()->published()->create();
 

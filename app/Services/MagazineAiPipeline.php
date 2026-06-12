@@ -9,6 +9,7 @@ use App\Enums\PostStatus;
 use App\Models\AiRun;
 use App\Models\ContentTopic;
 use App\Models\Post;
+use App\Models\PostTranslation;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -24,16 +25,23 @@ class MagazineAiPipeline
     {
         $draftRun = $this->startRun(AiRunType::Draft, $topic);
         $title = $topic->title;
-        $englishSlug = Str::slug($title);
+        $internalLinks = $this->internalLinkCandidates('en');
         $draft = $this->promptWithFallback(
-            instructions: 'You write educational, non-hype Bitcoin and financial independence articles in clear English Markdown.',
-            prompt: "Write a practical article for {$topic->audience_level} readers.\nTopic: {$topic->title}\nBrief: {$topic->brief}",
+            instructions: 'You write educational, non-hype Bitcoin and financial independence articles in clear English Markdown. Use concise article and section headings. Build a clear SEO-friendly structure with short paragraphs, H2/H3 headings, useful lists, and naturally repeated keywords. Do not keyword-stuff.',
+            prompt: "Write a practical article for {$topic->audience_level} readers.\nTopic: {$topic->title}\nBrief: {$topic->brief}\nUse these internal link candidates when relevant: ".json_encode($internalLinks, JSON_UNESCAPED_UNICODE),
             fallback: $this->fallbackMarkdown($title, 'en'),
         );
         $this->finishRun($draftRun, $draft);
 
+        $englishSeo = $this->seoPlan($topic, 'en', $title, $draft, $internalLinks);
+        $englishTitle = $englishSeo['article_title'];
+        $englishSlug = $this->uniqueTranslationSlug($englishSeo['slug'], 'en');
         $englishExcerpt = $this->excerpt($draft, 180);
-        $englishBlocks = $this->articleBlocks($topic, 'en', $title, $draft);
+        $englishBlocks = $this->withInternalLinks(
+            $this->articleBlocks($topic, 'en', $englishTitle, $draft, $englishSeo['keywords'], $internalLinks),
+            $internalLinks,
+            'en'
+        );
         $englishMarkdown = $this->markdownFromBlocks($englishBlocks, $draft);
 
         $post = Post::create([
@@ -46,7 +54,8 @@ class MagazineAiPipeline
             'published_at' => now(),
             'scheduled_for' => $topic->scheduled_for,
             'seo' => [
-                'keywords' => ['bitcoin', 'financial intelligence', 'self custody'],
+                'keywords' => $englishSeo['keywords'],
+                'internal_links' => $internalLinks,
             ],
             'ai_metadata' => [
                 'provider' => config('magazine_ai.provider', 'gemini'),
@@ -57,30 +66,37 @@ class MagazineAiPipeline
 
         $post->translations()->create([
             'locale' => 'en',
-            'title' => $title,
+            'title' => $englishTitle,
             'slug' => $englishSlug,
             'excerpt' => $englishExcerpt,
             'markdown' => $englishMarkdown,
-            'meta_title' => $title,
-            'meta_description' => $this->excerpt($englishMarkdown, 155),
-            'seo' => ['canonical_locale' => 'en'],
+            'meta_title' => $englishSeo['meta_title'],
+            'meta_description' => $englishSeo['meta_description'],
+            'seo' => [
+                'canonical_locale' => 'en',
+                'keywords' => $englishSeo['keywords'],
+                'internal_links' => $internalLinks,
+            ],
         ]);
 
         $translationRun = $this->startRun(AiRunType::Translation, $topic, $post);
         $germanArticle = $this->promptJsonWithFallback(
-            instructions: 'Translate Bitcoin magazine articles into precise, natural German. Return only valid JSON. Use real German umlauts and ß. Never leave English headings or UI-like labels untranslated unless they are proper nouns.',
+            instructions: 'Translate Bitcoin magazine articles into precise, natural German. Return only valid JSON. Use real German umlauts and ß. Keep article and section headings compact. Never leave English headings or UI-like labels untranslated unless they are proper nouns.',
             prompt: json_encode([
-                'title' => $title,
+                'title' => $englishTitle,
                 'excerpt' => $englishExcerpt,
                 'blocks' => $englishBlocks,
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            fallback: $this->fallbackTranslatedArticle($title, $englishBlocks),
+            fallback: $this->fallbackTranslatedArticle($englishTitle, $englishBlocks),
         );
-        $germanTitle = $this->cleanText((string) ($germanArticle['title'] ?? $this->germanTitle($title)), $this->germanTitle($title));
+        $germanTitle = $this->compactTitle($this->cleanText((string) ($germanArticle['title'] ?? $this->germanTitle($title)), $this->germanTitle($title)), 'de');
         $germanBlocks = $this->sanitizeBlocks($germanArticle['blocks'] ?? null, 'de', $germanTitle, $this->fallbackMarkdown($title, 'de'));
+        $germanInternalLinks = $this->internalLinkCandidates('de', $post->id);
+        $germanBlocks = $this->withInternalLinks($germanBlocks, $germanInternalLinks, 'de');
         $germanDraft = $this->markdownFromBlocks($germanBlocks, $this->fallbackMarkdown($title, 'de'));
         $this->finishRun($translationRun, $germanDraft, ['title' => $germanTitle]);
-        $germanSlug = Str::slug($germanTitle, '-', 'de');
+        $germanSeo = $this->seoPlan($topic, 'de', $germanTitle, $germanDraft, $germanInternalLinks);
+        $germanSlug = $this->uniqueTranslationSlug($germanSeo['slug'], 'de');
 
         $post->translations()->create([
             'locale' => 'de',
@@ -88,9 +104,13 @@ class MagazineAiPipeline
             'slug' => $germanSlug,
             'excerpt' => $this->cleanText((string) ($germanArticle['excerpt'] ?? $this->excerpt($germanDraft, 180)), $this->excerpt($germanDraft, 180)),
             'markdown' => $germanDraft,
-            'meta_title' => $germanTitle,
-            'meta_description' => $this->excerpt($germanDraft, 155),
-            'seo' => ['canonical_locale' => 'de'],
+            'meta_title' => $germanSeo['meta_title'],
+            'meta_description' => $germanSeo['meta_description'],
+            'seo' => [
+                'canonical_locale' => 'de',
+                'keywords' => $germanSeo['keywords'],
+                'internal_links' => $germanInternalLinks,
+            ],
         ]);
 
         $this->createBlocks($post, 'en', $englishBlocks);
@@ -229,21 +249,25 @@ class MagazineAiPipeline
     }
 
     /**
+     * @param  array<int, string>  $keywords
+     * @param  array<int, array{title: string, url: string, slug: string}>  $internalLinks
      * @return array<int, array<string, mixed>>
      */
-    private function articleBlocks(ContentTopic $topic, string $locale, string $title, string $markdown): array
+    private function articleBlocks(ContentTopic $topic, string $locale, string $title, string $markdown, array $keywords = [], array $internalLinks = []): array
     {
         $fallback = [
             'blocks' => $this->fallbackBlocks($title, $locale, $markdown),
         ];
 
         $response = $this->promptJsonWithFallback(
-            instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for article sections with a heading, anchor, and markdown body that does not repeat the heading. Visual blocks may supplement the article, but must not replace section text. Do not include raw HTML or raw SVG.',
+            instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Keep every section heading compact, ideally 3 to 7 words. Naturally use the provided SEO keywords in headings and body text where they fit. Add relevant internal Markdown links from the provided candidates. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for article sections with a heading, anchor, and markdown body that does not repeat the heading. Visual blocks may supplement the article, but must not replace section text. Do not include raw HTML or raw SVG.',
             prompt: json_encode([
                 'locale' => $locale,
                 'topic' => $topic->title,
                 'audience_level' => $topic->audience_level,
                 'brief' => $topic->brief,
+                'seo_keywords' => $keywords,
+                'internal_link_candidates' => $internalLinks,
                 'markdown' => $markdown,
                 'schema' => [
                     'blocks' => [
@@ -295,10 +319,10 @@ class MagazineAiPipeline
         $allowedTypes = ['section', 'markdown', 'insight', 'checklist', 'flow_diagram', 'sketch'];
         $sanitized = collect($blocks)
             ->filter(fn (mixed $block): bool => is_array($block))
-            ->map(function (array $block) use ($allowedTypes): array {
+            ->map(function (array $block) use ($allowedTypes, $locale): array {
                 $type = in_array($block['type'] ?? null, $allowedTypes, true) ? $block['type'] : 'markdown';
                 $data = is_array($block['data'] ?? null) ? $this->sanitizeBlockData($block['data']) : [];
-                $heading = $type === 'section' ? $this->cleanText((string) ($block['heading'] ?? ''), '') : null;
+                $heading = $type === 'section' ? $this->compactHeading($this->cleanText((string) ($block['heading'] ?? ''), ''), $locale) : null;
                 $anchor = filled($heading) ? Str::slug((string) ($block['anchor'] ?? $heading)) : null;
 
                 return [
@@ -469,6 +493,216 @@ class MagazineAiPipeline
     private function synthwaveImagePrompt(ContentTopic $topic): string
     {
         return "Premium synthwave editorial header image for article topic: {$topic->title}. Audience level: {$topic->audience_level}. Bitcoin financial sovereignty context, dark readable magazine composition, Bitcoin orange focal light, restrained neon cyan and magenta accents, subtle grid lines, abstract ledger details, no text in image, no logos, no real people, no stock-photo look.";
+    }
+
+    /**
+     * @param  array<int, array{title: string, url: string, slug: string}>  $internalLinks
+     * @return array{article_title: string, meta_title: string, meta_description: string, slug: string, keywords: array<int, string>}
+     */
+    private function seoPlan(ContentTopic $topic, string $locale, string $title, string $markdown, array $internalLinks): array
+    {
+        $fallback = $this->fallbackSeoPlan($topic, $locale, $title, $markdown);
+        $response = $this->promptJsonWithFallback(
+            instructions: 'Create SEO metadata for an educational Bitcoin magazine article. Return only valid JSON. Keep titles compact, avoid hype, and identify relevant keywords that should appear naturally in headings, body copy, and meta tags.',
+            prompt: json_encode([
+                'locale' => $locale,
+                'topic' => $topic->title,
+                'brief' => $topic->brief,
+                'article_title_candidate' => $title,
+                'markdown' => $this->excerpt($markdown, 1200),
+                'internal_link_candidates' => $internalLinks,
+                'limits' => [
+                    'article_title' => 70,
+                    'meta_title' => 60,
+                    'meta_description' => 160,
+                    'slug_words' => 6,
+                    'keywords' => 8,
+                ],
+                'schema' => [
+                    'article_title' => 'Compact visible H1 title',
+                    'meta_title' => 'SEO title up to 60 characters',
+                    'meta_description' => 'SEO description up to 160 characters',
+                    'slug' => 'short-hyphenated-url-slug',
+                    'keywords' => ['keyword one', 'keyword two'],
+                ],
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            fallback: $fallback,
+        );
+
+        $keywords = collect($response['keywords'] ?? $fallback['keywords'])
+            ->filter(fn (mixed $keyword): bool => is_scalar($keyword))
+            ->map(fn (mixed $keyword): string => Str::of((string) $keyword)->lower()->replaceMatches('/\s+/', ' ')->trim()->limit(48, '')->toString())
+            ->filter()
+            ->unique()
+            ->take(8)
+            ->values()
+            ->all();
+
+        if ($keywords === []) {
+            $keywords = $fallback['keywords'];
+        }
+
+        return [
+            'article_title' => $this->compactTitle($this->cleanText((string) ($response['article_title'] ?? $fallback['article_title']), $fallback['article_title']), $locale),
+            'meta_title' => $this->seoText((string) ($response['meta_title'] ?? $fallback['meta_title']), $fallback['meta_title'], 60),
+            'meta_description' => $this->seoText((string) ($response['meta_description'] ?? $fallback['meta_description']), $fallback['meta_description'], 160),
+            'slug' => $this->shortSlug((string) ($response['slug'] ?? $fallback['slug']), $locale),
+            'keywords' => $keywords,
+        ];
+    }
+
+    /**
+     * @return array{article_title: string, meta_title: string, meta_description: string, slug: string, keywords: array<int, string>}
+     */
+    private function fallbackSeoPlan(ContentTopic $topic, string $locale, string $title, string $markdown): array
+    {
+        $articleTitle = $this->compactTitle($title, $locale);
+        $keywords = $this->keywordsFor($topic, $locale);
+
+        return [
+            'article_title' => $articleTitle,
+            'meta_title' => $this->seoText($articleTitle, $articleTitle, 60),
+            'meta_description' => $this->seoText($this->excerpt($markdown, 160), $locale === 'de'
+                ? 'Praxisnaher Leitfaden zu Bitcoin, Selbstverwahrung und finanzieller Souveränität.'
+                : 'A practical guide to Bitcoin, self custody, and financial sovereignty.', 160),
+            'slug' => $this->shortSlug($articleTitle, $locale),
+            'keywords' => $keywords,
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function keywordsFor(ContentTopic $topic, string $locale): array
+    {
+        $base = $locale === 'de'
+            ? ['bitcoin', 'selbstverwahrung', 'finanzielle souveränität']
+            : ['bitcoin', 'self custody', 'financial sovereignty'];
+
+        return collect([
+            ...$base,
+            $topic->category,
+            ...Str::of($topic->title.' '.$topic->brief)
+                ->lower()
+                ->replaceMatches('/[^\pL\pN\s-]+/u', ' ')
+                ->explode(' ')
+                ->filter(fn (string $word): bool => mb_strlen($word) > 4)
+                ->take(5)
+                ->all(),
+        ])
+            ->map(fn (?string $keyword): string => Str::of((string) $keyword)->replace('-', ' ')->replaceMatches('/\s+/', ' ')->trim()->toString())
+            ->filter()
+            ->unique()
+            ->take(8)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{title: string, url: string, slug: string}>
+     */
+    private function internalLinkCandidates(string $locale, ?int $excludePostId = null): array
+    {
+        return Post::query()
+            ->with(['translations'])
+            ->where('status', PostStatus::Published)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->when($excludePostId !== null, fn ($query) => $query->whereKeyNot($excludePostId))
+            ->latest('published_at')
+            ->limit(5)
+            ->get()
+            ->map(function (Post $post) use ($locale): ?array {
+                $translation = $post->translation($locale);
+
+                if ($translation === null) {
+                    return null;
+                }
+
+                return [
+                    'title' => $translation->title,
+                    'url' => route($locale === 'de' ? 'magazine.de.show' : 'magazine.show', $translation->slug),
+                    'slug' => $translation->slug,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @param  array<int, array{title: string, url: string, slug: string}>  $internalLinks
+     * @return array<int, array<string, mixed>>
+     */
+    private function withInternalLinks(array $blocks, array $internalLinks, string $locale): array
+    {
+        if ($internalLinks === []) {
+            return $blocks;
+        }
+
+        $linksMarkdown = collect($internalLinks)
+            ->take(3)
+            ->map(fn (array $link): string => "- [{$link['title']}]({$link['url']})")
+            ->implode("\n");
+        $heading = $locale === 'de' ? 'Weitere Lektüre' : 'Related reading';
+        $anchor = $locale === 'de' ? 'weitere-lektuere' : 'related-reading';
+
+        $blocks[] = [
+            'type' => 'section',
+            'heading' => $heading,
+            'anchor' => $anchor,
+            'markdown' => $linksMarkdown,
+            'data' => [],
+        ];
+
+        return $blocks;
+    }
+
+    private function uniqueTranslationSlug(string $slug, string $locale): string
+    {
+        $baseSlug = $this->shortSlug($slug, $locale);
+        $slug = $baseSlug;
+        $suffix = 2;
+
+        while (Post::query()->where('slug', $slug)->exists()
+            || PostTranslation::query()->where('locale', $locale)->where('slug', $slug)->exists()) {
+            $slug = "{$baseSlug}-{$suffix}";
+            $suffix++;
+        }
+
+        return $slug;
+    }
+
+    private function compactTitle(string $title, string $locale): string
+    {
+        return $this->seoText($title, $locale === 'de' ? 'Bitcoin-Strategie' : 'Bitcoin strategy', 70);
+    }
+
+    private function compactHeading(string $heading, string $locale): string
+    {
+        return $this->seoText($heading, $locale === 'de' ? 'Praxis' : 'Practice', 72);
+    }
+
+    private function seoText(string $value, string $fallback, int $limit): string
+    {
+        $cleaned = $this->cleanText($value, $fallback);
+
+        return Str::of($cleaned)
+            ->limit($limit, '')
+            ->rtrim(' ,.;:-')
+            ->toString();
+    }
+
+    private function shortSlug(string $value, string $locale): string
+    {
+        $slug = Str::slug($value, '-', $locale);
+        $words = collect(explode('-', $slug))
+            ->filter()
+            ->take(6)
+            ->implode('-');
+
+        return filled($words) ? $words : ($locale === 'de' ? 'bitcoin-strategie' : 'bitcoin-strategy');
     }
 
     private function startRun(AiRunType $type, ?ContentTopic $topic = null, ?Post $post = null, ?string $model = null): AiRun

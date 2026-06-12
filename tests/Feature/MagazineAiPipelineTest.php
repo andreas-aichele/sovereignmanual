@@ -4,6 +4,8 @@ use App\Enums\ContentTopicStatus;
 use App\Enums\PostStatus;
 use App\Jobs\GeneratePostFromTopic;
 use App\Models\ContentTopic;
+use App\Models\Post;
+use App\Models\PostTranslation;
 use App\Services\MagazineAiPipeline;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Support\Facades\Log;
@@ -18,6 +20,7 @@ test('pipeline creates a published post with english and german translations', f
     ]);
 
     $post = app(MagazineAiPipeline::class)->generatePost($topic);
+    $englishTranslation = $post->translations()->where('locale', 'en')->firstOrFail();
     $germanTranslation = $post->translations()->where('locale', 'de')->firstOrFail();
     $asset = $post->assets()->firstOrFail();
     $englishBlockTypes = $post->blocks()->where('locale', 'en')->pluck('type')->all();
@@ -26,8 +29,15 @@ test('pipeline creates a published post with english and german translations', f
     expect($post->status)->toBe(PostStatus::Published)
         ->and($post->translations()->where('locale', 'en')->exists())->toBeTrue()
         ->and($post->translations()->where('locale', 'de')->exists())->toBeTrue()
+        ->and(mb_strlen($englishTranslation->meta_title))->toBeLessThanOrEqual(60)
+        ->and(mb_strlen($englishTranslation->meta_description))->toBeLessThanOrEqual(160)
+        ->and($englishTranslation->seo['keywords'])->toContain('bitcoin')
+        ->and($englishTranslation->slug)->toBe('why-bitcoin-custody-matters')
         ->and($germanTranslation->title)->toBe('Warum Bitcoin-Verwahrung wichtig ist')
         ->and($germanTranslation->slug)->toBe('warum-bitcoin-verwahrung-wichtig-ist')
+        ->and(mb_strlen($germanTranslation->meta_title))->toBeLessThanOrEqual(60)
+        ->and(mb_strlen($germanTranslation->meta_description))->toBeLessThanOrEqual(160)
+        ->and($germanTranslation->seo['keywords'])->toContain('bitcoin')
         ->and($post->blocks()->where('locale', 'en')->count())->toBeGreaterThan(1)
         ->and($post->blocks()->where('locale', 'de')->count())->toBeGreaterThan(1)
         ->and($englishBlockTypes)->toContain('section')
@@ -42,6 +52,31 @@ test('pipeline creates a published post with english and german translations', f
         ->and($asset->prompt)->not->toContain('unsplash')
         ->and($post->aiRuns()->count())->toBeGreaterThanOrEqual(1)
         ->and($topic->refresh()->status)->toBe(ContentTopicStatus::Published);
+});
+
+test('pipeline adds relevant internal links when published articles exist', function () {
+    config(['ai.providers.gemini.key' => null]);
+
+    $existingPost = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $existingPost->id,
+        'locale' => 'en',
+        'title' => 'Bitcoin wallet backups',
+        'slug' => 'bitcoin-wallet-backups',
+    ]);
+
+    $topic = ContentTopic::factory()->due()->create([
+        'title' => 'Bitcoin self custody threat models for beginners',
+    ]);
+
+    $post = app(MagazineAiPipeline::class)->generatePost($topic);
+    $englishTranslation = $post->translations()->where('locale', 'en')->firstOrFail();
+
+    expect($englishTranslation->markdown)
+        ->toContain('Related reading')
+        ->toContain('[Bitcoin wallet backups]')
+        ->and($englishTranslation->seo['internal_links'][0]['slug'])->toBe('bitcoin-wallet-backups');
 });
 
 test('pipeline fallback german titles use correct umlauts', function () {

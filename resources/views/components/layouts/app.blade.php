@@ -11,6 +11,10 @@
             <meta name="description" content="{{ $description }}">
         @endisset
 
+        @isset($keywords)
+            <meta name="keywords" content="{{ is_array($keywords) ? implode(', ', $keywords) : $keywords }}">
+        @endisset
+
         @isset($canonical)
             <link rel="canonical" href="{{ $canonical }}">
         @endisset

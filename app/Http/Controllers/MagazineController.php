@@ -8,6 +8,7 @@ use App\Models\PostAsset;
 use App\Models\PostBlock;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 
@@ -96,12 +97,43 @@ class MagazineController extends Controller
             ],
             'copy' => $this->translationArray('show', $locale),
             'meta' => [
-                'title' => $translation->meta_title ?: $translation->title,
-                'description' => $translation->meta_description ?: $translation->excerpt,
+                'title' => $this->truncateMeta($translation->meta_title ?: $translation->title, 60),
+                'description' => $this->truncateMeta($translation->meta_description ?: $translation->excerpt, 160),
+                'keywords' => $translation->seo['keywords'] ?? $post->seo['keywords'] ?? [],
                 'canonical' => route($this->translation('routes.show', $locale), $translation->slug),
                 'alternate' => $this->alternateUrl($post, $locale),
             ],
         ]);
+    }
+
+    public function sitemap(): Response
+    {
+        $urls = collect([
+            ['loc' => route('magazine.index'), 'lastmod' => null],
+            ['loc' => route('magazine.de.index'), 'lastmod' => null],
+        ]);
+
+        Post::query()
+            ->with(['translations'])
+            ->where('status', PostStatus::Published)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->latest('published_at')
+            ->get()
+            ->each(function (Post $post) use ($urls): void {
+                foreach ($post->translations as $translation) {
+                    $route = $translation->locale === 'de' ? 'magazine.de.show' : 'magazine.show';
+
+                    $urls->push([
+                        'loc' => route($route, $translation->slug),
+                        'lastmod' => ($post->updated_at ?? $post->published_at)?->toAtomString(),
+                    ]);
+                }
+            });
+
+        $xml = view('sitemap', ['urls' => $urls])->render();
+
+        return response($xml, 200, ['Content-Type' => 'application/xml']);
     }
 
     private function serializePostSummary(Post $post, string $locale): array
@@ -320,5 +352,15 @@ class MagazineController extends Controller
         $translation = Lang::get("magazine.{$key}", [], $locale);
 
         return $translation;
+    }
+
+    private function truncateMeta(?string $value, int $limit): string
+    {
+        return Str::of($value ?? '')
+            ->replaceMatches('/\s+/', ' ')
+            ->trim()
+            ->limit($limit, '')
+            ->rtrim(' ,.;:-')
+            ->toString();
     }
 }

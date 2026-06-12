@@ -1,4 +1,4 @@
-<x-layouts.app :title="$meta['title']" :description="$meta['description']" :canonical="$meta['canonical']" :alternate="$meta['alternate']">
+<x-layouts.app :title="$meta['title']" :description="$meta['description']" :keywords="$meta['keywords']" :canonical="$meta['canonical']" :alternate="$meta['alternate']">
     <x-public-nav :locale="$locale" :alternate-locale="$locale === 'de' ? 'en' : 'de'" :alternate-url="$meta['alternate']" />
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
