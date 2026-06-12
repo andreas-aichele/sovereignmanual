@@ -24,7 +24,23 @@ test('magazine article urls are available', function () {
 test('frontend entry is a blade asset', function () {
     $contents = file_get_contents(resource_path('js/app.js'));
 
-    expect($contents)->not->toContain('createInertiaApp');
+    expect($contents)->not->toContain('createInertiaApp')
+        ->and($contents)->not->toContain("import '../css/app.css'")
+        ->and($contents)->toContain("import('mermaid')")
+        ->and($contents)->toContain('mermaid.initialize')
+        ->and($contents)->toContain("querySelector: '.mermaid'");
+});
+
+test('frontend css loads before body scripts', function () {
+    $layout = file_get_contents(resource_path('views/components/layouts/app.blade.php'));
+    $vite = file_get_contents(base_path('vite.config.ts'));
+
+    expect($vite)->toContain("input: ['resources/css/app.css', 'resources/js/app.js']")
+        ->and($layout)->toContain("@vite('resources/css/app.css')")
+        ->and($layout)->toContain("@vite('resources/js/app.js')")
+        ->and(strpos($layout, "@vite('resources/css/app.css')"))->toBeLessThan(strpos($layout, '</head>'))
+        ->and(strpos($layout, '</div>'))->toBeLessThan(strpos($layout, "@vite('resources/js/app.js')"))
+        ->and(strpos($layout, "@vite('resources/js/app.js')"))->toBeLessThan(strpos($layout, '</body>'));
 });
 
 test('magazine localization strings live in language files', function () {
@@ -34,8 +50,10 @@ test('magazine localization strings live in language files', function () {
 
     expect(lang_path('en/magazine.php'))->toBeReadableFile()
         ->and(lang_path('de/magazine.php'))->toBeReadableFile()
-        ->and($englishTranslations)->toHaveKeys(['index', 'show', 'categories', 'meta', 'routes'])
-        ->and($germanTranslations)->toHaveKeys(['index', 'show', 'categories', 'meta', 'routes'])
+        ->and($englishTranslations)->toHaveKeys(['index', 'show', 'categories', 'language_switcher', 'locales', 'meta', 'routes'])
+        ->and($germanTranslations)->toHaveKeys(['index', 'show', 'categories', 'language_switcher', 'locales', 'meta', 'routes'])
+        ->and($englishTranslations['index'])->toHaveKeys(['about_body', 'about_heading'])
+        ->and($germanTranslations['index'])->toHaveKeys(['about_body', 'about_heading'])
         ->and($englishTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'details', 'language', 'magazine', 'toc'])
         ->and($germanTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'details', 'language', 'magazine', 'toc'])
         ->and($controller)->not->toContain("locale === 'de'")
@@ -45,13 +63,41 @@ test('magazine localization strings live in language files', function () {
         ->and($controller)->not->toContain('Latest article');
 });
 
+test('magazine start page moves visible intro copy below article list as about section', function () {
+    $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
+
+    expect($index)->toContain('<section class="sr-only">')
+        ->and($index)->toContain('$copy[\'about_heading\']')
+        ->and($index)->toContain('$copy[\'about_body\']')
+        ->and($index)->toContain('border-t border-primary/20 pt-10')
+        ->and($index)->not->toContain('$copy[\'featured\']');
+});
+
+test('public navigation uses a scalable language dropdown', function () {
+    $nav = file_get_contents(resource_path('views/components/public-nav.blade.php'));
+    $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
+    $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
+    $controller = file_get_contents(app_path('Http/Controllers/MagazineController.php'));
+
+    expect($nav)->toContain('@props([\'locale\' => \'en\', \'languageOptions\' => []])')
+        ->and($nav)->toContain('<details class="group relative">')
+        ->and($nav)->toContain('@foreach ($languageOptions as $option)')
+        ->and($nav)->toContain('svg(\'lucide-chevron-down\'')
+        ->and($nav)->toContain('magazine.language_switcher')
+        ->and($nav)->not->toContain('aria-hidden="true">v</span>')
+        ->and($nav)->not->toContain('alternateLocale')
+        ->and($index)->toContain(':language-options="$languageOptions"')
+        ->and($show)->toContain(':language-options="$languageOptions"')
+        ->and($controller)->toContain('private function languageOptions')
+        ->and($controller)->toContain('$this->translationArray(\'locales\', $currentLocale)');
+});
+
 test('magazine headings can break long words', function () {
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
     $css = file_get_contents(resource_path('css/background.css'));
 
     expect($index)->toContain('wrap-anywhere')
-        ->and($index)->toContain('text-4xl')
         ->and($index)->toContain('text-3xl')
         ->and($index)->toContain('text-xl')
         ->and($show)->toContain('wrap-anywhere')
@@ -105,6 +151,33 @@ test('magazine article tables have readable cell spacing', function () {
         ->and($css)->toContain('.content-body th,')
         ->and($css)->toContain('.content-body td')
         ->and($css)->toContain('px-4 py-3');
+});
+
+test('magazine article diagrams have responsive readable styling', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+    $controller = file_get_contents(app_path('Http/Controllers/MagazineController.php'));
+
+    expect($css)->toContain('.content-body .mermaid')
+        ->and($css)->toContain('overflow-x-auto')
+        ->and($css)->toContain('.content-body .mermaid svg')
+        ->and($controller)->toContain('renderAsciiDiagramCodeBlocks')
+        ->and($controller)->toContain('renderFlowDiagramData')
+        ->and($controller)->toContain('mermaidFlowchart');
+});
+
+test('public magazine styles restore synthwave atmosphere without removing readable panels', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+    $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
+    $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
+    $nav = file_get_contents(resource_path('views/components/public-nav.blade.php'));
+
+    expect($css)->toContain('radial-gradient(circle at 12% 8%')
+        ->and($css)->toContain('body::before')
+        ->and($css)->toContain('background-size: 4rem 4rem')
+        ->and($index)->toContain('bg-base-200/90')
+        ->and($index)->toContain('ring-cyan-300/10')
+        ->and($show)->toContain('bg-base-300 shadow-2xl')
+        ->and($nav)->toContain('border-primary/20 bg-base-100/85');
 });
 
 test('public magazine frontend does not link login admin or unsplash', function () {

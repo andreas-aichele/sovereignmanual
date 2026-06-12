@@ -26,11 +26,13 @@
         <link rel="icon" href="/logo.svg" type="image/svg+xml">
 
         @fonts
-        @vite('resources/js/app.js')
+        @vite('resources/css/app.css')
     </head>
     <body class="min-h-screen bg-base-100 font-sans text-base-content antialiased">
         <div class="min-h-screen">
             {{ $slot }}
         </div>
+
+        @vite('resources/js/app.js')
     </body>
 </html>

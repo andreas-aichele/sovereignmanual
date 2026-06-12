@@ -1,5 +1,5 @@
 <x-layouts.app :title="$meta['title']" :description="$meta['description']" :keywords="$meta['keywords']" :canonical="$meta['canonical']" :alternate="$meta['alternate']">
-    <x-public-nav :locale="$locale" :alternate-locale="$locale === 'de' ? 'en' : 'de'" :alternate-url="$meta['alternate']" />
+    <x-public-nav :locale="$locale" :language-options="$languageOptions" />
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <nav aria-label="{{ $copy['breadcrumb_label'] }}" class="text-sm text-base-content/65">
@@ -24,7 +24,7 @@
                 @endif
             </header>
 
-            <div class="mt-8 overflow-hidden rounded-lg border border-white/10 bg-base-300">
+            <div class="mt-8 overflow-hidden rounded-lg border border-primary/20 bg-base-300 shadow-2xl shadow-fuchsia-950/20 ring-1 ring-cyan-300/10">
                 @if ($post['image'])
                     <img src="{{ $post['image'] }}" alt="{{ $post['image_alt'] ?? $post['title'] }}" class="max-h-[32rem] w-full object-cover">
                 @else
@@ -33,7 +33,7 @@
             </div>
 
             @if (count($post['toc']) > 0)
-                <details class="mt-8 rounded-lg border border-white/10 bg-base-200 p-4 text-sm open:border-primary/50 lg:hidden">
+                <details class="mt-8 rounded-lg border border-primary/20 bg-base-200/90 p-4 text-sm open:border-primary/50 lg:hidden">
                     <summary class="cursor-pointer select-none font-semibold uppercase tracking-[0.2em] text-primary">{{ $copy['toc'] }}</summary>
 
                     <ol class="mt-4 space-y-3">

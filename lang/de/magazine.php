@@ -2,6 +2,11 @@
 
 return [
     'alternate_locale' => 'en',
+    'locales' => [
+        'en' => 'English',
+        'de' => 'Deutsch',
+    ],
+    'language_switcher' => 'Sprache',
     'routes' => [
         'index' => 'magazine.de.index',
         'show' => 'magazine.de.show',
@@ -16,6 +21,8 @@ return [
         'featured' => 'Neuer Artikel',
         'read' => 'Artikel lesen',
         'empty' => 'Noch keine veröffentlichten Artikel.',
+        'about_heading' => 'Über Sovereign Manual',
+        'about_body' => 'Sovereign Manual ist ein praktisches Bitcoin-Magazin für Menschen, die Verwahrung, Geld und Unabhängigkeit ohne Hype verstehen wollen. Die Artikel konzentrieren sich auf klare Denkmodelle, persönliche Routinen und Entscheidungen, die wirklich anwendbar sind.',
     ],
     'show' => [
         'alternate' => 'Auf Englisch lesen',

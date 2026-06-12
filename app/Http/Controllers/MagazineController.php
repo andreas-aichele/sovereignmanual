@@ -29,7 +29,7 @@ class MagazineController extends Controller
 
         return view('magazine.index', [
             'locale' => $locale,
-            'alternateLocale' => $this->translation('alternate_locale', $locale),
+            'languageOptions' => $this->languageOptions($locale),
             'posts' => $posts,
             'copy' => $this->translationArray('index', $locale),
             'meta' => $this->translationArray('meta', $locale),
@@ -95,6 +95,7 @@ class MagazineController extends Controller
                 'blocks' => $blocks,
                 'toc' => $tableOfContents,
             ],
+            'languageOptions' => $this->languageOptions($locale, $post),
             'copy' => $this->translationArray('show', $locale),
             'meta' => [
                 'title' => $this->truncateMeta($translation->meta_title ?: $translation->title, 60),
@@ -122,10 +123,8 @@ class MagazineController extends Controller
             ->get()
             ->each(function (Post $post) use ($urls): void {
                 foreach ($post->translations as $translation) {
-                    $route = $translation->locale === 'de' ? 'magazine.de.show' : 'magazine.show';
-
                     $urls->push([
-                        'loc' => route($route, $translation->slug),
+                        'loc' => route($this->translation('routes.show', $translation->locale), $translation->slug),
                         'lastmod' => ($post->updated_at ?? $post->published_at)?->toAtomString(),
                     ]);
                 }
@@ -221,11 +220,45 @@ class MagazineController extends Controller
     }
 
     /**
+     * @return array<int, array{locale: string, label: string, url: string, current: bool}>
+     */
+    private function languageOptions(string $currentLocale, ?Post $post = null): array
+    {
+        return collect($this->translationArray('locales', $currentLocale))
+            ->map(function (string $label, string $locale) use ($currentLocale, $post): ?array {
+                $translation = $post?->translation($locale);
+
+                if ($post !== null && $translation === null) {
+                    return null;
+                }
+
+                return [
+                    'locale' => $locale,
+                    'label' => $label,
+                    'url' => $translation === null
+                        ? route($this->translation('routes.index', $locale))
+                        : route($this->translation('routes.show', $locale), $translation->slug),
+                    'current' => $locale === $currentLocale,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
      * @param  array<string, int>  $usedHeadingIds
      * @return array{html: string, toc: array<int, array{id: string, title: string, level: int}>}
      */
     private function renderBlock(PostBlock $block, array &$usedHeadingIds): array
     {
+        if ($block->type === 'flow_diagram') {
+            return [
+                'html' => $this->renderFlowDiagramData($block->data),
+                'toc' => [],
+            ];
+        }
+
         if (! in_array($block->type, ['section', 'markdown'], true)) {
             return [
                 'html' => '',
@@ -277,6 +310,8 @@ class MagazineController extends Controller
             ])
             ->toString();
 
+        $html = $this->renderAsciiDiagramCodeBlocks($html);
+
         $html = preg_replace_callback(
             '/<h([23])>(.*?)<\/h\1>/s',
             function (array $matches) use (&$toc, &$usedHeadingIds): string {
@@ -308,12 +343,146 @@ class MagazineController extends Controller
 
     private function renderMarkdown(?string $markdown): string
     {
-        return Str::of($markdown ?? '')
+        $html = Str::of($markdown ?? '')
             ->markdown([
                 'html_input' => 'strip',
                 'allow_unsafe_links' => false,
             ])
             ->toString();
+
+        return $this->renderAsciiDiagramCodeBlocks($html);
+    }
+
+    private function renderAsciiDiagramCodeBlocks(string $html): string
+    {
+        return preg_replace_callback(
+            '/<pre><code\b([^>]*)>(.*?)<\/code><\/pre>/s',
+            function (array $matches): string {
+                $code = html_entity_decode($matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+                if (str_contains($matches[1], 'language-mermaid')) {
+                    return $this->renderMermaidBlock(trim($code));
+                }
+
+                $rows = $this->parseDiagramRows($code);
+
+                if ($rows === []) {
+                    return $matches[0];
+                }
+
+                return $this->renderMermaidBlock($this->mermaidFlowchart($rows));
+            },
+            $html
+        ) ?? $html;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $data
+     */
+    private function renderFlowDiagramData(?array $data): string
+    {
+        $steps = collect($data['steps'] ?? [])
+            ->filter(fn (mixed $step): bool => is_scalar($step) && trim((string) $step) !== '')
+            ->map(fn (mixed $step): string => trim((string) $step))
+            ->values()
+            ->all();
+
+        if ($steps === []) {
+            return '';
+        }
+
+        $title = is_scalar($data['title'] ?? null) ? trim((string) $data['title']) : '';
+
+        return $this->renderMermaidBlock($this->mermaidFlowchart([$steps], $title));
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    private function parseDiagramRows(string $code): array
+    {
+        $lines = Str::of($code)
+            ->replace(["\r\n", "\r"], "\n")
+            ->explode("\n")
+            ->map(fn (string $line): string => trim($line))
+            ->filter()
+            ->values();
+
+        if ($lines->isEmpty()) {
+            return [];
+        }
+
+        $rows = $lines
+            ->map(function (string $line): array {
+                if (! preg_match('/(?:-{1,2}>|={1,2}>)/', $line)) {
+                    return [];
+                }
+
+                return collect(preg_split('/\s*(?:-{1,2}>|={1,2}>)\s*/', $line) ?: [])
+                    ->map(fn (string $part): string => $this->cleanDiagramLabel($part))
+                    ->filter()
+                    ->values()
+                    ->all();
+            })
+            ->filter(fn (array $row): bool => count($row) >= 2)
+            ->values()
+            ->all();
+
+        return count($rows) === $lines->count() ? $rows : [];
+    }
+
+    private function cleanDiagramLabel(string $label): string
+    {
+        return Str::of($label)
+            ->trim()
+            ->replaceMatches('/^\[(.*)\]$/', '$1')
+            ->replaceMatches('/\s+/', ' ')
+            ->trim()
+            ->toString();
+    }
+
+    private function mermaidNodeId(int $rowIndex, int $columnIndex): string
+    {
+        return "node_{$rowIndex}_{$columnIndex}";
+    }
+
+    private function mermaidLabel(string $label): string
+    {
+        return str_replace('"', '#quot;', $label);
+    }
+
+    /**
+     * @param  array<int, array<int, string>>  $rows
+     */
+    private function mermaidFlowchart(array $rows, string $title = ''): string
+    {
+        $lines = ['flowchart LR'];
+
+        if ($title !== '') {
+            $lines[] = '%% '.$title;
+        }
+
+        foreach ($rows as $rowIndex => $row) {
+            for ($columnIndex = 0; $columnIndex < count($row) - 1; $columnIndex++) {
+                $fromId = $this->mermaidNodeId($rowIndex, $columnIndex);
+                $toId = $this->mermaidNodeId($rowIndex, $columnIndex + 1);
+                $fromLabel = $this->mermaidLabel($row[$columnIndex]);
+                $toLabel = $this->mermaidLabel($row[$columnIndex + 1]);
+
+                $lines[] = "    {$fromId}[\"{$fromLabel}\"] --> {$toId}[\"{$toLabel}\"]";
+            }
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function renderMermaidBlock(string $diagram): string
+    {
+        if ($diagram === '') {
+            return '';
+        }
+
+        return '<pre class="mermaid">'.e($diagram).'</pre>';
     }
 
     /**

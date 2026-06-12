@@ -141,6 +141,65 @@ test('markdown is rendered to sanitized html for articles', function () {
         ->assertDontSee('<script>', false);
 });
 
+test('arrow based diagram code blocks render as article diagrams', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Diagram Rendering',
+        'slug' => 'diagram-rendering',
+        'markdown' => "```\n[Traditional System]  --> [Intermediary / Bank]   --> [Your Money (Permissive)]\n[Bitcoin System]      --> [Your Private Keys]     --> [Your Money (Absolute)]\n```",
+    ]);
+
+    $this->get(route('magazine.show', 'diagram-rendering'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<pre class="mermaid">', false)
+        ->assertSee('flowchart LR')
+        ->assertSee('node_0_0[&quot;Traditional System&quot;] --&gt; node_0_1[&quot;Intermediary / Bank&quot;]', false)
+        ->assertSee('node_1_1[&quot;Your Private Keys&quot;] --&gt; node_1_2[&quot;Your Money (Absolute)&quot;]', false)
+        ->assertDontSee('<pre><code>[Traditional System]', false);
+});
+
+test('native mermaid code blocks render as mermaid diagrams', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Native Mermaid',
+        'slug' => 'native-mermaid',
+        'markdown' => "```mermaid\nflowchart TB\n    A[Bitcoin] --> B[Self custody]\n```",
+    ]);
+
+    $this->get(route('magazine.show', 'native-mermaid'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<pre class="mermaid">', false)
+        ->assertSee('flowchart TB')
+        ->assertSee('A[Bitcoin] --&gt; B[Self custody]', false)
+        ->assertDontSee('language-mermaid');
+});
+
+test('regular code blocks remain code when they are not diagrams', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Code Rendering',
+        'slug' => 'code-rendering',
+        'markdown' => "```php\n\$wallet = 'cold storage';\nreturn \$wallet;\n```",
+    ]);
+
+    $this->get(route('magazine.show', 'code-rendering'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<pre><code class="language-php">', false)
+        ->assertDontSee('class="mermaid"', false);
+});
+
 test('article pages render seo meta tags with limits and keywords', function () {
     $post = Post::factory()->published()->create([
         'seo' => ['keywords' => ['bitcoin', 'self custody']],
@@ -240,4 +299,35 @@ test('structured post blocks provide table of contents anchors before markdown f
         ->assertSee('<h2 id="custody-basics">Custody Basics</h2>', false)
         ->assertSee('href="#custody-basics"', false)
         ->assertDontSee('Legacy Heading');
+});
+
+test('structured flow diagram blocks render as article diagrams', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Structured Diagram',
+        'slug' => 'structured-diagram',
+        'markdown' => 'Legacy text.',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'flow_diagram',
+        'sort_order' => 0,
+        'data' => [
+            'title' => 'Decision path',
+            'steps' => ['Goal', 'Risk', 'Test'],
+        ],
+    ]);
+
+    $this->get(route('magazine.show', 'structured-diagram'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<pre class="mermaid">', false)
+        ->assertSee('%% Decision path')
+        ->assertSee('node_0_0[&quot;Goal&quot;] --&gt; node_0_1[&quot;Risk&quot;]', false)
+        ->assertSee('node_0_1[&quot;Risk&quot;] --&gt; node_0_2[&quot;Test&quot;]', false);
 });

@@ -1,10 +1,10 @@
 <x-layouts.app :title="$meta['title']" :description="$meta['description']">
-    <x-public-nav :locale="$locale" :alternate-locale="$alternateLocale" />
+    <x-public-nav :locale="$locale" :language-options="$languageOptions" />
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <section class="mb-12">
+        <section class="sr-only">
             <p class="text-sm font-semibold uppercase tracking-[0.25em] text-primary">{{ $copy['eyebrow'] }}</p>
-            <h1 class="wrap-anywhere mt-4 max-w-4xl text-4xl font-semibold leading-tight text-base-content sm:text-6xl">{{ $copy['heading'] }}</h1>
+            <h1>{{ $copy['heading'] }}</h1>
             <p class="mt-5 max-w-2xl text-lg text-base-content/70">{{ $meta['description'] }}</p>
         </section>
 
@@ -15,7 +15,7 @@
         @else
             @php($featured = $posts->first())
 
-            <article class="mb-10 grid overflow-hidden rounded-lg border border-white/10 bg-base-200 shadow-2xl shadow-black/20 lg:grid-cols-[1.1fr_0.9fr]">
+            <article class="mb-10 grid overflow-hidden rounded-lg border border-primary/20 bg-base-200/90 shadow-2xl shadow-fuchsia-950/25 ring-1 ring-cyan-300/10 lg:grid-cols-[1.1fr_0.9fr]">
                 <a href="{{ $featured['url'] }}" class="block min-h-80 bg-base-300">
                     @if ($featured['image'])
                         <img src="{{ $featured['image'] }}" alt="{{ $featured['image_alt'] ?? $featured['title'] }}" class="h-full w-full object-cover">
@@ -25,8 +25,7 @@
                 </a>
 
                 <div class="flex flex-col justify-center p-6 sm:p-8">
-                    <p class="text-sm font-semibold uppercase tracking-[0.2em] text-primary">{{ $copy['featured'] }}</p>
-                    <p class="mt-4 text-sm text-base-content/60">{{ $featured['category_label'] }}</p>
+                    <p class="text-sm text-base-content/60">{{ $featured['category_label'] }}</p>
                     <h2 class="wrap-anywhere mt-3 text-3xl font-semibold leading-tight">{{ $featured['title'] }}</h2>
 
                     @if ($featured['excerpt'])
@@ -41,7 +40,7 @@
 
             <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($posts->skip(1) as $post)
-                    <article class="overflow-hidden rounded-lg border border-white/10 bg-base-200">
+                    <article class="overflow-hidden rounded-lg border border-primary/15 bg-base-200/90 shadow-lg shadow-fuchsia-950/10 transition hover:border-primary/40">
                         <a href="{{ $post['url'] }}" class="block aspect-[16/10] bg-base-300">
                             @if ($post['image'])
                                 <img src="{{ $post['image'] }}" alt="{{ $post['image_alt'] ?? $post['title'] }}" class="h-full w-full object-cover">
@@ -67,6 +66,12 @@
             <div class="mt-10">
                 {{ $posts->links() }}
             </div>
+
+            <section class="mt-14 border-t border-primary/20 pt-10">
+                <p class="text-sm font-semibold uppercase tracking-[0.25em] text-primary">{{ $copy['eyebrow'] }}</p>
+                <h2 class="wrap-anywhere mt-4 text-2xl font-semibold leading-tight text-base-content sm:text-3xl">{{ $copy['about_heading'] }}</h2>
+                <p class="mt-4 max-w-3xl text-base leading-7 text-base-content/75">{{ $copy['about_body'] }}</p>
+            </section>
         @endif
     </main>
 </x-layouts.app>

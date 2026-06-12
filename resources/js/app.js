@@ -1,4 +1,31 @@
-import '../css/app.css';
+const renderMermaidDiagrams = () => {
+    if (!document.querySelector('.mermaid')) {
+        return;
+    }
+
+    import('mermaid')
+        .then(({ default: mermaid }) => {
+            mermaid.initialize({
+                startOnLoad: false,
+                securityLevel: 'strict',
+                theme: 'base',
+                themeVariables: {
+                    background: 'transparent',
+                    primaryColor: '#1c1630',
+                    primaryTextColor: '#f5f1ff',
+                    primaryBorderColor: '#26d9ff',
+                    lineColor: '#f7931a',
+                    secondaryColor: '#241337',
+                    tertiaryColor: '#130821',
+                },
+            });
+
+            return mermaid.run({ querySelector: '.mermaid' });
+        })
+        .catch((error) => {
+            window.console.warn('Unable to render Mermaid diagram.', error);
+        });
+};
 
 const setCookie = (name, value) => {
     document.cookie = `${name}=${value}; path=/; max-age=31536000; SameSite=Lax`;
@@ -23,3 +50,5 @@ document.querySelectorAll('[data-appearance-value]').forEach((button) => {
         window.location.reload();
     });
 });
+
+document.addEventListener('DOMContentLoaded', renderMermaidDiagrams);

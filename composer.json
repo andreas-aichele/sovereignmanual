@@ -13,6 +13,7 @@
         "laravel/fortify": "^1.37.2",
         "laravel/framework": "^13.7",
         "laravel/tinker": "^3.0",
+        "mallardduck/blade-lucide-icons": "^1.26",
         "owen-it/laravel-auditing": "^14.0",
         "spatie/laravel-permission": "^7.4"
     },

@@ -429,7 +429,7 @@ class MagazineAiPipeline
         $metadata = [
             'style' => 'synthwave-cypherpunk',
             'role' => 'header',
-            'prompt_version' => 1,
+            'prompt_version' => 2,
             'no_unsplash' => true,
         ];
 
@@ -440,7 +440,7 @@ class MagazineAiPipeline
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
-                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty cover for {$topic->title}",
+                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty background for {$topic->title}",
                 'status' => 'pending',
                 'metadata' => $metadata + ['reason' => 'image_generation_not_configured'],
             ]);
@@ -467,7 +467,7 @@ class MagazineAiPipeline
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
-                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty cover for {$topic->title}",
+                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty background for {$topic->title}",
                 'status' => is_string($path) ? 'ready' : 'pending',
                 'metadata' => $metadata,
             ]);
@@ -489,7 +489,7 @@ class MagazineAiPipeline
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
-                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty cover for {$topic->title}",
+                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty background for {$topic->title}",
                 'status' => 'pending',
                 'metadata' => $metadata + ['error' => $exception->getMessage()],
             ]);
@@ -500,7 +500,7 @@ class MagazineAiPipeline
 
     private function synthwaveImagePrompt(ContentTopic $topic): string
     {
-        return "Premium synthwave editorial header image for article topic: {$topic->title}. Audience level: {$topic->audience_level}. Bitcoin financial sovereignty context, dark readable magazine composition, Bitcoin orange focal light, restrained neon cyan and magenta accents, subtle grid lines, abstract ledger details, no text in image, no logos, no real people, no stock-photo look.";
+        return "Full-bleed synthwave editorial website background for article topic: {$topic->title}. Audience level: {$topic->audience_level}. Bitcoin financial sovereignty context, dark readable magazine atmosphere, Bitcoin orange focal light, restrained neon cyan and magenta accents, subtle grid lines, abstract ledger details, human-scale personal scene details like warm desk light, hands, notes, or a non-identifiable silhouette, modern handcrafted editorial character, cinematic depth, natural imperfections. Edge-to-edge background art only; no border, no frame, no book, no magazine mockup, no poster, no device mockup, no page layout, no floating card, no text in image, no logos, no identifiable real people, no stock-photo look, no glossy AI-slop aesthetic.";
     }
 
     /**
