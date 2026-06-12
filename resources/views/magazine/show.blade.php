@@ -15,7 +15,7 @@
         </nav>
 
         <article class="mt-8">
-            <header class="max-w-3xl">
+            <header>
                 <p class="text-sm font-semibold uppercase tracking-[0.2em] text-primary">{{ $post['category_label'] }}</p>
                 <h1 class="wrap-anywhere mt-4 text-4xl font-semibold leading-tight sm:text-6xl">{{ $post['title'] }}</h1>
 
