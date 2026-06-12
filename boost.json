@@ -11,9 +11,7 @@
         "ai-sdk-development",
         "fortify-development",
         "laravel-best-practices",
-        "wayfinder-development",
         "pest-testing",
-        "inertia-svelte-development",
         "tailwindcss-development"
     ]
 }

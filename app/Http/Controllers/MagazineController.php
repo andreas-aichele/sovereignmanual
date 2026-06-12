@@ -5,15 +5,14 @@ namespace App\Http\Controllers;
 use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\PostAsset;
+use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
-use Inertia\Inertia;
-use Inertia\Response;
 
 class MagazineController extends Controller
 {
-    public function index(Request $request, ?string $locale = null): Response
+    public function index(Request $request, ?string $locale = null): View
     {
         $locale ??= 'en';
 
@@ -26,7 +25,7 @@ class MagazineController extends Controller
             ->paginate(12)
             ->through(fn (Post $post): array => $this->serializePostSummary($post, $locale));
 
-        return Inertia::render('Magazine/Index', [
+        return view('magazine.index', [
             'locale' => $locale,
             'alternateLocale' => $this->translation('alternate_locale', $locale),
             'posts' => $posts,
@@ -35,7 +34,7 @@ class MagazineController extends Controller
         ]);
     }
 
-    public function show(Request $request, string $slug, ?string $locale = null): Response
+    public function show(Request $request, string $slug, ?string $locale = null): View
     {
         $locale ??= 'en';
 
@@ -53,7 +52,7 @@ class MagazineController extends Controller
 
         abort_if($translation === null, 404);
 
-        return Inertia::render('Magazine/Show', [
+        return view('magazine.show', [
             'locale' => $locale,
             'post' => [
                 ...$this->serializePostSummary($post, $locale),

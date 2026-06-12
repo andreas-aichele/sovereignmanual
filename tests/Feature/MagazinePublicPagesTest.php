@@ -3,7 +3,6 @@
 use App\Models\ContentTopic;
 use App\Models\Post;
 use App\Models\PostTranslation;
-use Inertia\Testing\AssertableInertia;
 
 test('published posts appear on the magazine index', function () {
     $topic = ContentTopic::factory()->create([
@@ -24,13 +23,10 @@ test('published posts appear on the magazine index', function () {
 
     $this->get(route('magazine.index'))
         ->assertSuccessful()
-        ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('Magazine/Index')
-            ->where('posts.data.0.title', 'Bitcoin self custody basics')
-            ->where('posts.data.0.category', 'self-custody')
-            ->where('posts.data.0.category_label', 'Self custody')
-            ->where('posts.data.0.image_placeholder.category', 'self-custody')
-            ->where('posts.data.0.image_placeholder.accent', '#F7931A'));
+        ->assertViewIs('magazine.index')
+        ->assertSee('Bitcoin self custody basics')
+        ->assertSee('Self custody')
+        ->assertSee('#F7931A', false);
 });
 
 test('newest published post leads the magazine index', function () {
@@ -57,10 +53,8 @@ test('newest published post leads the magazine index', function () {
 
     $this->get(route('magazine.index'))
         ->assertSuccessful()
-        ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('Magazine/Index')
-            ->where('posts.data.0.title', 'Newest article')
-            ->where('posts.data.1.title', 'Older article'));
+        ->assertViewIs('magazine.index')
+        ->assertSeeInOrder(['Newest article', 'Older article']);
 });
 
 test('unpublished posts are hidden from the public magazine', function () {
@@ -95,12 +89,11 @@ test('localized german posts render through the german route', function () {
 
     $this->get(route('magazine.de.show', 'bitcoin-selbstverwahrung'))
         ->assertSuccessful()
-        ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('Magazine/Show')
-            ->where('locale', 'de')
-            ->where('post.title', 'Bitcoin Selbstverwahrung')
-            ->where('post.image_placeholder.category', 'bitcoin')
-            ->where('copy.back', 'Zurück zum Magazin'));
+        ->assertViewIs('magazine.show')
+        ->assertViewHas('locale', 'de')
+        ->assertSee('Bitcoin Selbstverwahrung')
+        ->assertSee('bitcoin')
+        ->assertSee('Zurück zum Magazin');
 });
 
 test('german category labels use correct umlauts', function () {
@@ -121,9 +114,8 @@ test('german category labels use correct umlauts', function () {
 
     $this->get(route('magazine.de.index'))
         ->assertSuccessful()
-        ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('Magazine/Index')
-            ->where('posts.data.0.category_label', 'Finanzielle Unabhängigkeit'));
+        ->assertViewIs('magazine.index')
+        ->assertSee('Finanzielle Unabhängigkeit');
 });
 
 test('markdown is rendered to sanitized html for articles', function () {
@@ -139,10 +131,9 @@ test('markdown is rendered to sanitized html for articles', function () {
 
     $this->get(route('magazine.show', 'markdown-rendering'))
         ->assertSuccessful()
-        ->assertInertia(fn (AssertableInertia $page) => $page
-            ->component('Magazine/Show')
-            ->where('post.html', fn (string $html): bool => str_contains($html, '<h1>Markdown Rendering</h1>')
-                && str_contains($html, '<strong>strong</strong>')
-                && str_contains($html, '<li>first</li>')
-                && ! str_contains($html, '<script>')));
+        ->assertViewIs('magazine.show')
+        ->assertSee('<h1>Markdown Rendering</h1>', false)
+        ->assertSee('<strong>strong</strong>', false)
+        ->assertSee('<li>first</li>', false)
+        ->assertDontSee('<script>', false);
 });

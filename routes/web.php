@@ -9,7 +9,7 @@ Route::get('magazine/{slug}', [MagazineController::class, 'show'])->name('magazi
 Route::get('de/magazine/{slug}', [MagazineController::class, 'show'])->defaults('locale', 'de')->name('magazine.de.show');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::inertia('dashboard', 'Dashboard')->name('dashboard');
+    Route::view('dashboard', 'dashboard')->name('dashboard');
 });
 
 require __DIR__.'/settings.php';

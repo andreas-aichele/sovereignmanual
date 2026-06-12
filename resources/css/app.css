@@ -97,3 +97,55 @@
         @apply bg-base-100 text-base-content;
     }
 }
+
+@layer components {
+    .content-body {
+        @apply text-base leading-7 text-base-content/85;
+    }
+
+    .content-body h1,
+    .content-body h2,
+    .content-body h3 {
+        @apply mt-10 mb-4 leading-tight font-semibold text-base-content;
+        overflow-wrap: anywhere;
+    }
+
+    .content-body h1 {
+        @apply text-3xl;
+    }
+
+    .content-body h2 {
+        @apply text-2xl;
+    }
+
+    .content-body h3 {
+        @apply text-xl;
+    }
+
+    .content-body p,
+    .content-body ul,
+    .content-body ol {
+        @apply my-5;
+    }
+
+    .content-body ul,
+    .content-body ol {
+        @apply pl-6;
+    }
+
+    .content-body ul {
+        @apply list-disc;
+    }
+
+    .content-body ol {
+        @apply list-decimal;
+    }
+
+    .content-body a {
+        @apply text-primary underline underline-offset-4;
+    }
+
+    .content-body strong {
+        @apply font-semibold text-base-content;
+    }
+}
