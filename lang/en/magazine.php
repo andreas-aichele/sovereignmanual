@@ -24,6 +24,7 @@ return [
         'details' => 'Article details',
         'language' => 'Language',
         'magazine' => 'Magazine',
+        'toc' => 'Contents',
     ],
     'categories' => [
         'bitcoin' => 'Bitcoin',

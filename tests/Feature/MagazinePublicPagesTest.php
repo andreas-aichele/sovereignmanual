@@ -139,3 +139,26 @@ test('markdown is rendered to sanitized html for articles', function () {
         ->assertSee('<li>first</li>', false)
         ->assertDontSee('<script>', false);
 });
+
+test('article headings render table of contents anchor links', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Linked Contents',
+        'slug' => 'linked-contents',
+        'markdown' => "## Risk Model\n\nText.\n\n### Cold Storage\n\nText.\n\n## Risk Model\n\nDuplicate heading.",
+    ]);
+
+    $this->get(route('magazine.show', 'linked-contents'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('Contents')
+        ->assertSee('<h2 id="risk-model">Risk Model</h2>', false)
+        ->assertSee('<h3 id="cold-storage">Cold Storage</h3>', false)
+        ->assertSee('<h2 id="risk-model-2">Risk Model</h2>', false)
+        ->assertSee('href="#risk-model"', false)
+        ->assertSee('href="#cold-storage"', false)
+        ->assertSee('href="#risk-model-2"', false);
+});

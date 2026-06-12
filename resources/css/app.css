@@ -122,6 +122,11 @@
         @apply text-xl;
     }
 
+    .content-body h2[id],
+    .content-body h3[id] {
+        @apply scroll-mt-24;
+    }
+
     .content-body p,
     .content-body ul,
     .content-body ol,

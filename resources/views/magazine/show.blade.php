@@ -32,6 +32,22 @@
                 @endif
             </div>
 
+            @if (count($post['toc']) > 0)
+                <details class="mt-8 rounded-lg border border-white/10 bg-base-200 p-4 text-sm open:border-primary/50 lg:hidden">
+                    <summary class="cursor-pointer select-none font-semibold uppercase tracking-[0.2em] text-primary">{{ $copy['toc'] }}</summary>
+
+                    <ol class="mt-4 space-y-3">
+                        @foreach ($post['toc'] as $item)
+                            <li class="{{ $item['level'] === 3 ? 'pl-4' : '' }}">
+                                <a href="#{{ $item['id'] }}" class="block leading-snug text-base-content/75 underline-offset-4 hover:text-primary hover:underline">
+                                    {{ $item['title'] }}
+                                </a>
+                            </li>
+                        @endforeach
+                    </ol>
+                </details>
+            @endif
+
             <div class="mt-10 grid gap-10 lg:grid-cols-[minmax(0,48rem)_16rem] lg:items-start lg:gap-14">
                 <div class="min-w-0">
                     <div class="content-body max-w-none">
@@ -49,7 +65,23 @@
                     @endforeach
                 </div>
 
-                <aside class="border-t border-white/10 pt-6 text-sm lg:sticky lg:top-8 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-6">
+                <aside class="hidden text-sm lg:sticky lg:top-8 lg:block lg:border-l lg:pl-6">
+                    @if (count($post['toc']) > 0)
+                        <nav aria-label="{{ $copy['toc'] }}" class="mb-8">
+                            <p class="font-semibold uppercase tracking-[0.2em] text-primary">{{ $copy['toc'] }}</p>
+
+                            <ol class="mt-4 space-y-3">
+                                @foreach ($post['toc'] as $item)
+                                    <li class="{{ $item['level'] === 3 ? 'pl-4' : '' }}">
+                                        <a href="#{{ $item['id'] }}" class="block leading-snug text-base-content/70 underline-offset-4 transition hover:text-primary hover:underline">
+                                            {{ $item['title'] }}
+                                        </a>
+                                    </li>
+                                @endforeach
+                            </ol>
+                        </nav>
+                    @endif
+
                     <p class="font-semibold uppercase tracking-[0.2em] text-primary">{{ $copy['details'] }}</p>
 
                     <dl class="mt-5 space-y-5">

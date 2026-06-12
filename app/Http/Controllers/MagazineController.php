@@ -52,26 +52,41 @@ class MagazineController extends Controller
 
         abort_if($translation === null, 404);
 
+        $usedHeadingIds = [];
+        $tableOfContents = [];
+        $article = $this->renderMarkdownWithTableOfContents($translation->markdown, $usedHeadingIds);
+        $tableOfContents = $article['toc'];
+        $blocks = $post->blocks
+            ->where('locale', $locale)
+            ->values()
+            ->map(function ($block) use (&$usedHeadingIds, &$tableOfContents): array {
+                $renderedBlock = $this->renderMarkdownWithTableOfContents($block->markdown, $usedHeadingIds);
+                $tableOfContents = [
+                    ...$tableOfContents,
+                    ...$renderedBlock['toc'],
+                ];
+
+                return [
+                    'id' => $block->id,
+                    'type' => $block->type,
+                    'markdown' => $block->markdown,
+                    'html' => $renderedBlock['html'],
+                    'data' => $block->data,
+                    'asset' => $block->asset ? [
+                        'url' => $block->asset->url,
+                        'alt' => $block->asset->alt_text,
+                    ] : null,
+                ];
+            });
+
         return view('magazine.show', [
             'locale' => $locale,
             'post' => [
                 ...$this->serializePostSummary($post, $locale),
                 'markdown' => $translation->markdown,
-                'html' => $this->renderMarkdown($translation->markdown),
-                'blocks' => $post->blocks
-                    ->where('locale', $locale)
-                    ->values()
-                    ->map(fn ($block): array => [
-                        'id' => $block->id,
-                        'type' => $block->type,
-                        'markdown' => $block->markdown,
-                        'html' => $this->renderMarkdown($block->markdown),
-                        'data' => $block->data,
-                        'asset' => $block->asset ? [
-                            'url' => $block->asset->url,
-                            'alt' => $block->asset->alt_text,
-                        ] : null,
-                    ]),
+                'html' => $article['html'],
+                'blocks' => $blocks,
+                'toc' => $tableOfContents,
             ],
             'copy' => $this->translationArray('show', $locale),
             'meta' => [
@@ -167,14 +182,62 @@ class MagazineController extends Controller
         return route($this->translation('routes.show', $alternateLocale), $translation->slug);
     }
 
-    private function renderMarkdown(?string $markdown): string
+    /**
+     * @param  array<string, int>  $usedHeadingIds
+     * @return array{html: string, toc: array<int, array{id: string, title: string, level: int}>}
+     */
+    private function renderMarkdownWithTableOfContents(?string $markdown, array &$usedHeadingIds): array
     {
-        return Str::of($markdown ?? '')
+        $toc = [];
+        $html = Str::of($markdown ?? '')
             ->markdown([
                 'html_input' => 'strip',
                 'allow_unsafe_links' => false,
             ])
             ->toString();
+
+        $html = preg_replace_callback(
+            '/<h([23])>(.*?)<\/h\1>/s',
+            function (array $matches) use (&$toc, &$usedHeadingIds): string {
+                $level = (int) $matches[1];
+                $htmlTitle = $matches[2];
+                $title = trim(html_entity_decode(strip_tags($htmlTitle), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+
+                if ($title === '') {
+                    return $matches[0];
+                }
+
+                $id = $this->uniqueHeadingId($title, $usedHeadingIds);
+                $toc[] = [
+                    'id' => $id,
+                    'title' => $title,
+                    'level' => $level,
+                ];
+
+                return "<h{$level} id=\"{$id}\">{$htmlTitle}</h{$level}>";
+            },
+            $html
+        );
+
+        return [
+            'html' => $html ?? '',
+            'toc' => $toc,
+        ];
+    }
+
+    /**
+     * @param  array<string, int>  $usedHeadingIds
+     */
+    private function uniqueHeadingId(string $title, array &$usedHeadingIds): string
+    {
+        $baseId = Str::slug($title) ?: 'section';
+        $usedHeadingIds[$baseId] = ($usedHeadingIds[$baseId] ?? 0) + 1;
+
+        if ($usedHeadingIds[$baseId] === 1) {
+            return $baseId;
+        }
+
+        return "{$baseId}-{$usedHeadingIds[$baseId]}";
     }
 
     private function translation(string $key, string $locale): string
