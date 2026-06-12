@@ -21,6 +21,7 @@ test('pipeline creates a published post with english and german translations', f
     $germanTranslation = $post->translations()->where('locale', 'de')->firstOrFail();
     $asset = $post->assets()->firstOrFail();
     $englishBlockTypes = $post->blocks()->where('locale', 'en')->pluck('type')->all();
+    $englishSection = $post->blocks()->where('locale', 'en')->where('type', 'section')->firstOrFail();
 
     expect($post->status)->toBe(PostStatus::Published)
         ->and($post->translations()->where('locale', 'en')->exists())->toBeTrue()
@@ -29,6 +30,9 @@ test('pipeline creates a published post with english and german translations', f
         ->and($germanTranslation->slug)->toBe('warum-bitcoin-verwahrung-wichtig-ist')
         ->and($post->blocks()->where('locale', 'en')->count())->toBeGreaterThan(1)
         ->and($post->blocks()->where('locale', 'de')->count())->toBeGreaterThan(1)
+        ->and($englishBlockTypes)->toContain('section')
+        ->and($englishSection->heading)->toBe('Why Bitcoin custody matters')
+        ->and($englishSection->anchor)->toBe('why-bitcoin-custody-matters')
         ->and($englishBlockTypes)->toContain('flow_diagram')
         ->and($asset->url)->toBeNull()
         ->and($asset->metadata['role'])->toBe('header')
@@ -55,6 +59,15 @@ test('pipeline fallback german titles use correct umlauts', function () {
         ->and($germanInsight->data['title'])->toBe('Kernaussage')
         ->and($germanTranslation->markdown)->not->toContain('Souveraene')
         ->and($germanTranslation->markdown)->not->toContain('Unabhaengigkeit');
+});
+
+test('pipeline block planning preserves article detail up to twelve blocks', function () {
+    $pipeline = file_get_contents(app_path('Services/MagazineAiPipeline.php'));
+
+    expect($pipeline)->toContain('Preserve the full article detail')
+        ->and($pipeline)->toContain('Do not summarize, shorten, or omit practical examples')
+        ->and($pipeline)->toContain('Split the full draft into section blocks with several paragraphs each')
+        ->and($pipeline)->toContain('->take(12)');
 });
 
 test('topic ideation creates scheduled topics', function () {

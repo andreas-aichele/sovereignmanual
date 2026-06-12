@@ -15,6 +15,8 @@ use OwenIt\Auditing\Contracts\Auditable;
     'locale',
     'type',
     'sort_order',
+    'heading',
+    'anchor',
     'markdown',
     'data',
 ])]

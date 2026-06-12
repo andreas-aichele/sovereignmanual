@@ -2,6 +2,7 @@
 
 use App\Models\ContentTopic;
 use App\Models\Post;
+use App\Models\PostBlock;
 use App\Models\PostTranslation;
 
 test('published posts appear on the magazine index', function () {
@@ -161,4 +162,33 @@ test('article headings render table of contents anchor links', function () {
         ->assertSee('href="#risk-model"', false)
         ->assertSee('href="#cold-storage"', false)
         ->assertSee('href="#risk-model-2"', false);
+});
+
+test('structured post blocks provide table of contents anchors before markdown fallback parsing', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Structured Contents',
+        'slug' => 'structured-contents',
+        'markdown' => '## Legacy Heading',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'section',
+        'sort_order' => 0,
+        'heading' => 'Custody Basics',
+        'anchor' => 'custody-basics',
+        'markdown' => 'A structured section.',
+    ]);
+
+    $this->get(route('magazine.show', 'structured-contents'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<h2 id="custody-basics">Custody Basics</h2>', false)
+        ->assertSee('href="#custody-basics"', false)
+        ->assertDontSee('Legacy Heading');
 });

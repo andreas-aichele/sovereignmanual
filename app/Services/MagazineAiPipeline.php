@@ -238,7 +238,7 @@ class MagazineAiPipeline
         ];
 
         $response = $this->promptJsonWithFallback(
-            instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Use these block types only: markdown, insight, checklist, flow_diagram, sketch. Do not include raw HTML or raw SVG.',
+            instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for article sections with a heading, anchor, and markdown body that does not repeat the heading. Visual blocks may supplement the article, but must not replace section text. Do not include raw HTML or raw SVG.',
             prompt: json_encode([
                 'locale' => $locale,
                 'topic' => $topic->title,
@@ -248,8 +248,10 @@ class MagazineAiPipeline
                 'schema' => [
                     'blocks' => [
                         [
-                            'type' => 'markdown',
-                            'markdown' => 'Markdown section text',
+                            'type' => 'section',
+                            'heading' => 'Section heading',
+                            'anchor' => 'section-heading',
+                            'markdown' => 'Markdown section body without the heading',
                             'data' => [],
                         ],
                         [
@@ -290,21 +292,25 @@ class MagazineAiPipeline
             return $this->fallbackBlocks($title, $locale, $markdown);
         }
 
-        $allowedTypes = ['markdown', 'insight', 'checklist', 'flow_diagram', 'sketch'];
+        $allowedTypes = ['section', 'markdown', 'insight', 'checklist', 'flow_diagram', 'sketch'];
         $sanitized = collect($blocks)
             ->filter(fn (mixed $block): bool => is_array($block))
             ->map(function (array $block) use ($allowedTypes): array {
                 $type = in_array($block['type'] ?? null, $allowedTypes, true) ? $block['type'] : 'markdown';
                 $data = is_array($block['data'] ?? null) ? $this->sanitizeBlockData($block['data']) : [];
+                $heading = $type === 'section' ? $this->cleanText((string) ($block['heading'] ?? ''), '') : null;
+                $anchor = filled($heading) ? Str::slug((string) ($block['anchor'] ?? $heading)) : null;
 
                 return [
                     'type' => $type,
-                    'markdown' => $type === 'markdown' ? $this->cleanMarkdown($block['markdown'] ?? null) : null,
+                    'heading' => filled($heading) ? $heading : null,
+                    'anchor' => filled($anchor) ? $anchor : null,
+                    'markdown' => in_array($type, ['section', 'markdown'], true) ? $this->cleanMarkdown($block['markdown'] ?? null) : null,
                     'data' => $data,
                 ];
             })
-            ->filter(fn (array $block): bool => $block['type'] !== 'markdown' || filled($block['markdown']))
-            ->take(8)
+            ->filter(fn (array $block): bool => ! in_array($block['type'], ['section', 'markdown'], true) || filled($block['markdown']))
+            ->take(12)
             ->values()
             ->all();
 
@@ -349,8 +355,18 @@ class MagazineAiPipeline
     private function markdownFromBlocks(array $blocks, string $fallback): string
     {
         $markdown = collect($blocks)
-            ->pluck('markdown')
-            ->filter(fn (mixed $markdown): bool => filled($markdown))
+            ->map(function (array $block): ?string {
+                if (! filled($block['markdown'] ?? null)) {
+                    return null;
+                }
+
+                if (($block['type'] ?? null) === 'section' && filled($block['heading'] ?? null)) {
+                    return "## {$block['heading']}\n\n{$block['markdown']}";
+                }
+
+                return $block['markdown'];
+            })
+            ->filter(fn (?string $markdown): bool => filled($markdown))
             ->implode("\n\n");
 
         return filled($markdown) ? $markdown : $fallback;
@@ -366,8 +382,10 @@ class MagazineAiPipeline
                 'locale' => $locale,
                 'type' => $block['type'],
                 'sort_order' => $index,
-                'markdown' => $block['markdown'],
-                'data' => $block['data'],
+                'heading' => $block['heading'] ?? null,
+                'anchor' => $block['anchor'] ?? null,
+                'markdown' => $block['markdown'] ?? null,
+                'data' => $block['data'] ?? [],
             ]);
         }
     }
@@ -537,8 +555,10 @@ class MagazineAiPipeline
         if ($locale === 'de') {
             return [
                 [
-                    'type' => 'markdown',
-                    'markdown' => $markdown,
+                    'type' => 'section',
+                    'heading' => $title,
+                    'anchor' => Str::slug($title, '-', 'de'),
+                    'markdown' => $this->markdownWithoutLeadingHeading($markdown),
                     'data' => [],
                 ],
                 [
@@ -570,8 +590,10 @@ class MagazineAiPipeline
 
         return [
             [
-                'type' => 'markdown',
-                'markdown' => $markdown,
+                'type' => 'section',
+                'heading' => $title,
+                'anchor' => Str::slug($title),
+                'markdown' => $this->markdownWithoutLeadingHeading($markdown),
                 'data' => [],
             ],
             [
@@ -637,6 +659,14 @@ class MagazineAiPipeline
             ->replaceMatches('/<[^>]+>/', '')
             ->trim()
             ->limit(6000, '')
+            ->toString();
+    }
+
+    private function markdownWithoutLeadingHeading(string $markdown): string
+    {
+        return Str::of($markdown)
+            ->replaceMatches('/\A#{1,3}\s+.+\R{2,}/u', '')
+            ->trim()
             ->toString();
     }
 

@@ -21,8 +21,10 @@ class PostBlockFactory extends Factory
         return [
             'post_id' => Post::factory(),
             'locale' => 'en',
-            'type' => 'markdown',
+            'type' => 'section',
             'sort_order' => fake()->numberBetween(0, 10),
+            'heading' => fake()->sentence(3),
+            'anchor' => fake()->slug(3),
             'markdown' => fake()->paragraphs(2, true),
             'data' => [],
         ];

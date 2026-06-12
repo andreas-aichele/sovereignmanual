@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\PostAsset;
+use App\Models\PostBlock;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Lang;
@@ -54,13 +55,16 @@ class MagazineController extends Controller
 
         $usedHeadingIds = [];
         $tableOfContents = [];
-        $article = $this->renderMarkdownWithTableOfContents($translation->markdown, $usedHeadingIds);
-        $tableOfContents = $article['toc'];
-        $blocks = $post->blocks
+        $localizedBlocks = $post->blocks
             ->where('locale', $locale)
-            ->values()
-            ->map(function ($block) use (&$usedHeadingIds, &$tableOfContents): array {
-                $renderedBlock = $this->renderMarkdownWithTableOfContents($block->markdown, $usedHeadingIds);
+            ->values();
+        $article = $localizedBlocks->isEmpty()
+            ? $this->renderMarkdownWithTableOfContents($translation->markdown, $usedHeadingIds)
+            : ['html' => '', 'toc' => []];
+        $tableOfContents = $article['toc'];
+        $blocks = $localizedBlocks
+            ->map(function (PostBlock $block) use (&$usedHeadingIds, &$tableOfContents): array {
+                $renderedBlock = $this->renderBlock($block, $usedHeadingIds);
                 $tableOfContents = [
                     ...$tableOfContents,
                     ...$renderedBlock['toc'],
@@ -70,6 +74,8 @@ class MagazineController extends Controller
                     'id' => $block->id,
                     'type' => $block->type,
                     'markdown' => $block->markdown,
+                    'heading' => $block->heading,
+                    'anchor' => $block->anchor,
                     'html' => $renderedBlock['html'],
                     'data' => $block->data,
                     'asset' => $block->asset ? [
@@ -186,6 +192,49 @@ class MagazineController extends Controller
      * @param  array<string, int>  $usedHeadingIds
      * @return array{html: string, toc: array<int, array{id: string, title: string, level: int}>}
      */
+    private function renderBlock(PostBlock $block, array &$usedHeadingIds): array
+    {
+        if (! in_array($block->type, ['section', 'markdown'], true)) {
+            return [
+                'html' => '',
+                'toc' => [],
+            ];
+        }
+
+        $toc = [];
+        $heading = $this->cleanHeading($block->heading);
+        $headingHtml = '';
+
+        if ($heading !== null) {
+            $id = $this->uniqueHeadingId($block->anchor ?: $heading, $usedHeadingIds);
+            $toc[] = [
+                'id' => $id,
+                'title' => $heading,
+                'level' => 2,
+            ];
+            $headingHtml = '<h2 id="'.$id.'">'.e($heading).'</h2>';
+        }
+
+        $renderedMarkdown = $heading === null
+            ? $this->renderMarkdownWithTableOfContents($block->markdown, $usedHeadingIds)
+            : [
+                'html' => $this->renderMarkdown($block->markdown),
+                'toc' => [],
+            ];
+
+        return [
+            'html' => $headingHtml.$renderedMarkdown['html'],
+            'toc' => [
+                ...$toc,
+                ...$renderedMarkdown['toc'],
+            ],
+        ];
+    }
+
+    /**
+     * @param  array<string, int>  $usedHeadingIds
+     * @return array{html: string, toc: array<int, array{id: string, title: string, level: int}>}
+     */
     private function renderMarkdownWithTableOfContents(?string $markdown, array &$usedHeadingIds): array
     {
         $toc = [];
@@ -225,6 +274,16 @@ class MagazineController extends Controller
         ];
     }
 
+    private function renderMarkdown(?string $markdown): string
+    {
+        return Str::of($markdown ?? '')
+            ->markdown([
+                'html_input' => 'strip',
+                'allow_unsafe_links' => false,
+            ])
+            ->toString();
+    }
+
     /**
      * @param  array<string, int>  $usedHeadingIds
      */
@@ -238,6 +297,13 @@ class MagazineController extends Controller
         }
 
         return "{$baseId}-{$usedHeadingIds[$baseId]}";
+    }
+
+    private function cleanHeading(?string $heading): ?string
+    {
+        $heading = trim((string) $heading);
+
+        return $heading === '' ? null : $heading;
     }
 
     private function translation(string $key, string $locale): string
