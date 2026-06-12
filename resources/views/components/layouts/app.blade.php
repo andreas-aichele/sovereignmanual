@@ -26,7 +26,7 @@
         <link rel="icon" href="/logo.svg" type="image/svg+xml">
 
         @fonts
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
+        @vite('resources/js/app.js')
     </head>
     <body class="min-h-screen bg-base-100 font-sans text-base-content antialiased">
         <div class="min-h-screen">
