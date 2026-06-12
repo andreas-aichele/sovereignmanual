@@ -1,6 +1,5 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
-@import './background.css';
 
 @plugin "daisyui";
 
@@ -99,9 +98,13 @@
 
     body {
         @apply bg-base-100 text-base-content;
+        --parallax-grid-x: 0px;
+        --parallax-grid-y: 0px;
+        --parallax-x: 0px;
+        --parallax-y: 0px;
         background:
-            radial-gradient(circle at 12% 8%, color-mix(in oklch, var(--color-accent) 28%, transparent), transparent 28rem),
-            radial-gradient(circle at 86% 18%, color-mix(in oklch, var(--color-info) 24%, transparent), transparent 24rem),
+            radial-gradient(circle at calc(12% + var(--parallax-x)) calc(8% + var(--parallax-y)), color-mix(in oklch, var(--color-accent) 28%, transparent), transparent 28rem),
+            radial-gradient(circle at calc(86% - var(--parallax-x)) calc(18% - var(--parallax-y)), color-mix(in oklch, var(--color-info) 24%, transparent), transparent 24rem),
             linear-gradient(180deg, color-mix(in oklch, var(--color-base-100) 88%, black), var(--color-base-100) 38rem);
         min-height: 100vh;
     }
@@ -110,6 +113,9 @@
         background:
             linear-gradient(color-mix(in oklch, var(--color-primary) 12%, transparent) 1px, transparent 1px),
             linear-gradient(90deg, color-mix(in oklch, var(--color-info) 10%, transparent) 1px, transparent 1px);
+        background-position:
+            var(--parallax-grid-x) var(--parallax-grid-y),
+            var(--parallax-grid-x) var(--parallax-grid-y);
         background-size: 4rem 4rem;
         content: '';
         inset: 0;
@@ -118,6 +124,15 @@
         pointer-events: none;
         position: fixed;
         z-index: -1;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        body {
+            --parallax-grid-x: 0px;
+            --parallax-grid-y: 0px;
+            --parallax-x: 0px;
+            --parallax-y: 0px;
+        }
     }
 }
 

@@ -28,7 +28,11 @@ test('frontend entry is a blade asset', function () {
         ->and($contents)->not->toContain("import '../css/app.css'")
         ->and($contents)->toContain("import('mermaid')")
         ->and($contents)->toContain('mermaid.initialize')
-        ->and($contents)->toContain("querySelector: '.mermaid'");
+        ->and($contents)->toContain("querySelector: '.mermaid'")
+        ->and($contents)->toContain('setupBackgroundParallax')
+        ->and($contents)->toContain('requestAnimationFrame')
+        ->and($contents)->toContain('prefers-reduced-motion: reduce')
+        ->and($contents)->toContain('--parallax-x');
 });
 
 test('frontend css loads before body scripts', function () {
@@ -95,7 +99,7 @@ test('public navigation uses a scalable language dropdown', function () {
 test('magazine headings can break long words', function () {
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
-    $css = file_get_contents(resource_path('css/background.css'));
+    $css = file_get_contents(resource_path('css/app.css'));
 
     expect($index)->toContain('wrap-anywhere')
         ->and($index)->toContain('text-3xl')
@@ -103,6 +107,16 @@ test('magazine headings can break long words', function () {
         ->and($show)->toContain('wrap-anywhere')
         ->and($show)->toContain('text-4xl')
         ->and($css)->toContain('overflow-wrap: anywhere;');
+});
+
+test('public magazine css no longer ships legacy background stylesheet', function () {
+    $css = file_get_contents(resource_path('css/app.css'));
+
+    expect(resource_path('css/background.css'))->not->toBeFile()
+        ->and($css)->not->toContain("@import './background.css'")
+        ->and($css)->not->toContain('.synthwave-page')
+        ->and($css)->not->toContain('.synthwave-hero-grid')
+        ->and($css)->not->toContain('.article-markdown');
 });
 
 test('magazine article layout keeps public container width and readable article content', function () {
@@ -171,9 +185,13 @@ test('public magazine styles restore synthwave atmosphere without removing reada
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
     $nav = file_get_contents(resource_path('views/components/public-nav.blade.php'));
 
-    expect($css)->toContain('radial-gradient(circle at 12% 8%')
+    expect($css)->toContain('radial-gradient(circle at calc(12% + var(--parallax-x)) calc(8% + var(--parallax-y))')
+        ->and($css)->toContain('radial-gradient(circle at calc(86% - var(--parallax-x)) calc(18% - var(--parallax-y))')
         ->and($css)->toContain('body::before')
+        ->and($css)->toContain('background-position:')
+        ->and($css)->toContain('var(--parallax-grid-x) var(--parallax-grid-y)')
         ->and($css)->toContain('background-size: 4rem 4rem')
+        ->and($css)->toContain('@media (prefers-reduced-motion: reduce)')
         ->and($index)->toContain('bg-base-200/90')
         ->and($index)->toContain('ring-cyan-300/10')
         ->and($show)->toContain('bg-base-300 shadow-2xl')
