@@ -7,6 +7,7 @@ use App\Enums\AiRunType;
 use App\Enums\ContentTopicStatus;
 use App\Enums\PostStatus;
 use App\Models\AiRun;
+use App\Models\Category;
 use App\Models\ContentTopic;
 use App\Models\Post;
 use App\Models\PostTranslation;
@@ -47,6 +48,7 @@ class MagazineAiPipeline
 
         $post = Post::create([
             'content_topic_id' => $topic->id,
+            'category_id' => $topic->category_id ?? $this->defaultCategory()->id,
             'slug' => $englishSlug,
             'status' => PostStatus::Draft,
             'topic' => $topic->title,
@@ -166,7 +168,7 @@ class MagazineAiPipeline
                 ['slug' => Str::slug($title)],
                 [
                     'title' => $title,
-                    'category' => 'bitcoin',
+                    'category_id' => $this->defaultCategory()->id,
                     'status' => ContentTopicStatus::Scheduled,
                     'priority' => max(1, 10 - $index),
                     'audience_level' => 'intermediate',
@@ -643,7 +645,7 @@ class MagazineAiPipeline
 
         return collect([
             ...$base,
-            $topic->category,
+            $topic->categorySlug(),
             ...Str::of($topic->title.' '.$topic->brief)
                 ->lower()
                 ->replaceMatches('/[^\pL\pN\s-]+/u', ' ')
@@ -666,7 +668,7 @@ class MagazineAiPipeline
     private function internalLinkCandidates(string $locale, ?int $excludePostId = null): array
     {
         return Post::query()
-            ->with(['translations'])
+            ->with(['category', 'translations'])
             ->where('status', PostStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())
@@ -683,13 +685,24 @@ class MagazineAiPipeline
 
                 return [
                     'title' => $translation->title,
-                    'url' => route($locale === 'de' ? 'magazine.de.show' : 'magazine.show', $translation->slug),
+                    'url' => route($locale === 'de' ? 'magazine.de.show' : 'magazine.show', [
+                        'category' => $post->category?->slug ?? 'self-custody',
+                        'slug' => $translation->slug,
+                    ]),
                     'slug' => $translation->slug,
                 ];
             })
             ->filter()
             ->values()
             ->all();
+    }
+
+    private function defaultCategory(): Category
+    {
+        return Category::query()->firstOrCreate(
+            ['slug' => 'self-custody'],
+            ['name' => ['en' => 'Self Custody', 'de' => 'Selbstverwahrung']]
+        );
     }
 
     /**

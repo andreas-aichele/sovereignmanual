@@ -34,8 +34,12 @@ return [
         'toc' => 'Inhalt',
     ],
     'categories' => [
-        'bitcoin' => 'Bitcoin',
-        'financial-independence' => 'Finanzielle Unabhängigkeit',
         'self-custody' => 'Selbstverwahrung',
+        'privacy-security' => 'Privatsphäre & Sicherheit',
+        'financial-sovereignty' => 'Finanzielle Souveränität',
+        'family-legacy' => 'Familie & Nachlass',
+        'tools-practice' => 'Werkzeuge & Praxis',
+        'economics' => 'Ökonomie',
+        'mindset' => 'Denkweise',
     ],
 ];

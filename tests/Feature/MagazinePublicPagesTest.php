@@ -1,17 +1,21 @@
 <?php
 
-use App\Models\ContentTopic;
+use App\Models\Category;
 use App\Models\Post;
 use App\Models\PostBlock;
 use App\Models\PostTranslation;
 
 test('published posts appear on the magazine index', function () {
-    $topic = ContentTopic::factory()->create([
-        'category' => 'self-custody',
-    ]);
+    $category = Category::query()->firstOrCreate(
+        ['slug' => 'self-custody'],
+        ['name' => [
+            'en' => 'Self custody',
+            'de' => 'Selbstverwahrung',
+        ]]
+    );
 
     $post = Post::factory()->published()->create([
-        'content_topic_id' => $topic->id,
+        'category_id' => $category->id,
         'topic' => 'Bitcoin self custody basics',
     ]);
 
@@ -26,7 +30,7 @@ test('published posts appear on the magazine index', function () {
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
         ->assertSee('Bitcoin self custody basics')
-        ->assertSee('Self custody')
+        ->assertSee('Self Custody')
         ->assertSee('fallback.jpg');
 });
 
@@ -68,16 +72,17 @@ test('unpublished posts are hidden from the public magazine', function () {
         'slug' => 'hidden-draft',
     ]);
 
-    $this->get(route('magazine.show', 'hidden-draft'))->assertNotFound();
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'hidden-draft']))->assertNotFound();
 });
 
 test('localized german posts render through the german route', function () {
-    $topic = ContentTopic::factory()->create([
-        'category' => 'bitcoin',
-    ]);
+    $category = Category::query()->firstOrCreate(
+        ['slug' => 'self-custody'],
+        ['name' => ['en' => 'Self Custody', 'de' => 'Selbstverwahrung']]
+    );
 
     $post = Post::factory()->published()->create([
-        'content_topic_id' => $topic->id,
+        'category_id' => $category->id,
     ]);
 
     PostTranslation::factory()->create([
@@ -88,7 +93,7 @@ test('localized german posts render through the german route', function () {
         'markdown' => '# Bitcoin Selbstverwahrung',
     ]);
 
-    $this->get(route('magazine.de.show', 'bitcoin-selbstverwahrung'))
+    $this->get(route('magazine.de.show', ['category' => 'self-custody', 'slug' => 'bitcoin-selbstverwahrung']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertViewHas('locale', 'de')
@@ -101,13 +106,70 @@ test('localized german posts render through the german route', function () {
         ->assertSee('Artikeldetails');
 });
 
-test('german category labels use correct umlauts', function () {
-    $topic = ContentTopic::factory()->create([
-        'category' => 'financial-independence',
-    ]);
+test('article urls are scoped by their real category', function () {
+    $category = Category::query()->firstOrCreate(
+        ['slug' => 'self-custody'],
+        ['name' => [
+            'en' => 'Self custody',
+            'de' => 'Selbstverwahrung',
+        ]]
+    );
 
     $post = Post::factory()->published()->create([
-        'content_topic_id' => $topic->id,
+        'category_id' => $category->id,
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Wallet Backups',
+        'slug' => 'wallet-backups',
+    ]);
+
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'wallet-backups']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show');
+
+    $this->get(route('magazine.show', ['category' => 'privacy-security', 'slug' => 'wallet-backups']))
+        ->assertNotFound();
+});
+
+test('legacy magazine article urls redirect to category urls', function () {
+    $category = Category::query()->firstOrCreate(
+        ['slug' => 'self-custody'],
+        ['name' => [
+            'en' => 'Self custody',
+            'de' => 'Selbstverwahrung',
+        ]]
+    );
+
+    $post = Post::factory()->published()->create([
+        'category_id' => $category->id,
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Wallet Backups',
+        'slug' => 'wallet-backups',
+    ]);
+
+    $this->get(route('magazine.legacy.show', 'wallet-backups'))
+        ->assertMovedPermanently()
+        ->assertRedirect(route('magazine.show', ['category' => 'self-custody', 'slug' => 'wallet-backups']));
+});
+
+test('german category labels use correct umlauts', function () {
+    $category = Category::query()->firstOrCreate(
+        ['slug' => 'financial-sovereignty'],
+        ['name' => [
+            'en' => 'Financial Sovereignty',
+            'de' => 'Finanzielle Souveränität',
+        ]]
+    );
+
+    $post = Post::factory()->published()->create([
+        'category_id' => $category->id,
     ]);
 
     PostTranslation::factory()->create([
@@ -158,7 +220,7 @@ test('markdown is rendered to sanitized html for articles', function () {
         'markdown' => "# Markdown Rendering\n\nA **strong** point.\n\n- first\n- second\n\n<script>alert('x')</script>",
     ]);
 
-    $this->get(route('magazine.show', 'markdown-rendering'))
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'markdown-rendering']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertSee('<h1>Markdown Rendering</h1>', false)
@@ -178,7 +240,7 @@ test('arrow based diagram code blocks render as article diagrams', function () {
         'markdown' => "```\n[Traditional System]  --> [Intermediary / Bank]   --> [Your Money (Permissive)]\n[Bitcoin System]      --> [Your Private Keys]     --> [Your Money (Absolute)]\n```",
     ]);
 
-    $this->get(route('magazine.show', 'diagram-rendering'))
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'diagram-rendering']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertSee('<pre class="mermaid">', false)
@@ -199,7 +261,7 @@ test('native mermaid code blocks render as mermaid diagrams', function () {
         'markdown' => "```mermaid\nflowchart TB\n    A[Bitcoin] --> B[Self custody]\n```",
     ]);
 
-    $this->get(route('magazine.show', 'native-mermaid'))
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'native-mermaid']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertSee('<pre class="mermaid">', false)
@@ -219,7 +281,7 @@ test('regular code blocks remain code when they are not diagrams', function () {
         'markdown' => "```php\n\$wallet = 'cold storage';\nreturn \$wallet;\n```",
     ]);
 
-    $this->get(route('magazine.show', 'code-rendering'))
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'code-rendering']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertSee('<pre><code class="language-php">', false)
@@ -241,7 +303,7 @@ test('article pages render seo meta tags with limits and keywords', function () 
         'seo' => ['keywords' => ['bitcoin', 'wallet security']],
     ]);
 
-    $response = $this->get(route('magazine.show', 'bitcoin-custody'))
+    $response = $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-custody']))
         ->assertSuccessful()
         ->assertSee('name="keywords" content="bitcoin, wallet security"', false);
 
@@ -307,8 +369,8 @@ test('paginated sitemap lists public magazine urls for all translations', functi
         ->assertSee('<changefreq>daily</changefreq>', false)
         ->assertSee('<priority>1.0</priority>', false)
         ->assertDontSee('<loc>'.route('magazine.de.index').'</loc>', false)
-        ->assertSee(route('magazine.show', 'bitcoin-basics'), false)
-        ->assertSee(route('magazine.de.show', 'bitcoin-grundlagen'), false)
+        ->assertSee(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-basics']), false)
+        ->assertSee(route('magazine.de.show', ['category' => 'self-custody', 'slug' => 'bitcoin-grundlagen']), false)
         ->assertSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false)
         ->assertSee('<changefreq>monthly</changefreq>', false)
         ->assertSee('<priority>0.8</priority>', false);
@@ -365,13 +427,13 @@ test('sitemap pages are split by configured page size', function () {
     $this->get(route('sitemap.page', 1))
         ->assertSuccessful()
         ->assertSee(route('magazine.index'), false)
-        ->assertSee(route('magazine.de.show', 'bitcoin-grundlagen'), false)
-        ->assertDontSee(route('magazine.show', 'bitcoin-basics'), false);
+        ->assertSee(route('magazine.de.show', ['category' => 'self-custody', 'slug' => 'bitcoin-grundlagen']), false)
+        ->assertDontSee(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-basics']), false);
 
     $this->get(route('sitemap.page', 2))
         ->assertSuccessful()
         ->assertDontSee('<loc>'.route('magazine.index').'</loc>', false)
-        ->assertSee(route('magazine.show', 'bitcoin-basics'), false);
+        ->assertSee(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-basics']), false);
 
     $this->get('/sitemap-3.xml')->assertNotFound();
 });
@@ -387,7 +449,7 @@ test('article h2 headings render table of contents anchor links', function () {
         'markdown' => "## Risk Model\n\nText.\n\n### Cold Storage\n\nText.\n\n#### Key Rotation\n\nText.\n\n## Risk Model\n\nDuplicate heading.",
     ]);
 
-    $this->get(route('magazine.show', 'linked-contents'))
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'linked-contents']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertSee('Contents')
@@ -426,7 +488,7 @@ test('structured post blocks provide table of contents anchors before markdown f
         'markdown' => 'A structured section.',
     ]);
 
-    $this->get(route('magazine.show', 'structured-contents'))
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'structured-contents']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertSee('<h2 id="custody-basics">Custody Basics</h2>', false)
@@ -455,7 +517,7 @@ test('structured post block markdown headings are included in the table of conte
         'markdown' => "Intro.\n\n## Wallet Setup\n\nText.\n\n## Recovery Plan\n\nText.",
     ]);
 
-    $this->get(route('magazine.show', 'complete-structured-contents'))
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'complete-structured-contents']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertSee('<h2 id="custody-basics">Custody Basics</h2>', false)
@@ -488,7 +550,7 @@ test('structured flow diagram blocks render as article diagrams', function () {
         ],
     ]);
 
-    $this->get(route('magazine.show', 'structured-diagram'))
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'structured-diagram']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertSee('<pre class="mermaid">', false)

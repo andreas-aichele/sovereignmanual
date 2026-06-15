@@ -17,8 +17,21 @@ test('german magazine index route stores the locale and redirects to the start p
 test('magazine article urls are available', function () {
     expect(route('magazine.en.index', absolute: false))->toBe('/en');
     expect(route('magazine.de.index', absolute: false))->toBe('/de');
-    expect(route('magazine.show', 'example', absolute: false))->toBe('/magazine/example');
-    expect(route('magazine.de.show', 'beispiel', absolute: false))->toBe('/de/magazine/beispiel');
+    expect(route('magazine.show', ['category' => 'self-custody', 'slug' => 'example'], absolute: false))->toBe('/self-custody/example');
+    expect(route('magazine.de.show', ['category' => 'self-custody', 'slug' => 'beispiel'], absolute: false))->toBe('/de/self-custody/beispiel');
+});
+
+test('admin backend and filament are not registered', function () {
+    $composer = file_get_contents(base_path('composer.json'));
+    $providers = file_get_contents(base_path('bootstrap/providers.php'));
+    $user = file_get_contents(app_path('Models/User.php'));
+
+    expect(app_path('Filament'))->not->toBeDirectory()
+        ->and(app_path('Providers/Filament'))->not->toBeDirectory()
+        ->and($composer)->not->toContain('filament/filament')
+        ->and($providers)->not->toContain('AdminPanelProvider')
+        ->and($user)->not->toContain('FilamentUser')
+        ->and($user)->not->toContain('canAccessPanel');
 });
 
 test('frontend entry is a blade asset', function () {

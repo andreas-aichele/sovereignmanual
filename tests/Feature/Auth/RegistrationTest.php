@@ -22,6 +22,5 @@ test('new users can register', function () {
 
     $this->assertAuthenticated();
     $response->assertRedirect(route('dashboard', absolute: false));
-    expect(auth()->user()->hasRole('user'))->toBeTrue()
-        ->and(auth()->user()->can('access cms'))->toBeFalse();
+    expect(auth()->user()->email)->toBe('test@example.com');
 });

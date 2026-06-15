@@ -13,6 +13,7 @@ use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'content_topic_id',
+    'category_id',
     'slug',
     'status',
     'topic',
@@ -49,6 +50,14 @@ class Post extends Model implements Auditable
     public function contentTopic(): BelongsTo
     {
         return $this->belongsTo(ContentTopic::class);
+    }
+
+    /**
+     * @return BelongsTo<Category, $this>
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
     }
 
     /**

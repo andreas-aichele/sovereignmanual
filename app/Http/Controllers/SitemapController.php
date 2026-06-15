@@ -95,7 +95,7 @@ class SitemapController extends Controller
     {
         return PostTranslation::query()
             ->select('post_translations.*')
-            ->with('post')
+            ->with('post.category')
             ->join('posts', 'posts.id', '=', 'post_translations.post_id')
             ->where('posts.status', PostStatus::Published)
             ->whereNotNull('posts.published_at')
@@ -110,7 +110,10 @@ class SitemapController extends Controller
     private function sitemapUrlForTranslation(PostTranslation $translation): array
     {
         return [
-            'loc' => route($this->translation('routes.show', $translation->locale), $translation->slug),
+            'loc' => route($this->translation('routes.show', $translation->locale), [
+                'category' => $translation->post->category?->slug ?? 'self-custody',
+                'slug' => $translation->slug,
+            ]),
             'lastmod' => ($translation->post->updated_at ?? $translation->post->published_at)?->toDateString(),
             'changefreq' => 'monthly',
             'priority' => '0.8',

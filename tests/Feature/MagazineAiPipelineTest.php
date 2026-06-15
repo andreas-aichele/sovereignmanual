@@ -48,6 +48,7 @@ test('pipeline creates a published post with english and german translations', f
         ->and(mb_strlen($germanTranslation->meta_title))->toBeLessThanOrEqual(60)
         ->and(mb_strlen($germanTranslation->meta_description))->toBeLessThanOrEqual(160)
         ->and($germanTranslation->seo['keywords'])->toContain('bitcoin')
+        ->and($post->category?->slug)->toBe('self-custody')
         ->and($post->blocks()->where('locale', 'en')->count())->toBeGreaterThan(1)
         ->and($post->blocks()->where('locale', 'de')->count())->toBeGreaterThan(1)
         ->and($englishBlockTypes)->toContain('section')
@@ -150,7 +151,7 @@ test('pipeline keeps internal link blocks within the twelve block limit', functi
         ->all();
 
     $result = $method->invoke($pipeline, $blocks, [
-        ['title' => 'Bitcoin wallet backups', 'url' => '/magazine/bitcoin-wallet-backups', 'slug' => 'bitcoin-wallet-backups'],
+        ['title' => 'Bitcoin wallet backups', 'url' => '/self-custody/bitcoin-wallet-backups', 'slug' => 'bitcoin-wallet-backups'],
     ], 'en');
 
     expect($result)->toHaveCount(12)

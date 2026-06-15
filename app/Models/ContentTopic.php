@@ -7,13 +7,14 @@ use Database\Factories\ContentTopicFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use OwenIt\Auditing\Contracts\Auditable;
 
 #[Fillable([
     'title',
     'slug',
-    'category',
+    'category_id',
     'status',
     'priority',
     'audience_level',
@@ -37,6 +38,19 @@ class ContentTopic extends Model implements Auditable
     public function posts(): HasMany
     {
         return $this->hasMany(Post::class);
+    }
+
+    /**
+     * @return BelongsTo<Category, $this>
+     */
+    public function category(): BelongsTo
+    {
+        return $this->belongsTo(Category::class);
+    }
+
+    public function categorySlug(): string
+    {
+        return $this->category?->slug ?? 'self-custody';
     }
 
     /**

@@ -19,7 +19,7 @@ class MagazineController extends Controller
         $locale = App::currentLocale();
 
         $posts = Post::query()
-            ->with(['contentTopic', 'translations', 'assets'])
+            ->with(['category', 'translations', 'assets'])
             ->where('status', PostStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())
@@ -36,15 +36,16 @@ class MagazineController extends Controller
         ]);
     }
 
-    public function show(string $slug): View
+    public function show(string $category, string $slug): View
     {
         $locale = App::currentLocale();
 
         $post = Post::query()
-            ->with(['translations', 'blocks.asset', 'assets'])
+            ->with(['category', 'translations', 'blocks.asset', 'assets'])
             ->where('status', PostStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())
+            ->whereHas('category', fn ($query) => $query->where('slug', $category))
             ->whereHas('translations', fn ($query) => $query
                 ->where('locale', $locale)
                 ->where('slug', $slug))
@@ -101,10 +102,37 @@ class MagazineController extends Controller
                 'title' => $this->truncateMeta($translation->meta_title ?: $translation->title, 60),
                 'description' => $this->truncateMeta($translation->meta_description ?: $translation->excerpt, 160),
                 'keywords' => $translation->seo['keywords'] ?? $post->seo['keywords'] ?? [],
-                'canonical' => route($this->translation('routes.show', $locale), $translation->slug),
+                'canonical' => route($this->translation('routes.show', $locale), [
+                    'category' => $post->category?->slug ?? 'self-custody',
+                    'slug' => $translation->slug,
+                ]),
                 'alternate' => $this->alternateUrl($post, $locale),
             ],
         ]);
+    }
+
+    public function legacyShow(string $slug): RedirectResponse
+    {
+        $locale = App::currentLocale();
+
+        $post = Post::query()
+            ->with(['category', 'translations'])
+            ->where('status', PostStatus::Published)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->whereHas('translations', fn ($query) => $query
+                ->where('locale', $locale)
+                ->where('slug', $slug))
+            ->firstOrFail();
+
+        $translation = $post->translation($locale);
+
+        abort_if($translation === null, 404);
+
+        return redirect()->route($this->translation('routes.show', $locale), [
+            'category' => $post->category?->slug ?? 'self-custody',
+            'slug' => $translation->slug,
+        ], 301);
     }
 
     public function switchLocale(): RedirectResponse
@@ -115,7 +143,7 @@ class MagazineController extends Controller
     private function serializePostSummary(Post $post, string $locale): array
     {
         $translation = $post->translation($locale);
-        $category = $post->contentTopic?->category ?? 'bitcoin';
+        $category = $post->category?->slug ?? 'self-custody';
         $coverImage = $this->coverImage($post);
         $title = $translation?->title ?? $post->topic;
 
@@ -125,12 +153,15 @@ class MagazineController extends Controller
             'status' => $post->status->value,
             'audience_level' => $post->audience_level,
             'category' => $category,
-            'category_label' => $this->categoryLabel($category, $locale),
+            'category_label' => $post->category?->label($locale) ?? $this->categoryLabel($category, $locale),
             'published_at' => $post->published_at?->toAtomString(),
             'title' => $title,
             'slug' => $translation?->slug ?? $post->slug,
             'excerpt' => $translation?->excerpt,
-            'url' => route($this->translation('routes.show', $locale), $translation?->slug ?? $post->slug),
+            'url' => route($this->translation('routes.show', $locale), [
+                'category' => $category,
+                'slug' => $translation?->slug ?? $post->slug,
+            ]),
             'image' => $coverImage?->url ?? asset('fallback.jpg'),
             'image_alt' => $coverImage?->alt_text ?? $title,
             'image_placeholder' => $this->imagePlaceholder($post, $title, $category),
@@ -139,7 +170,7 @@ class MagazineController extends Controller
 
     private function categoryLabel(?string $category, string $locale): string
     {
-        $category ??= 'bitcoin';
+        $category ??= 'self-custody';
         $translationKey = "magazine.categories.{$category}";
 
         if (Lang::has($translationKey, $locale, false)) {
@@ -168,12 +199,16 @@ class MagazineController extends Controller
     private function imagePlaceholder(Post $post, string $title, string $category): array
     {
         $palettes = [
-            'bitcoin' => ['accent' => '#F7931A', 'secondary' => '#26D9FF'],
-            'financial-independence' => ['accent' => '#F7931A', 'secondary' => '#FF4FD8'],
             'self-custody' => ['accent' => '#F7931A', 'secondary' => '#42F5C8'],
+            'privacy-security' => ['accent' => '#26D9FF', 'secondary' => '#FF4FD8'],
+            'financial-sovereignty' => ['accent' => '#F7931A', 'secondary' => '#FF4FD8'],
+            'family-legacy' => ['accent' => '#42F5C8', 'secondary' => '#F7931A'],
+            'tools-practice' => ['accent' => '#26D9FF', 'secondary' => '#42F5C8'],
+            'economics' => ['accent' => '#F7931A', 'secondary' => '#26D9FF'],
+            'mindset' => ['accent' => '#FF4FD8', 'secondary' => '#F7931A'],
         ];
 
-        $palette = $palettes[$category] ?? $palettes['bitcoin'];
+        $palette = $palettes[$category] ?? $palettes['self-custody'];
 
         return [
             'title' => $title,
@@ -193,7 +228,10 @@ class MagazineController extends Controller
             return null;
         }
 
-        return route($this->translation('routes.show', $alternateLocale), $translation->slug);
+        return route($this->translation('routes.show', $alternateLocale), [
+            'category' => $post->category?->slug ?? 'self-custody',
+            'slug' => $translation->slug,
+        ]);
     }
 
     /**
@@ -214,7 +252,10 @@ class MagazineController extends Controller
                     'label' => $label,
                     'url' => $translation === null
                         ? $this->localeSwitchUrl($locale)
-                        : route($this->translation('routes.show', $locale), $translation->slug),
+                        : route($this->translation('routes.show', $locale), [
+                            'category' => $post->category?->slug ?? 'self-custody',
+                            'slug' => $translation->slug,
+                        ]),
                     'current' => $locale === $currentLocale,
                 ];
             })

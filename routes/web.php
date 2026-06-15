@@ -9,8 +9,10 @@ Route::get('sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
 Route::get('sitemap-{page}.xml', [SitemapController::class, 'page'])->whereNumber('page')->name('sitemap.page');
 Route::get('/en', [MagazineController::class, 'switchLocale'])->defaults('locale', 'en')->name('magazine.en.index');
 Route::get('/de', [MagazineController::class, 'switchLocale'])->defaults('locale', 'de')->name('magazine.de.index');
-Route::get('magazine/{slug}', [MagazineController::class, 'show'])->defaults('locale', 'en')->name('magazine.show');
-Route::get('de/magazine/{slug}', [MagazineController::class, 'show'])->defaults('locale', 'de')->name('magazine.de.show');
+Route::get('magazine/{slug}', [MagazineController::class, 'legacyShow'])->defaults('locale', 'en')->name('magazine.legacy.show');
+Route::get('de/magazine/{slug}', [MagazineController::class, 'legacyShow'])->defaults('locale', 'de')->name('magazine.de.legacy.show');
+Route::get('{category}/{slug}', [MagazineController::class, 'show'])->defaults('locale', 'en')->name('magazine.show');
+Route::get('de/{category}/{slug}', [MagazineController::class, 'show'])->defaults('locale', 'de')->name('magazine.de.show');
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::view('dashboard', 'dashboard')->name('dashboard');

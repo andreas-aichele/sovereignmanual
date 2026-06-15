@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\PostStatus;
+use App\Models\Category;
 use App\Models\ContentTopic;
 use App\Models\Post;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -24,6 +25,10 @@ class PostFactory extends Factory
 
         return [
             'content_topic_id' => ContentTopic::factory(),
+            'category_id' => Category::query()->firstOrCreate(
+                ['slug' => 'self-custody'],
+                ['name' => ['en' => 'Self Custody', 'de' => 'Selbstverwahrung']]
+            )->id,
             'slug' => Str::slug($topic).'-'.fake()->unique()->numberBetween(1000, 9999),
             'status' => PostStatus::Draft,
             'topic' => $topic,

@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\ContentTopicStatus;
+use App\Models\Category;
 use App\Models\ContentTopic;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -24,7 +25,10 @@ class ContentTopicFactory extends Factory
         return [
             'title' => $title,
             'slug' => Str::slug($title).'-'.fake()->unique()->numberBetween(1000, 9999),
-            'category' => fake()->randomElement(['bitcoin', 'financial-independence', 'self-custody']),
+            'category_id' => Category::query()->firstOrCreate(
+                ['slug' => 'self-custody'],
+                ['name' => ['en' => 'Self Custody', 'de' => 'Selbstverwahrung']]
+            )->id,
             'status' => ContentTopicStatus::Scheduled,
             'priority' => fake()->numberBetween(1, 10),
             'audience_level' => fake()->randomElement(['beginner', 'intermediate', 'advanced']),
