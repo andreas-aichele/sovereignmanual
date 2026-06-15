@@ -52,3 +52,6 @@ yarn-error.log
 .codex/
 .codex/config.toml
 .mcp.json
+
+# Ignore SQL dumps
+*.sql

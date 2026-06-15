@@ -7,16 +7,17 @@ use App\Models\Post;
 use App\Models\PostAsset;
 use App\Models\PostBlock;
 use Illuminate\Contracts\View\View;
-use Illuminate\Http\Request;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 
 class MagazineController extends Controller
 {
-    public function index(Request $request, ?string $locale = null): View
+    public function index(): View
     {
-        $locale ??= 'en';
+        $locale = App::currentLocale();
 
         $posts = Post::query()
             ->with(['contentTopic', 'translations', 'assets'])
@@ -36,9 +37,9 @@ class MagazineController extends Controller
         ]);
     }
 
-    public function show(Request $request, string $slug, ?string $locale = null): View
+    public function show(string $slug): View
     {
-        $locale ??= 'en';
+        $locale = App::currentLocale();
 
         $post = Post::query()
             ->with(['translations', 'blocks.asset', 'assets'])
@@ -107,11 +108,15 @@ class MagazineController extends Controller
         ]);
     }
 
+    public function switchLocale(): RedirectResponse
+    {
+        return redirect()->route('magazine.index');
+    }
+
     public function sitemap(): Response
     {
         $urls = collect([
             ['loc' => route('magazine.index'), 'lastmod' => null],
-            ['loc' => route('magazine.de.index'), 'lastmod' => null],
         ]);
 
         Post::query()
@@ -236,7 +241,7 @@ class MagazineController extends Controller
                     'locale' => $locale,
                     'label' => $label,
                     'url' => $translation === null
-                        ? route($this->translation('routes.index', $locale))
+                        ? $this->localeSwitchUrl($locale)
                         : route($this->translation('routes.show', $locale), $translation->slug),
                     'current' => $locale === $currentLocale,
                 ];
@@ -244,6 +249,11 @@ class MagazineController extends Controller
             ->filter()
             ->values()
             ->all();
+    }
+
+    private function localeSwitchUrl(string $locale): string
+    {
+        return route("magazine.{$locale}.index");
     }
 
     /**

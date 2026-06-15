@@ -10,6 +10,7 @@ use App\Models\AiRun;
 use App\Models\ContentTopic;
 use App\Models\Post;
 use App\Models\PostTranslation;
+use App\Support\Locales;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -78,41 +79,50 @@ class MagazineAiPipeline
             ],
         ]);
 
-        $translationRun = $this->startRun(AiRunType::Translation, $topic, $post);
-        $germanArticle = $this->promptJson(
-            instructions: 'Translate Bitcoin magazine articles into precise, natural German. Return only valid JSON. Use real German umlauts and ß. Keep article and section headings compact. Never leave English headings or UI-like labels untranslated unless they are proper nouns.',
-            prompt: json_encode([
-                'title' => $englishTitle,
-                'excerpt' => $englishExcerpt,
-                'blocks' => $englishBlocks,
-            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-        ) ?? $this->fallbackTranslatedArticle($title, $englishBlocks);
-        $germanTitle = $this->cleanText((string) ($germanArticle['title'] ?? $this->germanTitle($title)), $this->germanTitle($title));
-        $germanBlocks = $this->sanitizeBlocks($germanArticle['blocks'] ?? null, 'de', $germanTitle, $this->fallbackMarkdown($title, 'de'));
-        $germanInternalLinks = $this->internalLinkCandidates('de', $post->id);
-        $germanBlocks = $this->withInternalLinks($germanBlocks, $germanInternalLinks, 'de');
-        $germanDraft = $this->markdownFromBlocks($germanBlocks, $this->fallbackMarkdown($title, 'de'));
-        $this->finishRun($translationRun, $germanDraft, ['title' => $germanTitle]);
-        $germanSeo = $this->seoPlan($topic, 'de', $germanTitle, $germanDraft, $germanInternalLinks);
-        $germanSlug = $this->uniqueTranslationSlug($germanSeo['slug'], 'de');
+        $translatedBlocks = [];
 
-        $post->translations()->create([
-            'locale' => 'de',
-            'title' => $germanTitle,
-            'slug' => $germanSlug,
-            'excerpt' => $this->cleanText((string) ($germanArticle['excerpt'] ?? $this->excerpt($germanDraft, 180)), $this->excerpt($germanDraft, 180)),
-            'markdown' => $germanDraft,
-            'meta_title' => $germanSeo['meta_title'],
-            'meta_description' => $germanSeo['meta_description'],
-            'seo' => [
-                'canonical_locale' => 'de',
-                'keywords' => $germanSeo['keywords'],
-                'internal_links' => $germanInternalLinks,
-            ],
-        ]);
+        if ($this->shouldTranslateLocale('de')) {
+            $translationRun = $this->startRun(AiRunType::Translation, $topic, $post);
+            $germanArticle = $this->promptJson(
+                instructions: 'Translate Bitcoin magazine articles into precise, natural German. Return only valid JSON. Use real German umlauts and ß. Keep article and section headings compact. Never leave English headings or UI-like labels untranslated unless they are proper nouns.',
+                prompt: json_encode([
+                    'title' => $englishTitle,
+                    'excerpt' => $englishExcerpt,
+                    'blocks' => $englishBlocks,
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            ) ?? $this->fallbackTranslatedArticle($title, $englishBlocks);
+            $germanTitle = $this->cleanText((string) ($germanArticle['title'] ?? $this->germanTitle($title)), $this->germanTitle($title));
+            $germanBlocks = $this->sanitizeBlocks($germanArticle['blocks'] ?? null, 'de', $germanTitle, $this->fallbackMarkdown($title, 'de'));
+            $germanInternalLinks = $this->internalLinkCandidates('de', $post->id);
+            $germanBlocks = $this->withInternalLinks($germanBlocks, $germanInternalLinks, 'de');
+            $germanDraft = $this->markdownFromBlocks($germanBlocks, $this->fallbackMarkdown($title, 'de'));
+            $this->finishRun($translationRun, $germanDraft, ['title' => $germanTitle]);
+            $germanSeo = $this->seoPlan($topic, 'de', $germanTitle, $germanDraft, $germanInternalLinks);
+            $germanSlug = $this->uniqueTranslationSlug($germanSeo['slug'], 'de');
+
+            $post->translations()->create([
+                'locale' => 'de',
+                'title' => $germanTitle,
+                'slug' => $germanSlug,
+                'excerpt' => $this->cleanText((string) ($germanArticle['excerpt'] ?? $this->excerpt($germanDraft, 180)), $this->excerpt($germanDraft, 180)),
+                'markdown' => $germanDraft,
+                'meta_title' => $germanSeo['meta_title'],
+                'meta_description' => $germanSeo['meta_description'],
+                'seo' => [
+                    'canonical_locale' => 'de',
+                    'keywords' => $germanSeo['keywords'],
+                    'internal_links' => $germanInternalLinks,
+                ],
+            ]);
+
+            $translatedBlocks['de'] = $germanBlocks;
+        }
 
         $this->createBlocks($post, 'en', $englishBlocks);
-        $this->createBlocks($post, 'de', $germanBlocks);
+
+        foreach ($translatedBlocks as $locale => $blocks) {
+            $this->createBlocks($post, $locale, $blocks);
+        }
 
         $this->generatePostImage($post, $topic);
 
@@ -253,6 +263,11 @@ class MagazineAiPipeline
     private function hasAiProviderKey(): bool
     {
         return filled(config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key'));
+    }
+
+    private function shouldTranslateLocale(string $locale): bool
+    {
+        return $locale !== 'en' && Locales::isSupported($locale);
     }
 
     /**

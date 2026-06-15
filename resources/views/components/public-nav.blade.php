@@ -2,7 +2,7 @@
 
 <header class="border-b border-primary/20 bg-base-100/85 shadow-lg shadow-fuchsia-950/20 backdrop-blur">
     <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-        <a href="{{ route($locale === 'de' ? 'magazine.de.index' : 'magazine.index') }}" class="flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.2em] text-primary">
+        <a href="{{ route('magazine.index') }}" class="flex items-center gap-3 text-sm font-semibold uppercase tracking-[0.2em] text-primary">
             <img src="/logo.svg" alt="" class="size-8">
             <span>Sovereign Manual</span>
         </a>

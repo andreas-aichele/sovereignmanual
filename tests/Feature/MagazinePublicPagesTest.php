@@ -92,6 +92,8 @@ test('localized german posts render through the german route', function () {
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertViewHas('locale', 'de')
+        ->assertCookie('locale', 'de')
+        ->assertSee('<html lang="de"', false)
         ->assertSee('Bitcoin Selbstverwahrung')
         ->assertSee('fallback.jpg')
         ->assertSee('bitcoin')
@@ -115,10 +117,34 @@ test('german category labels use correct umlauts', function () {
         'slug' => 'finanzielle-unabhaengigkeit',
     ]);
 
-    $this->get(route('magazine.de.index'))
+    $this->withCookie('locale', 'de')
+        ->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
+        ->assertViewHas('locale', 'de')
+        ->assertSee('<html lang="de"', false)
         ->assertSee('Finanzielle Unabhängigkeit');
+});
+
+test('stored locale controls the public magazine start page language', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'de',
+        'title' => 'Bitcoin Grundlagen',
+        'slug' => 'bitcoin-grundlagen',
+    ]);
+
+    $this->withCookie('locale', 'de')
+        ->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.index')
+        ->assertViewHas('locale', 'de')
+        ->assertCookie('locale', 'de')
+        ->assertSee('<html lang="de"', false)
+        ->assertSee('Bitcoin Grundlagen')
+        ->assertSee('Artikel lesen');
 });
 
 test('markdown is rendered to sanitized html for articles', function () {
@@ -245,6 +271,7 @@ test('sitemap lists public magazine urls for all translations', function () {
         ->assertHeader('Content-Type', 'application/xml')
         ->assertSee('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', false)
         ->assertSee(route('magazine.index'), false)
+        ->assertDontSee('<loc>'.route('magazine.de.index').'</loc>', false)
         ->assertSee(route('magazine.show', 'bitcoin-basics'), false)
         ->assertSee(route('magazine.de.show', 'bitcoin-grundlagen'), false);
 });

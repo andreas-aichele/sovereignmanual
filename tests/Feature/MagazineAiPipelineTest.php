@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\AiRunType;
 use App\Enums\ContentTopicStatus;
 use App\Enums\PostStatus;
 use App\Jobs\GeneratePostFromTopic;
@@ -65,6 +66,23 @@ test('pipeline creates a published post with english and german translations', f
         ->and($asset->prompt)->not->toContain('unsplash')
         ->and($post->aiRuns()->count())->toBeGreaterThanOrEqual(1)
         ->and($topic->refresh()->status)->toBe(ContentTopicStatus::Published);
+});
+
+test('pipeline only creates translations for configured supported locales', function () {
+    config([
+        'ai.providers.gemini.key' => null,
+        'app.supported_locales' => ['en'],
+    ]);
+
+    $topic = ContentTopic::factory()->due()->create([
+        'title' => 'Why Bitcoin custody matters',
+    ]);
+
+    $post = app(MagazineAiPipeline::class)->generatePost($topic);
+
+    expect($post->translations()->pluck('locale')->all())->toBe(['en'])
+        ->and($post->blocks()->pluck('locale')->unique()->values()->all())->toBe(['en'])
+        ->and($post->aiRuns()->where('type', AiRunType::Translation)->exists())->toBeFalse();
 });
 
 test('pipeline adds relevant internal links when published articles exist', function () {

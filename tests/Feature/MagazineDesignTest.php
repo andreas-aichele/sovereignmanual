@@ -8,15 +8,15 @@ test('magazine index is the public start page', function () {
         ->assertSee('Sovereign Manual Magazine');
 });
 
-test('german magazine index is the localized public start page', function () {
+test('german magazine index route stores the locale and redirects to the start page', function () {
     $this->get(route('magazine.de.index'))
-        ->assertSuccessful()
-        ->assertViewIs('magazine.index')
-        ->assertViewHas('locale', 'de')
-        ->assertSee('Noch keine veröffentlichten Artikel.');
+        ->assertRedirect(route('magazine.index'))
+        ->assertCookie('locale', 'de');
 });
 
 test('magazine article urls are available', function () {
+    expect(route('magazine.en.index', absolute: false))->toBe('/en');
+    expect(route('magazine.de.index', absolute: false))->toBe('/de');
     expect(route('magazine.show', 'example', absolute: false))->toBe('/magazine/example');
     expect(route('magazine.de.show', 'beispiel', absolute: false))->toBe('/de/magazine/beispiel');
 });

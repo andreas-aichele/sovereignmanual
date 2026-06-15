@@ -5,8 +5,11 @@
     "htmlWhitespaceSensitivity": "css",
     "printWidth": 80,
     "plugins": [
-        "prettier-plugin-tailwindcss"
+        "prettier-plugin-tailwindcss",
+        "@shufo/prettier-plugin-blade"
     ],
+    "sortTailwindcssClasses": true,
+    "sortHtmlAttributes": "code-guide",
     "tailwindStylesheet": "resources/css/app.css",
     "tabWidth": 4,
     "overrides": [
