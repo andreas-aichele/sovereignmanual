@@ -268,6 +268,8 @@ test('article h2 headings render table of contents anchor links', function () {
         ->assertSee('<h3>Cold Storage</h3>', false)
         ->assertSee('<h4>Key Rotation</h4>', false)
         ->assertSee('<h2 id="risk-model-2">Risk Model</h2>', false)
+        ->assertSee('data-toc-link', false)
+        ->assertSee('aria-[current=location]:font-semibold', false)
         ->assertSee('href="#risk-model"', false)
         ->assertSee('href="#risk-model-2"', false)
         ->assertDontSee('href="#cold-storage"', false)

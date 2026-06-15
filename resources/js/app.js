@@ -41,6 +41,41 @@ const applyAppearance = (appearance) => {
     );
 };
 
+const initializeTableOfContentsScrollSpy = () => {
+    const links = Array.from(document.querySelectorAll('[data-toc-link]'));
+    const headings = [...new Set(links.map((link) => link.hash.slice(1)))]
+        .map((id) => document.getElementById(id))
+        .filter(Boolean);
+
+    if (headings.length === 0) {
+        return;
+    }
+
+    const updateActiveLink = () => {
+        const offset = window.innerHeight * 0.25;
+        const activeId =
+            headings
+                .filter(
+                    (heading) => heading.getBoundingClientRect().top <= offset,
+                )
+                .at(-1)?.id ?? headings[0].id;
+
+        links.forEach((link) => {
+            const isActive = link.hash === `#${activeId}`;
+
+            link.toggleAttribute('aria-current', isActive);
+
+            if (isActive) {
+                link.setAttribute('aria-current', 'location');
+            }
+        });
+    };
+
+    updateActiveLink();
+    window.addEventListener('scroll', updateActiveLink, { passive: true });
+    window.addEventListener('resize', updateActiveLink);
+};
+
 document.querySelectorAll('[data-appearance-value]').forEach((button) => {
     button.addEventListener('click', () => {
         const appearance = button.dataset.appearanceValue || 'system';
@@ -53,4 +88,5 @@ document.querySelectorAll('[data-appearance-value]').forEach((button) => {
 
 document.addEventListener('DOMContentLoaded', () => {
     renderMermaidDiagrams();
+    initializeTableOfContentsScrollSpy();
 });

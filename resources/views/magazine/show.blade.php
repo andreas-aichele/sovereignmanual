@@ -39,7 +39,7 @@
                     <ol class="mt-4 space-y-3">
                         @foreach ($post['toc'] as $item)
                             <li class="{{ $item['level'] === 3 ? 'pl-4' : '' }}">
-                                <a href="#{{ $item['id'] }}" class="block leading-snug text-base-content/75 underline-offset-4 hover:text-primary hover:underline">
+                                <a href="#{{ $item['id'] }}" data-toc-link class="block leading-snug text-base-content/75 underline-offset-4 transition hover:text-primary hover:underline aria-[current=location]:font-semibold aria-[current=location]:text-primary">
                                     {{ $item['title'] }}
                                 </a>
                             </li>
@@ -73,7 +73,7 @@
                             <ol class="mt-4 space-y-3">
                                 @foreach ($post['toc'] as $item)
                                     <li class="{{ $item['level'] === 3 ? 'pl-4' : '' }}">
-                                        <a href="#{{ $item['id'] }}" class="block leading-snug text-base-content/70 underline-offset-4 transition hover:text-primary hover:underline">
+                                        <a href="#{{ $item['id'] }}" data-toc-link class="block leading-snug text-base-content/70 underline-offset-4 transition hover:text-primary hover:underline aria-[current=location]:font-semibold aria-[current=location]:text-primary">
                                             {{ $item['title'] }}
                                         </a>
                                     </li>
