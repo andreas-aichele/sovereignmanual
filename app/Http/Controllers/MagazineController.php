@@ -8,7 +8,6 @@ use App\Models\PostAsset;
 use App\Models\PostBlock;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
-use Illuminate\Http\Response;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
@@ -111,33 +110,6 @@ class MagazineController extends Controller
     public function switchLocale(): RedirectResponse
     {
         return redirect()->route('magazine.index');
-    }
-
-    public function sitemap(): Response
-    {
-        $urls = collect([
-            ['loc' => route('magazine.index'), 'lastmod' => null],
-        ]);
-
-        Post::query()
-            ->with(['translations'])
-            ->where('status', PostStatus::Published)
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
-            ->latest('published_at')
-            ->get()
-            ->each(function (Post $post) use ($urls): void {
-                foreach ($post->translations as $translation) {
-                    $urls->push([
-                        'loc' => route($this->translation('routes.show', $translation->locale), $translation->slug),
-                        'lastmod' => ($post->updated_at ?? $post->published_at)?->toAtomString(),
-                    ]);
-                }
-            });
-
-        $xml = view('sitemap', ['urls' => $urls])->render();
-
-        return response($xml, 200, ['Content-Type' => 'application/xml']);
     }
 
     private function serializePostSummary(Post $post, string $locale): array

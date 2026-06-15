@@ -1,10 +1,12 @@
 <?php
 
 use App\Http\Controllers\MagazineController;
+use App\Http\Controllers\SitemapController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', [MagazineController::class, 'index'])->name('magazine.index');
-Route::get('sitemap.xml', [MagazineController::class, 'sitemap'])->name('sitemap');
+Route::get('sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
+Route::get('sitemap-{page}.xml', [SitemapController::class, 'page'])->whereNumber('page')->name('sitemap.page');
 Route::get('/en', [MagazineController::class, 'switchLocale'])->defaults('locale', 'en')->name('magazine.en.index');
 Route::get('/de', [MagazineController::class, 'switchLocale'])->defaults('locale', 'de')->name('magazine.de.index');
 Route::get('magazine/{slug}', [MagazineController::class, 'show'])->defaults('locale', 'en')->name('magazine.show');

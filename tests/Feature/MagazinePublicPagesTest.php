@@ -249,8 +249,11 @@ test('article pages render seo meta tags with limits and keywords', function () 
         ->and(mb_strlen($response->viewData('meta')['description']))->toBeLessThanOrEqual(160);
 });
 
-test('sitemap lists public magazine urls for all translations', function () {
-    $post = Post::factory()->published()->create();
+test('sitemap index links to paginated sitemap files', function () {
+    $post = Post::factory()->published()->create([
+        'published_at' => now()->subDays(2),
+        'updated_at' => now()->subDay(),
+    ]);
 
     PostTranslation::factory()->create([
         'post_id' => $post->id,
@@ -269,11 +272,108 @@ test('sitemap lists public magazine urls for all translations', function () {
     $this->get('/sitemap.xml')
         ->assertSuccessful()
         ->assertHeader('Content-Type', 'application/xml')
+        ->assertSee('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', false)
+        ->assertSee('<loc>'.route('sitemap.page', 1).'</loc>', false)
+        ->assertSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false);
+});
+
+test('paginated sitemap lists public magazine urls for all translations', function () {
+    $post = Post::factory()->published()->create([
+        'published_at' => now()->subDays(2),
+        'updated_at' => now()->subDay(),
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Bitcoin Basics',
+        'slug' => 'bitcoin-basics',
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'de',
+        'title' => 'Bitcoin Grundlagen',
+        'slug' => 'bitcoin-grundlagen',
+    ]);
+
+    $this->get(route('sitemap.page', 1))
+        ->assertSuccessful()
+        ->assertHeader('Content-Type', 'application/xml')
         ->assertSee('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', false)
         ->assertSee(route('magazine.index'), false)
+        ->assertSee('<loc>'.route('magazine.index').'</loc>', false)
+        ->assertSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false)
+        ->assertSee('<changefreq>daily</changefreq>', false)
+        ->assertSee('<priority>1.0</priority>', false)
         ->assertDontSee('<loc>'.route('magazine.de.index').'</loc>', false)
         ->assertSee(route('magazine.show', 'bitcoin-basics'), false)
-        ->assertSee(route('magazine.de.show', 'bitcoin-grundlagen'), false);
+        ->assertSee(route('magazine.de.show', 'bitcoin-grundlagen'), false)
+        ->assertSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false)
+        ->assertSee('<changefreq>monthly</changefreq>', false)
+        ->assertSee('<priority>0.8</priority>', false);
+});
+
+test('sitemap homepage lastmod uses latest published article', function () {
+    Post::factory()->published()->create([
+        'published_at' => now()->subDays(10),
+        'updated_at' => now()->subDay(),
+    ]);
+
+    Post::factory()->published()->create([
+        'published_at' => now()->subDays(2),
+        'updated_at' => now()->subDays(2),
+    ]);
+
+    $this->get(route('sitemap.page', 1))
+        ->assertSuccessful()
+        ->assertSee('<loc>'.route('magazine.index').'</loc>', false)
+        ->assertSee('<lastmod>'.now()->subDays(2)->toDateString().'</lastmod>', false)
+        ->assertSee('<changefreq>daily</changefreq>', false)
+        ->assertSee('<priority>1.0</priority>', false)
+        ->assertDontSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false);
+});
+
+test('sitemap pages are split by configured page size', function () {
+    config(['app.sitemap_per_page' => 2]);
+
+    $post = Post::factory()->published()->create([
+        'published_at' => now()->subDays(2),
+        'updated_at' => now()->subDay(),
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Bitcoin Basics',
+        'slug' => 'bitcoin-basics',
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'de',
+        'title' => 'Bitcoin Grundlagen',
+        'slug' => 'bitcoin-grundlagen',
+    ]);
+
+    $this->get('/sitemap.xml')
+        ->assertSuccessful()
+        ->assertSee('<loc>'.route('sitemap.page', 1).'</loc>', false)
+        ->assertSee('<loc>'.route('sitemap.page', 2).'</loc>', false)
+        ->assertDontSee('<loc>'.route('sitemap.page', 3).'</loc>', false);
+
+    $this->get(route('sitemap.page', 1))
+        ->assertSuccessful()
+        ->assertSee(route('magazine.index'), false)
+        ->assertSee(route('magazine.de.show', 'bitcoin-grundlagen'), false)
+        ->assertDontSee(route('magazine.show', 'bitcoin-basics'), false);
+
+    $this->get(route('sitemap.page', 2))
+        ->assertSuccessful()
+        ->assertDontSee('<loc>'.route('magazine.index').'</loc>', false)
+        ->assertSee(route('magazine.show', 'bitcoin-basics'), false);
+
+    $this->get('/sitemap-3.xml')->assertNotFound();
 });
 
 test('article h2 headings render table of contents anchor links', function () {
