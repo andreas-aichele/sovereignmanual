@@ -1,0 +1,89 @@
+@layer components {
+    .content-body {
+        @apply text-base leading-7 text-base-content/85;
+    }
+
+    .content-body h1,
+    .content-body h2,
+    .content-body h3 {
+        @apply mt-10 mb-4 leading-tight font-semibold text-base-content;
+        overflow-wrap: anywhere;
+    }
+
+    .content-body h1 {
+        @apply text-3xl;
+    }
+
+    .content-body h2 {
+        @apply text-2xl;
+    }
+
+    .content-body h3 {
+        @apply text-xl;
+    }
+
+    .content-body h2[id],
+    .content-body h3[id] {
+        @apply scroll-mt-24;
+    }
+
+    .content-body p,
+    .content-body ul,
+    .content-body ol,
+    .content-body table {
+        @apply my-5;
+    }
+
+    .content-body ul,
+    .content-body ol {
+        @apply pl-6;
+    }
+
+    .content-body ul {
+        @apply list-disc;
+    }
+
+    .content-body ol {
+        @apply list-decimal;
+    }
+
+    .content-body a {
+        @apply text-primary underline underline-offset-4;
+    }
+
+    .content-body strong {
+        @apply font-semibold text-base-content;
+    }
+
+    .content-body table {
+        @apply block w-full overflow-x-auto rounded-lg border border-white/10 text-left text-sm;
+        border-collapse: separate;
+        border-spacing: 0;
+    }
+
+    .content-body .mermaid {
+        @apply my-6 overflow-x-auto rounded-lg border border-primary/20 bg-base-200/90 p-4 shadow-lg shadow-fuchsia-950/10;
+    }
+
+    .content-body .mermaid svg {
+        @apply mx-auto max-w-full;
+    }
+
+    .content-body thead {
+        @apply bg-base-300 text-base-content;
+    }
+
+    .content-body tbody tr + tr {
+        @apply border-t border-white/10;
+    }
+
+    .content-body th,
+    .content-body td {
+        @apply border-t border-white/10 px-4 py-3 align-top;
+        min-width: 10rem;
+    }
+
+    .content-body th {
+        @apply font-semibold;
+    }
+}
