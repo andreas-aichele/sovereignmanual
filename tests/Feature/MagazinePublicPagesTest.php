@@ -249,7 +249,7 @@ test('sitemap lists public magazine urls for all translations', function () {
         ->assertSee(route('magazine.de.show', 'bitcoin-grundlagen'), false);
 });
 
-test('article headings render table of contents anchor links', function () {
+test('article h2 headings render table of contents anchor links', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
@@ -257,7 +257,7 @@ test('article headings render table of contents anchor links', function () {
         'locale' => 'en',
         'title' => 'Linked Contents',
         'slug' => 'linked-contents',
-        'markdown' => "## Risk Model\n\nText.\n\n### Cold Storage\n\nText.\n\n## Risk Model\n\nDuplicate heading.",
+        'markdown' => "## Risk Model\n\nText.\n\n### Cold Storage\n\nText.\n\n#### Key Rotation\n\nText.\n\n## Risk Model\n\nDuplicate heading.",
     ]);
 
     $this->get(route('magazine.show', 'linked-contents'))
@@ -265,11 +265,15 @@ test('article headings render table of contents anchor links', function () {
         ->assertViewIs('magazine.show')
         ->assertSee('Contents')
         ->assertSee('<h2 id="risk-model">Risk Model</h2>', false)
-        ->assertSee('<h3 id="cold-storage">Cold Storage</h3>', false)
+        ->assertSee('<h3>Cold Storage</h3>', false)
+        ->assertSee('<h4>Key Rotation</h4>', false)
         ->assertSee('<h2 id="risk-model-2">Risk Model</h2>', false)
         ->assertSee('href="#risk-model"', false)
-        ->assertSee('href="#cold-storage"', false)
-        ->assertSee('href="#risk-model-2"', false);
+        ->assertSee('href="#risk-model-2"', false)
+        ->assertDontSee('href="#cold-storage"', false)
+        ->assertDontSee('href="#key-rotation"', false)
+        ->assertDontSee('id="cold-storage"', false)
+        ->assertDontSee('id="key-rotation"', false);
 });
 
 test('structured post blocks provide table of contents anchors before markdown fallback parsing', function () {
@@ -299,6 +303,38 @@ test('structured post blocks provide table of contents anchors before markdown f
         ->assertSee('<h2 id="custody-basics">Custody Basics</h2>', false)
         ->assertSee('href="#custody-basics"', false)
         ->assertDontSee('Legacy Heading');
+});
+
+test('structured post block markdown headings are included in the table of contents', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Complete Structured Contents',
+        'slug' => 'complete-structured-contents',
+        'markdown' => '## Legacy Heading',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'section',
+        'sort_order' => 0,
+        'heading' => 'Custody Basics',
+        'anchor' => 'custody-basics',
+        'markdown' => "Intro.\n\n## Wallet Setup\n\nText.\n\n## Recovery Plan\n\nText.",
+    ]);
+
+    $this->get(route('magazine.show', 'complete-structured-contents'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<h2 id="custody-basics">Custody Basics</h2>', false)
+        ->assertSee('<h2 id="wallet-setup">Wallet Setup</h2>', false)
+        ->assertSee('<h2 id="recovery-plan">Recovery Plan</h2>', false)
+        ->assertSee('href="#custody-basics"', false)
+        ->assertSee('href="#wallet-setup"', false)
+        ->assertSee('href="#recovery-plan"', false);
 });
 
 test('structured flow diagram blocks render as article diagrams', function () {

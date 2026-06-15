@@ -280,12 +280,7 @@ class MagazineController extends Controller
             $headingHtml = '<h2 id="'.$id.'">'.e($heading).'</h2>';
         }
 
-        $renderedMarkdown = $heading === null
-            ? $this->renderMarkdownWithTableOfContents($block->markdown, $usedHeadingIds)
-            : [
-                'html' => $this->renderMarkdown($block->markdown),
-                'toc' => [],
-            ];
+        $renderedMarkdown = $this->renderMarkdownWithTableOfContents($block->markdown, $usedHeadingIds);
 
         return [
             'html' => $headingHtml.$renderedMarkdown['html'],
@@ -313,10 +308,9 @@ class MagazineController extends Controller
         $html = $this->renderAsciiDiagramCodeBlocks($html);
 
         $html = preg_replace_callback(
-            '/<h([23])>(.*?)<\/h\1>/s',
+            '/<h2>(.*?)<\/h2>/s',
             function (array $matches) use (&$toc, &$usedHeadingIds): string {
-                $level = (int) $matches[1];
-                $htmlTitle = $matches[2];
+                $htmlTitle = $matches[1];
                 $title = trim(html_entity_decode(strip_tags($htmlTitle), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
 
                 if ($title === '') {
@@ -327,10 +321,10 @@ class MagazineController extends Controller
                 $toc[] = [
                     'id' => $id,
                     'title' => $title,
-                    'level' => $level,
+                    'level' => 2,
                 ];
 
-                return "<h{$level} id=\"{$id}\">{$htmlTitle}</h{$level}>";
+                return "<h2 id=\"{$id}\">{$htmlTitle}</h2>";
             },
             $html
         );
