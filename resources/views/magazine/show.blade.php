@@ -3,24 +3,11 @@
     <x-public-nav :locale="$locale" :language-options="$languageOptions" />
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <nav class="text-base-content/65 text-sm"
-            aria-label="{{ $copy['breadcrumb_label'] }}">
-            <ol class="flex flex-wrap items-center gap-2">
-                <li>
-                    <a class="text-primary font-semibold underline-offset-4 hover:underline"
-                        href="{{ route('magazine.index') }}">{{ $copy['magazine'] }}</a>
-                </li>
-                <li class="text-base-content/35" aria-hidden="true">/</li>
-                <li>
-                    <a class="text-base-content/80 hover:text-primary underline-offset-4 hover:underline"
-                        href="{{ $post['category_url'] }}">{{ $post['category_label'] }}</a>
-                </li>
-                <li class="text-base-content/35" aria-hidden="true">/</li>
-                <li class="text-base-content max-w-full truncate sm:max-w-96"
-                    aria-current="page">
-                    {{ $post['title'] }}</li>
-            </ol>
-        </nav>
+        <x-breadcrumbs :label="$copy['breadcrumb_label']" :items="[
+            ['label' => $copy['magazine'], 'url' => route('magazine.index')],
+            ['label' => $post['category_label'], 'url' => $post['category_url']],
+            ['label' => $post['title'], 'current' => true],
+        ]" />
 
         <article class="mt-8">
             <header class="max-w-3xl">

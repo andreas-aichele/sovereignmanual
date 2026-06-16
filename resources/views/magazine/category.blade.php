@@ -2,8 +2,12 @@
     <x-public-nav :locale="$locale" :language-options="$languageOptions" />
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        {{-- TODO: add Breadcrumbs --}}
-        <header class="max-w-3xl">
+        <x-breadcrumbs :label="__('magazine.show.breadcrumb_label', [], $locale)" :items="[
+            ['label' => __('magazine.show.magazine', [], $locale), 'url' => route('magazine.index')],
+            ['label' => $category['title'], 'current' => true],
+        ]" />
+
+        <header class="mt-8 max-w-3xl">
             <h1
                 class="wrap-anywhere text-4xl font-semibold leading-tight sm:text-5xl">
                 {{ $category['title'] }}</h1>
