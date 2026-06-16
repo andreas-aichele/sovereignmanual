@@ -13,6 +13,7 @@ use App\Models\ContentTopic;
 use App\Models\Post;
 use App\Models\PostTranslation;
 use App\Support\Locales;
+use App\Support\ResponsiveImage;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
@@ -474,7 +475,18 @@ class MagazineAiPipeline
                 ->quality('medium')
                 ->generate(provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.image_model', 'gemini-2.5-flash-image'));
 
-            $path = $image->storePubliclyAs("post-assets/{$post->id}", "{$post->slug}.png", 'public');
+            $temporaryPath = $image->storePubliclyAs("post-assets/{$post->id}", "{$post->slug}.png", 'public');
+            $path = is_string($temporaryPath)
+                ? app(ResponsiveImage::class)->convertToJpeg('public', $temporaryPath, "post-assets/{$post->id}/{$post->slug}.jpg") ?? $temporaryPath
+                : null;
+
+            if (is_string($temporaryPath) && $path !== $temporaryPath) {
+                Storage::disk('public')->delete($temporaryPath);
+            }
+
+            $responsiveImage = is_string($path)
+                ? app(ResponsiveImage::class)->generate('public', $path)
+                : null;
 
             $post->assets()->create([
                 'type' => 'image',
@@ -487,7 +499,7 @@ class MagazineAiPipeline
                 'prompt' => $prompt,
                 'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty background for {$topic->title}",
                 'status' => is_string($path) ? 'ready' : 'pending',
-                'metadata' => $metadata,
+                'metadata' => $responsiveImage === null ? $metadata : $metadata + ['responsive_image' => $responsiveImage],
             ]);
 
             $this->finishRun($run, 'Image generated and stored.', $metadata);

@@ -3,8 +3,11 @@
 use App\Enums\Language;
 use App\Models\Category;
 use App\Models\Post;
+use App\Models\PostAsset;
 use App\Models\PostBlock;
 use App\Models\PostTranslation;
+use App\Support\ResponsiveImage;
+use Illuminate\Support\Facades\Storage;
 
 function selfCustodyCategory(): Category
 {
@@ -50,6 +53,9 @@ test('published posts appear on the magazine index', function () {
     $this->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
+        ->assertSee('<picture>', false)
+        ->assertSee('loading="eager"', false)
+        ->assertSee('fetchpriority="high"', false)
         ->assertSee('Bitcoin self custody basics')
         ->assertSee('Self Custody')
         ->assertSee('fallback.jpg');
@@ -190,6 +196,8 @@ test('category page renders heading description and paginated article listing', 
         ->assertSee('Selbstverwahrung')
         ->assertSee('Praktische Orientierung')
         ->assertSee('Bitcoin Selbstverwahrung')
+        ->assertSee('<picture>', false)
+        ->assertSee('loading="lazy"', false)
         ->assertSee('fallback.jpg');
 });
 
@@ -357,6 +365,181 @@ test('regular code blocks remain code when they are not diagrams', function () {
         ->assertViewIs('magazine.show')
         ->assertSee('<pre><code class="language-php">', false)
         ->assertDontSee('class="mermaid"', false);
+});
+
+test('article images render responsive picture markup', function () {
+    $post = Post::factory()->published()->create();
+    $responsiveImage = [
+        'src' => '/storage/post-assets/header.png',
+        'width' => 1600,
+        'height' => 900,
+        'sources' => [
+            'avif' => [
+                ['url' => '/storage/post-assets/responsive/header-768.avif', 'width' => 768, 'height' => 432],
+                ['url' => '/storage/post-assets/responsive/header-1600.avif', 'width' => 1600, 'height' => 900],
+            ],
+            'webp' => [
+                ['url' => '/storage/post-assets/responsive/header-768.webp', 'width' => 768, 'height' => 432],
+            ],
+            'jpg' => [
+                ['url' => '/storage/post-assets/responsive/header-768.jpg', 'width' => 768, 'height' => 432],
+            ],
+        ],
+    ];
+    $blockResponsiveImage = [
+        'src' => '/storage/post-assets/block.png',
+        'width' => 1200,
+        'height' => 800,
+        'sources' => [
+            'webp' => [
+                ['url' => '/storage/post-assets/responsive/block-768.webp', 'width' => 768, 'height' => 512],
+            ],
+        ],
+    ];
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Responsive Images',
+        'slug' => 'responsive-images',
+    ]);
+
+    PostAsset::factory()->create([
+        'post_id' => $post->id,
+        'url' => '/storage/post-assets/header.png',
+        'alt_text' => 'Header image alt text',
+        'metadata' => [
+            'role' => 'header',
+            'responsive_image' => $responsiveImage,
+        ],
+    ]);
+
+    $blockAsset = PostAsset::factory()->create([
+        'post_id' => $post->id,
+        'url' => '/storage/post-assets/block.png',
+        'alt_text' => 'Block image alt text',
+        'metadata' => [
+            'responsive_image' => $blockResponsiveImage,
+        ],
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'post_asset_id' => $blockAsset->id,
+        'locale' => 'en',
+        'markdown' => 'Block body.',
+    ]);
+
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'responsive-images']))
+        ->assertSuccessful()
+        ->assertSee('<picture>', false)
+        ->assertSee('type="image/avif"', false)
+        ->assertSee('/storage/post-assets/responsive/header-768.avif 768w, /storage/post-assets/responsive/header-1600.avif 1600w', false)
+        ->assertSee('type="image/jpeg"', false)
+        ->assertSee('sizes="(min-width: 72rem) 72rem, 100vw"', false)
+        ->assertSee('src="/storage/post-assets/header.png"', false)
+        ->assertSee('alt="Header image alt text"', false)
+        ->assertSee('width="1600"', false)
+        ->assertSee('height="900"', false)
+        ->assertSee('loading="eager"', false)
+        ->assertSee('fetchpriority="high"', false)
+        ->assertSee('src="/storage/post-assets/block.png"', false)
+        ->assertSee('alt="Block image alt text"', false)
+        ->assertSee('loading="lazy"', false);
+});
+
+test('responsive image command converts stored assets without responsive metadata', function () {
+    app()->instance(ResponsiveImage::class, new class extends ResponsiveImage
+    {
+        /**
+         * @return array<string, mixed>|null
+         */
+        public function generate(string $disk, string $path, array $widths = [480, 768, 1024, 1360, 1800]): ?array
+        {
+            return [
+                'src' => "/storage/{$path}",
+                'width' => 1200,
+                'height' => 675,
+                'sources' => [
+                    'webp' => [
+                        ['url' => '/storage/post-assets/responsive/existing-768.webp', 'width' => 768, 'height' => 432],
+                    ],
+                ],
+            ];
+        }
+    });
+
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Existing Image',
+        'slug' => 'existing-image',
+    ]);
+
+    $asset = PostAsset::factory()->create([
+        'post_id' => $post->id,
+        'path' => 'post-assets/existing.jpg',
+        'url' => 'https://sovereignmanual.com/storage/post-assets/existing.jpg',
+        'metadata' => [
+            'role' => 'header',
+            'responsive_image' => [
+                'src' => 'https://sovereignmanual.com/storage/post-assets/existing.jpg',
+                'width' => null,
+                'height' => null,
+                'sources' => [],
+            ],
+        ],
+    ]);
+
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'existing-image']))
+        ->assertSuccessful()
+        ->assertSee('post-assets/existing.jpg')
+        ->assertDontSee('https://sovereignmanual.com/storage/post-assets/existing.jpg', false);
+
+    expect($asset->refresh()->metadata['responsive_image']['sources'])->toBe([]);
+
+    $this->artisan('app:generate-responsive-post-images --force')
+        ->assertSuccessful();
+
+    expect($asset->refresh()->metadata['responsive_image']['sources']['webp'][0]['width'])->toBe(768);
+});
+
+test('responsive image command does not store empty metadata when generation fails', function () {
+    app()->instance(ResponsiveImage::class, new class extends ResponsiveImage
+    {
+        public function generate(string $disk, string $path, array $widths = [480, 768, 1024, 1360, 1800]): ?array
+        {
+            return null;
+        }
+    });
+
+    $asset = PostAsset::factory()->create([
+        'path' => 'post-assets/missing.jpg',
+        'metadata' => [
+            'role' => 'header',
+        ],
+    ]);
+
+    $this->artisan('app:generate-responsive-post-images')
+        ->assertFailed();
+
+    expect($asset->refresh()->metadata)->not->toHaveKey('responsive_image');
+});
+
+test('responsive image service generates variants from stored images', function () {
+    Storage::fake('public');
+    Storage::disk('public')->put(
+        'post-assets/test.jpg',
+        base64_decode('/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAHsP//EABQQAQAAAAAAAAAAAAAAAAAAAAD/2gAIAQEAAQUCcf/EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQMBAT8BP//EABQRAQAAAAAAAAAAAAAAAAAAABD/2gAIAQIBAT8BP//Z')
+    );
+
+    $responsiveImage = app(ResponsiveImage::class)->generate('public', 'post-assets/test.jpg', [1]);
+
+    expect($responsiveImage['width'])->toBe(1)
+        ->and($responsiveImage['height'])->toBe(1)
+        ->and($responsiveImage['sources'])->not->toBeEmpty();
 });
 
 test('article pages render seo meta tags with limits and keywords', function () {

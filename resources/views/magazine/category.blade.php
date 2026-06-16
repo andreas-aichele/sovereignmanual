@@ -30,9 +30,11 @@
                         <article
                             class="border-primary/15 bg-base-200/90 hover:border-primary/40 overflow-hidden rounded-lg border-2 shadow-lg shadow-fuchsia-950/10 transition hover:shadow-xl hover:shadow-fuchsia-950/40">
                             <div class="aspect-16/10 bg-base-300">
-                                <img class="h-full w-full object-cover"
-                                    src="{{ $post['image'] }}"
-                                    alt="{{ $post['image_alt'] ?? $post['title'] }}">
+                                <x-img class="h-full w-full object-cover"
+                                    :src="$post['image']"
+                                    :alt="$post['image_alt'] ?? $post['title']"
+                                    :responsive="$post['image_responsive']"
+                                    sizes="(min-width: 64rem) 22rem, (min-width: 40rem) 50vw, 100vw" />
                             </div>
 
                             <div class="p-5">

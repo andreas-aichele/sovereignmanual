@@ -26,10 +26,11 @@
 
             <div
                 class="border-primary/20 bg-base-300 mt-8 overflow-hidden rounded-lg border shadow-2xl shadow-fuchsia-950/20 ring-1 ring-cyan-300/10">
-                {{-- TODO: Implement a complete responsive image system using a new <x-img /> Blade component, upload/storage logic, automatic image resizing to multiple sizes, AVIF/WebP/JPEG generation, srcset/sizes/picture markup, CLS-safe width/height, lazy loading, and optional hero optimization via fetchpriority="high".  --}}
-                <img class="max-h-[32rem] w-full object-cover"
-                    src="{{ $post['image'] }}"
-                    alt="{{ $post['image_alt'] ?? $post['title'] }}">
+                <x-img class="max-h-[32rem] w-full object-cover"
+                    :src="$post['image']"
+                    :alt="$post['image_alt'] ?? $post['title']"
+                    :responsive="$post['image_responsive']"
+                    sizes="(min-width: 72rem) 72rem, 100vw" hero />
             </div>
 
             @if (count($post['toc']) > 0)
@@ -63,9 +64,11 @@
                     @foreach ($post['blocks'] as $block)
                         <section class="content-body mt-10 max-w-none">
                             @if ($block['asset'])
-                                <img class="rounded-lg border border-white/10"
-                                    src="{{ $block['asset']['url'] }}"
-                                    alt="{{ $block['asset']['alt'] ?? '' }}">
+                                <x-img class="rounded-lg border border-white/10"
+                                    :src="$block['asset']['url']"
+                                    :alt="$block['asset']['alt'] ?? ''"
+                                    :responsive="$block['asset']['responsive']"
+                                    sizes="(min-width: 64rem) 48rem, 100vw" />
                             @endif
 
                             {!! $block['html'] !!}

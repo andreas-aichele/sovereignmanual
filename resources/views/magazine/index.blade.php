@@ -23,9 +23,11 @@
                 href="{{ $featured['url'] }}" <article>
                 <div class="bg-base-300 block min-h-80"
                     href="{{ $featured['url'] }}">
-                    <img class="h-full w-full object-cover"
-                        src="{{ $featured['image'] }}"
-                        alt="{{ $featured['image_alt'] ?? $featured['title'] }}">
+                    <x-img class="h-full w-full object-cover"
+                        :src="$featured['image']"
+                        :alt="$featured['image_alt'] ?? $featured['title']"
+                        :responsive="$featured['image_responsive']"
+                        sizes="(min-width: 72rem) 40rem, 100vw" hero />
                 </div>
 
                 <div class="flex flex-col justify-center p-6 sm:p-8">
@@ -54,9 +56,11 @@
                         <article
                             class="border-primary/15 bg-base-200/90 hover:border-primary/40 overflow-hidden rounded-lg border-2 shadow-lg shadow-fuchsia-950/10 transition hover:shadow-xl hover:shadow-fuchsia-950/40">
                             <div class="aspect-16/10 bg-base-300 block">
-                                <img class="h-full w-full object-cover"
-                                    src="{{ $post['image'] }}"
-                                    alt="{{ $post['image_alt'] ?? $post['title'] }}">
+                                <x-img class="h-full w-full object-cover"
+                                    :src="$post['image']"
+                                    :alt="$post['image_alt'] ?? $post['title']"
+                                    :responsive="$post['image_responsive']"
+                                    sizes="(min-width: 64rem) 22rem, (min-width: 40rem) 50vw, 100vw" />
                                 <div>
 
                                     <div class="p-5">

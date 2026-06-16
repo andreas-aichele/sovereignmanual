@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Lang;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 class MagazineController extends Controller
@@ -94,8 +95,9 @@ class MagazineController extends Controller
                     'html' => $renderedBlock['html'],
                     'data' => $block->data,
                     'asset' => $block->asset ? [
-                        'url' => $block->asset->url,
+                        'url' => $this->assetUrl($block->asset),
                         'alt' => $block->asset->alt_text,
+                        'responsive' => $block->asset->metadata['responsive_image'] ?? null,
                     ] : null,
                 ];
             });
@@ -194,9 +196,19 @@ class MagazineController extends Controller
                 'category' => $category,
                 'slug' => $translation?->slug ?? $post->slug,
             ]),
-            'image' => $coverImage?->url ?? asset('fallback.jpg'),
+            'image' => $coverImage ? $this->assetUrl($coverImage) : asset('fallback.jpg'),
             'image_alt' => $coverImage?->alt_text ?? $title,
+            'image_responsive' => $coverImage?->metadata['responsive_image'] ?? null,
         ];
+    }
+
+    private function assetUrl(PostAsset $asset): ?string
+    {
+        if ($asset->path !== null && $asset->disk !== null) {
+            return Storage::disk($asset->disk)->url($asset->path);
+        }
+
+        return $asset->url;
     }
 
     private function categoryLabel(?string $category): string
