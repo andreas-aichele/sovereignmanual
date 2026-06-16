@@ -39,6 +39,7 @@
 
             <div
                 class="mt-8 overflow-hidden rounded-lg border border-primary/20 bg-base-300 shadow-2xl shadow-fuchsia-950/20 ring-1 ring-cyan-300/10">
+                {{-- TODO: Implement a complete responsive image system using a new <x-img /> Blade component, upload/storage logic, automatic image resizing to multiple sizes, AVIF/WebP/JPEG generation, srcset/sizes/picture markup, CLS-safe width/height, lazy loading, and optional hero optimization via fetchpriority="high".  --}}
                 <img src="{{ $post['image'] }}"
                     alt="{{ $post['image_alt'] ?? $post['title'] }}"
                     class="max-h-[32rem] w-full object-cover">
