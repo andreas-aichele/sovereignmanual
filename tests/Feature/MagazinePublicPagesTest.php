@@ -411,6 +411,8 @@ test('article language switcher uses localized category and slug for translated 
         'current' => false,
     ]);
 
+    expect($germanResponse->viewData('meta')['alternate'])->toBe($englishUrl);
+
     $this->withCookie('locale', 'de')
         ->get($englishUrl)
         ->assertSuccessful()

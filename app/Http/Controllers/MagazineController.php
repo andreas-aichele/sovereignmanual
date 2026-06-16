@@ -241,7 +241,7 @@ class MagazineController extends Controller
             return null;
         }
 
-        return $this->localizedRoute($alternateLocale, 'show', [
+        return $this->explicitLocalizedRoute($alternateLocale, 'show', [
             'category' => $this->categorySlug($post->category, $alternateLocale),
             'slug' => $translation->slug,
         ]);
