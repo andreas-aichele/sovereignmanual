@@ -378,7 +378,7 @@ test('article pages render seo meta tags with limits and keywords', function () 
         ->and(mb_strlen($response->viewData('meta')['description']))->toBeLessThanOrEqual(160);
 });
 
-test('sitemap index links to paginated sitemap files', function () {
+test('sitemap index links to content type sitemap files', function () {
     $post = Post::factory()->published()->create([
         'published_at' => now()->subDays(2),
         'updated_at' => now()->subDay(),
@@ -402,11 +402,12 @@ test('sitemap index links to paginated sitemap files', function () {
         ->assertSuccessful()
         ->assertHeader('Content-Type', 'application/xml')
         ->assertSee('<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', false)
-        ->assertSee('<loc>'.route('sitemap.page', 1).'</loc>', false)
+        ->assertSee('<loc>'.route('sitemap.posts').'</loc>', false)
+        ->assertSee('<loc>'.route('sitemap.categories').'</loc>', false)
         ->assertSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false);
 });
 
-test('paginated sitemap lists public magazine urls for all translations', function () {
+test('post sitemap lists public magazine urls for all translations', function () {
     $post = Post::factory()->published()->create([
         'published_at' => now()->subDays(2),
         'updated_at' => now()->subDay(),
@@ -426,83 +427,35 @@ test('paginated sitemap lists public magazine urls for all translations', functi
         'slug' => 'bitcoin-grundlagen',
     ]);
 
-    $this->get(route('sitemap.page', 1))
+    $this->get(route('sitemap.posts'))
         ->assertSuccessful()
         ->assertHeader('Content-Type', 'application/xml')
         ->assertSee('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', false)
-        ->assertSee(route('magazine.index'), false)
-        ->assertSee('<loc>'.route('magazine.index').'</loc>', false)
-        ->assertSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false)
-        ->assertSee('<changefreq>daily</changefreq>', false)
-        ->assertSee('<priority>1.0</priority>', false)
-        ->assertDontSee('<loc>'.route('magazine.localized.index', ['locale' => 'de']).'</loc>', false)
         ->assertSee(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-basics']), false)
         ->assertSee(route('magazine.localized.show', ['locale' => 'de', 'category' => 'selbstverwahrung', 'slug' => 'bitcoin-grundlagen']), false)
         ->assertSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false)
         ->assertSee('<changefreq>monthly</changefreq>', false)
-        ->assertSee('<priority>0.8</priority>', false);
+        ->assertSee('<priority>0.8</priority>', false)
+        ->assertDontSee('<loc>'.route('magazine.category', ['category' => 'self-custody']).'</loc>', false);
 });
 
-test('sitemap homepage lastmod uses latest published article', function () {
-    Post::factory()->published()->create([
-        'published_at' => now()->subDays(10),
-        'updated_at' => now()->subDay(),
-    ]);
+test('category sitemap lists category urls', function () {
+    selfCustodyCategory();
 
-    Post::factory()->published()->create([
-        'published_at' => now()->subDays(2),
-        'updated_at' => now()->subDays(2),
-    ]);
-
-    $this->get(route('sitemap.page', 1))
+    $this->get(route('sitemap.categories'))
         ->assertSuccessful()
-        ->assertSee('<loc>'.route('magazine.index').'</loc>', false)
-        ->assertSee('<lastmod>'.now()->subDays(2)->toDateString().'</lastmod>', false)
-        ->assertSee('<changefreq>daily</changefreq>', false)
-        ->assertSee('<priority>1.0</priority>', false)
-        ->assertDontSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false);
-});
-
-test('sitemap pages are split by configured page size', function () {
-    config(['app.sitemap_per_page' => 2]);
-
-    $post = Post::factory()->published()->create([
-        'published_at' => now()->subDays(2),
-        'updated_at' => now()->subDay(),
-    ]);
-
-    PostTranslation::factory()->create([
-        'post_id' => $post->id,
-        'locale' => 'en',
-        'title' => 'Bitcoin Basics',
-        'slug' => 'bitcoin-basics',
-    ]);
-
-    PostTranslation::factory()->create([
-        'post_id' => $post->id,
-        'locale' => 'de',
-        'title' => 'Bitcoin Grundlagen',
-        'slug' => 'bitcoin-grundlagen',
-    ]);
-
-    $this->get('/sitemap.xml')
-        ->assertSuccessful()
-        ->assertSee('<loc>'.route('sitemap.page', 1).'</loc>', false)
-        ->assertSee('<loc>'.route('sitemap.page', 2).'</loc>', false)
-        ->assertDontSee('<loc>'.route('sitemap.page', 3).'</loc>', false);
-
-    $this->get(route('sitemap.page', 1))
-        ->assertSuccessful()
-        ->assertSee(route('magazine.index'), false)
-        ->assertSee(route('magazine.localized.show', ['locale' => 'de', 'category' => 'selbstverwahrung', 'slug' => 'bitcoin-grundlagen']), false)
+        ->assertHeader('Content-Type', 'application/xml')
+        ->assertSee('<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">', false)
+        ->assertSee('<loc>'.route('magazine.category', ['category' => 'self-custody']).'</loc>', false)
+        ->assertSee('<loc>'.route('magazine.localized.category', ['locale' => 'de', 'category' => 'selbstverwahrung']).'</loc>', false)
+        ->assertSee('<changefreq>weekly</changefreq>', false)
+        ->assertSee('<priority>0.9</priority>', false)
         ->assertDontSee(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-basics']), false);
+});
 
-    $this->get(route('sitemap.page', 2))
-        ->assertSuccessful()
-        ->assertDontSee('<loc>'.route('magazine.index').'</loc>', false)
-        ->assertSee(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-basics']), false);
-
-    $this->get('/sitemap-3.xml')->assertNotFound();
+test('numbered sitemap pages no longer exist', function () {
+    $this->get('/sitemap-1.xml')
+        ->assertNotFound();
 });
 
 test('article h2 headings render table of contents anchor links', function () {

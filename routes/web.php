@@ -7,7 +7,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', [MagazineController::class, 'index'])->name('magazine.index');
 Route::get('sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
-Route::get('sitemap-{page}.xml', [SitemapController::class, 'page'])->whereNumber('page')->name('sitemap.page');
+Route::get('sitemap-posts.xml', [SitemapController::class, 'posts'])->name('sitemap.posts');
+Route::get('sitemap-categories.xml', [SitemapController::class, 'categories'])->name('sitemap.categories');
 Route::get('{locale}', [MagazineController::class, 'switchLocale'])
     ->whereIn('locale', Locales::supported())
     ->name('magazine.localized.index');

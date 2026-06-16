@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\PostStatus;
+use App\Models\Category;
 use App\Models\Post;
 use App\Models\PostTranslation;
 use App\Support\Locales;
@@ -13,68 +14,45 @@ class SitemapController extends Controller
 {
     public function index(): Response
     {
-        $lastModified = $this->sitemapLastModifiedDate();
-        $pageCount = max(1, (int) ceil($this->sitemapUrlCount() / $this->sitemapPageSize()));
-
-        $sitemaps = collect(range(1, $pageCount))
-            ->map(fn (int $page): array => [
-                'loc' => route('sitemap.page', $page),
-                'lastmod' => $lastModified,
-            ]);
+        $sitemaps = collect([
+            ['loc' => route('sitemap.posts'), 'lastmod' => $this->postLastModifiedDate()],
+            ['loc' => route('sitemap.categories'), 'lastmod' => $this->categoryLastModifiedDate()],
+        ]);
 
         $xml = view('sitemap-index', ['sitemaps' => $sitemaps])->render();
 
         return response($xml, 200, ['Content-Type' => 'application/xml']);
     }
 
-    public function page(int $page): Response
+    public function posts(): Response
     {
-        $pageSize = $this->sitemapPageSize();
-        $urlCount = $this->sitemapUrlCount();
-        $pageCount = max(1, (int) ceil($urlCount / $pageSize));
-
-        abort_if($page < 1 || $page > $pageCount, 404);
-
-        $offset = ($page - 1) * $pageSize;
-        $urls = collect();
-
-        if ($offset === 0) {
-            $urls->push([
-                'loc' => route('magazine.index'),
-                'lastmod' => $this->sitemapLastModifiedDate(),
-                'changefreq' => 'daily',
-                'priority' => '1.0',
-            ]);
-        }
-
-        $translationLimit = $pageSize - $urls->count();
-
-        if ($translationLimit > 0) {
-            $this->publishedTranslationsQuery()
-                ->skip(max(0, $offset - 1))
-                ->take($translationLimit)
-                ->get()
-                ->each(function (PostTranslation $translation) use ($urls): void {
-                    $urls->push($this->sitemapUrlForTranslation($translation));
-                });
-        }
+        $urls = $this->publishedTranslationsQuery()
+            ->get()
+            ->map(fn (PostTranslation $translation): array => $this->postSitemapUrl($translation));
 
         $xml = view('sitemap', ['urls' => $urls])->render();
 
         return response($xml, 200, ['Content-Type' => 'application/xml']);
     }
 
-    private function sitemapPageSize(): int
+    public function categories(): Response
     {
-        return max(1, (int) config('app.sitemap_per_page', 1000));
+        $urls = Category::query()
+            ->orderBy('key')
+            ->get()
+            ->sortBy(fn (Category $category): array => [
+                $category->key,
+                $category->lang->value === Locales::fallback() ? 0 : 1,
+                $category->lang->value,
+            ])
+            ->map(fn (Category $category): array => $this->categorySitemapUrl($category));
+
+        $xml = view('sitemap', ['urls' => $urls])->render();
+
+        return response($xml, 200, ['Content-Type' => 'application/xml']);
     }
 
-    private function sitemapUrlCount(): int
-    {
-        return 1 + $this->publishedTranslationsQuery()->count();
-    }
-
-    private function sitemapLastModifiedDate(): string
+    private function postLastModifiedDate(): string
     {
         $latestPost = Post::query()
             ->where('status', PostStatus::Published)
@@ -86,6 +64,15 @@ class SitemapController extends Controller
         return $latestPost
             ? ($latestPost->updated_at ?? $latestPost->published_at)->toDateString()
             : now()->toDateString();
+    }
+
+    private function categoryLastModifiedDate(): string
+    {
+        $latestCategory = Category::query()
+            ->latest('updated_at')
+            ->first(['updated_at']);
+
+        return $latestCategory?->updated_at?->toDateString() ?? now()->toDateString();
     }
 
     /**
@@ -107,7 +94,7 @@ class SitemapController extends Controller
     /**
      * @return array{loc: string, lastmod: ?string, changefreq: string, priority: string}
      */
-    private function sitemapUrlForTranslation(PostTranslation $translation): array
+    private function postSitemapUrl(PostTranslation $translation): array
     {
         return [
             'loc' => $this->localizedRoute($translation->locale, 'show', [
@@ -117,6 +104,21 @@ class SitemapController extends Controller
             'lastmod' => ($translation->post->updated_at ?? $translation->post->published_at)?->toDateString(),
             'changefreq' => 'monthly',
             'priority' => '0.8',
+        ];
+    }
+
+    /**
+     * @return array{loc: string, lastmod: ?string, changefreq: string, priority: string}
+     */
+    private function categorySitemapUrl(Category $category): array
+    {
+        return [
+            'loc' => $this->localizedRoute($category->lang->value, 'category', [
+                'category' => $category->slug,
+            ]),
+            'lastmod' => $category->updated_at?->toDateString(),
+            'changefreq' => 'weekly',
+            'priority' => '0.9',
         ];
     }
 
