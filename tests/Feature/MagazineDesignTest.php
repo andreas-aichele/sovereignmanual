@@ -10,7 +10,7 @@ test('magazine index is the public start page', function () {
 
 test('german magazine index route stores the locale and redirects to the start page', function () {
     $this->get(route('magazine.localized.index', ['locale' => 'de']))
-        ->assertRedirect(route('magazine.localized.index', ['locale' => 'de']))
+        ->assertRedirect(route('magazine.index'))
         ->assertCookie('locale', 'de');
 });
 

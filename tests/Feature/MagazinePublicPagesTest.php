@@ -288,6 +288,136 @@ test('stored locale controls the public magazine start page language', function 
         ->assertSee('Artikel lesen');
 });
 
+test('start page language switcher links directly to localized start pages', function () {
+    $response = $this->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertViewHas('locale', 'en');
+
+    expect($response->viewData('languageOptions'))->toContain([
+        'locale' => 'de',
+        'label' => 'Deutsch',
+        'url' => route('magazine.localized.index', ['locale' => 'de']),
+        'current' => false,
+    ]);
+
+    $this->get(route('magazine.localized.index', ['locale' => 'de']))
+        ->assertRedirect(route('magazine.index'))
+        ->assertCookie('locale', 'de');
+
+    $germanResponse = $this->withCookie('locale', 'de')
+        ->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertViewHas('locale', 'de');
+
+    expect($germanResponse->viewData('languageOptions'))->toContain([
+        'locale' => 'en',
+        'label' => 'English',
+        'url' => route('magazine.localized.index', ['locale' => 'en']),
+        'current' => false,
+    ]);
+
+    $this->withCookie('locale', 'de')
+        ->get(route('magazine.localized.index', ['locale' => 'en']))
+        ->assertRedirect(route('magazine.index'))
+        ->assertCookie('locale', 'en');
+
+    $this->withCookie('locale', 'en')
+        ->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertViewHas('locale', 'en');
+});
+
+test('article language switcher only links to real translated article urls', function () {
+    $category = selfCustodyCategory();
+
+    $post = Post::factory()->published()->create([
+        'category_id' => $category->id,
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'English only article',
+        'slug' => 'english-only-article',
+    ]);
+
+    $response = $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'english-only-article']))
+        ->assertSuccessful();
+
+    expect($response->viewData('languageOptions'))
+        ->toHaveCount(1)
+        ->sequence(fn ($option) => $option
+            ->locale->toBe('en')
+            ->url->toBe(route('magazine.localized.show', [
+                'locale' => 'en',
+                'category' => 'self-custody',
+                'slug' => 'english-only-article',
+            ])));
+});
+
+test('article language switcher uses localized category and slug for translated articles', function () {
+    $category = selfCustodyCategory();
+
+    $post = Post::factory()->published()->create([
+        'category_id' => $category->id,
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Seed Backup',
+        'slug' => 'seed-backup',
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'de',
+        'title' => 'Seed Backup Deutsch',
+        'slug' => 'seed-backup-deutsch',
+    ]);
+
+    $germanUrl = route('magazine.localized.show', [
+        'locale' => 'de',
+        'category' => 'selbstverwahrung',
+        'slug' => 'seed-backup-deutsch',
+    ]);
+    $englishUrl = route('magazine.localized.show', [
+        'locale' => 'en',
+        'category' => 'self-custody',
+        'slug' => 'seed-backup',
+    ]);
+
+    $response = $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'seed-backup']))
+        ->assertSuccessful();
+
+    expect($response->viewData('languageOptions'))->toContain([
+        'locale' => 'de',
+        'label' => 'Deutsch',
+        'url' => $germanUrl,
+        'current' => false,
+    ]);
+
+    $this->get($germanUrl)->assertSuccessful();
+
+    $germanResponse = $this->withCookie('locale', 'de')
+        ->get($germanUrl)
+        ->assertSuccessful()
+        ->assertViewHas('locale', 'de');
+
+    expect($germanResponse->viewData('languageOptions'))->toContain([
+        'locale' => 'en',
+        'label' => 'English',
+        'url' => $englishUrl,
+        'current' => false,
+    ]);
+
+    $this->withCookie('locale', 'de')
+        ->get($englishUrl)
+        ->assertSuccessful()
+        ->assertViewHas('locale', 'en')
+        ->assertSee('Seed Backup');
+});
+
 test('markdown is rendered to sanitized html for articles', function () {
     $post = Post::factory()->published()->create();
 

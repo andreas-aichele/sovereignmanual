@@ -8,6 +8,7 @@ use App\Models\Category;
 use App\Models\Post;
 use App\Models\PostAsset;
 use App\Models\PostBlock;
+use App\Models\PostTranslation;
 use App\Support\Locales;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
@@ -168,7 +169,7 @@ class MagazineController extends Controller
 
     public function switchLocale(): RedirectResponse
     {
-        return redirect()->to($this->localizedRoute(App::currentLocale(), 'index'));
+        return redirect()->route('magazine.index');
     }
 
     private function serializePostSummary(Post $post, string $locale): array
@@ -234,7 +235,7 @@ class MagazineController extends Controller
     private function alternateUrl(Post $post, string $locale): ?string
     {
         $alternateLocale = $this->translation('alternate_locale', $locale);
-        $translation = $post->translation($alternateLocale);
+        $translation = $this->exactTranslation($post, $alternateLocale);
 
         if ($translation === null) {
             return null;
@@ -253,7 +254,7 @@ class MagazineController extends Controller
     {
         return collect($this->translationArray('locales', $currentLocale))
             ->map(function (string $label, string $locale) use ($currentLocale, $post): ?array {
-                $translation = $post?->translation($locale);
+                $translation = $post === null ? null : $this->exactTranslation($post, $locale);
 
                 if ($post !== null && $translation === null) {
                     return null;
@@ -264,7 +265,7 @@ class MagazineController extends Controller
                     'label' => $label,
                     'url' => $translation === null
                         ? $this->localeSwitchUrl($locale)
-                        : $this->localizedRoute($locale, 'show', [
+                        : $this->explicitLocalizedRoute($locale, 'show', [
                             'category' => $this->categorySlug($post->category, $locale),
                             'slug' => $translation->slug,
                         ]),
@@ -278,7 +279,23 @@ class MagazineController extends Controller
 
     private function localeSwitchUrl(string $locale): string
     {
-        return $this->localizedRoute($locale, 'index');
+        return $this->explicitLocalizedRoute($locale, 'index');
+    }
+
+    private function exactTranslation(Post $post, string $locale): ?PostTranslation
+    {
+        return $post->translations->firstWhere('locale', $locale);
+    }
+
+    /**
+     * @param  array<string, string>  $parameters
+     */
+    private function explicitLocalizedRoute(string $locale, string $route, array $parameters = []): string
+    {
+        return route("magazine.localized.{$route}", [
+            'locale' => $locale,
+            ...$parameters,
+        ]);
     }
 
     /**
