@@ -7,10 +7,6 @@ return [
         'de' => 'Deutsch',
     ],
     'language_switcher' => 'Language',
-    'routes' => [
-        'index' => 'magazine.index',
-        'show' => 'magazine.show',
-    ],
     'meta' => [
         'title' => 'Sovereign Manual Magazine',
         'description' => 'Bitcoin, financial intelligence, and sovereign independence.',
@@ -32,14 +28,5 @@ return [
         'language' => 'Language',
         'magazine' => 'Magazine',
         'toc' => 'Contents',
-    ],
-    'categories' => [
-        'self-custody' => 'Self Custody',
-        'privacy-security' => 'Privacy & Security',
-        'financial-sovereignty' => 'Financial Sovereignty',
-        'family-legacy' => 'Family & Legacy',
-        'tools-practice' => 'Tools & Practice',
-        'economics' => 'Economics',
-        'mindset' => 'Mindset',
     ],
 ];

@@ -22,7 +22,7 @@ class Locales
 
     public static function fallback(): string
     {
-        $fallbackLocale = config('app.locale', 'en');
+        $fallbackLocale = config('app.fallback_locale', 'en');
 
         if (is_string($fallbackLocale) && self::isSupported($fallbackLocale)) {
             return $fallbackLocale;

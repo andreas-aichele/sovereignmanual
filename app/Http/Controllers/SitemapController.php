@@ -5,9 +5,9 @@ namespace App\Http\Controllers;
 use App\Enums\PostStatus;
 use App\Models\Post;
 use App\Models\PostTranslation;
+use App\Support\Locales;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\Lang;
 
 class SitemapController extends Controller
 {
@@ -110,8 +110,8 @@ class SitemapController extends Controller
     private function sitemapUrlForTranslation(PostTranslation $translation): array
     {
         return [
-            'loc' => route($this->translation('routes.show', $translation->locale), [
-                'category' => $translation->post->category?->slug ?? 'self-custody',
+            'loc' => $this->localizedRoute($translation->locale, 'show', [
+                'category' => $translation->post->category?->localizedSlug($translation->locale) ?? 'self-custody',
                 'slug' => $translation->slug,
             ]),
             'lastmod' => ($translation->post->updated_at ?? $translation->post->published_at)?->toDateString(),
@@ -120,8 +120,18 @@ class SitemapController extends Controller
         ];
     }
 
-    private function translation(string $key, string $locale): string
+    /**
+     * @param  array<string, string>  $parameters
+     */
+    private function localizedRoute(string $locale, string $route, array $parameters = []): string
     {
-        return (string) Lang::get("magazine.{$key}", [], $locale);
+        if ($locale === Locales::fallback()) {
+            return route("magazine.{$route}", $parameters);
+        }
+
+        return route("magazine.localized.{$route}", [
+            'locale' => $locale,
+            ...$parameters,
+        ]);
     }
 }

@@ -9,16 +9,18 @@ test('magazine index is the public start page', function () {
 });
 
 test('german magazine index route stores the locale and redirects to the start page', function () {
-    $this->get(route('magazine.de.index'))
+    $this->get(route('magazine.localized.index', ['locale' => 'de']))
         ->assertRedirect(route('magazine.index'))
         ->assertCookie('locale', 'de');
 });
 
 test('magazine article urls are available', function () {
-    expect(route('magazine.en.index', absolute: false))->toBe('/en');
-    expect(route('magazine.de.index', absolute: false))->toBe('/de');
+    expect(route('magazine.localized.index', ['locale' => 'en'], absolute: false))->toBe('/en');
+    expect(route('magazine.localized.index', ['locale' => 'de'], absolute: false))->toBe('/de');
+    expect(route('magazine.category', ['category' => 'self-custody'], absolute: false))->toBe('/self-custody');
+    expect(route('magazine.localized.category', ['locale' => 'de', 'category' => 'selbstverwahrung'], absolute: false))->toBe('/de/selbstverwahrung');
     expect(route('magazine.show', ['category' => 'self-custody', 'slug' => 'example'], absolute: false))->toBe('/self-custody/example');
-    expect(route('magazine.de.show', ['category' => 'self-custody', 'slug' => 'beispiel'], absolute: false))->toBe('/de/self-custody/beispiel');
+    expect(route('magazine.localized.show', ['locale' => 'de', 'category' => 'selbstverwahrung', 'slug' => 'beispiel'], absolute: false))->toBe('/de/selbstverwahrung/beispiel');
 });
 
 test('admin backend and filament are not registered', function () {
@@ -67,8 +69,10 @@ test('magazine localization strings live in language files', function () {
 
     expect(lang_path('en/magazine.php'))->toBeReadableFile()
         ->and(lang_path('de/magazine.php'))->toBeReadableFile()
-        ->and($englishTranslations)->toHaveKeys(['index', 'show', 'categories', 'language_switcher', 'locales', 'meta', 'routes'])
-        ->and($germanTranslations)->toHaveKeys(['index', 'show', 'categories', 'language_switcher', 'locales', 'meta', 'routes'])
+        ->and($englishTranslations)->toHaveKeys(['index', 'show', 'language_switcher', 'locales', 'meta'])
+        ->and($germanTranslations)->toHaveKeys(['index', 'show', 'language_switcher', 'locales', 'meta'])
+        ->and($englishTranslations)->not->toHaveKey('categories')
+        ->and($germanTranslations)->not->toHaveKey('categories')
         ->and($englishTranslations['index'])->toHaveKeys(['about_body', 'about_heading'])
         ->and($germanTranslations['index'])->toHaveKeys(['about_body', 'about_heading'])
         ->and($englishTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'details', 'language', 'magazine', 'toc'])

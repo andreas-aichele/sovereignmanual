@@ -11,7 +11,9 @@
                         class="font-semibold text-primary underline-offset-4 hover:underline">{{ $copy['magazine'] }}</a>
                 </li>
                 <li aria-hidden="true" class="text-base-content/35">/</li>
-                <li class="text-base-content/80">{{ $post['category_label'] }}
+                <li>
+                    <a href="{{ $post['category_url'] }}"
+                        class="text-base-content/80 underline-offset-4 hover:text-primary hover:underline">{{ $post['category_label'] }}</a>
                 </li>
                 <li aria-hidden="true" class="text-base-content/35">/</li>
                 <li aria-current="page"
@@ -22,9 +24,9 @@
 
         <article class="mt-8">
             <header class="max-w-3xl">
-                <p
-                    class="text-sm font-semibold uppercase tracking-[0.2em] text-primary">
-                    {{ $post['category_label'] }}</p>
+                <a href="{{ $post['category_url'] }}"
+                    class="text-sm font-semibold uppercase tracking-[0.2em] text-primary underline-offset-4 hover:underline">
+                    {{ $post['category_label'] }}</a>
                 <h1
                     class="wrap-anywhere mt-4 text-4xl font-semibold leading-tight sm:text-6xl">
                     {{ $post['title'] }}</h1>
@@ -37,14 +39,9 @@
 
             <div
                 class="mt-8 overflow-hidden rounded-lg border border-primary/20 bg-base-300 shadow-2xl shadow-fuchsia-950/20 ring-1 ring-cyan-300/10">
-                @if ($post['image'])
-                    <img src="{{ $post['image'] }}"
-                        alt="{{ $post['image_alt'] ?? $post['title'] }}"
-                        class="max-h-[32rem] w-full object-cover">
-                @else
-                    <x-magazine-placeholder :placeholder="$post['image_placeholder']"
-                        class="min-h-96" />
-                @endif
+                <img src="{{ $post['image'] }}"
+                    alt="{{ $post['image_alt'] ?? $post['title'] }}"
+                    class="max-h-[32rem] w-full object-cover">
             </div>
 
             @if (count($post['toc']) > 0)
@@ -120,8 +117,10 @@
                             <dt
                                 class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/45">
                                 {{ $copy['category'] }}</dt>
-                            <dd class="mt-2 text-base-content/85">
-                                {{ $post['category_label'] }}</dd>
+                            <dd class="mt-2">
+                                <a href="{{ $post['category_url'] }}"
+                                    class="text-base-content/85 underline-offset-4 hover:text-primary hover:underline">{{ $post['category_label'] }}</a>
+                            </dd>
                         </div>
 
                         @if ($meta['alternate'])

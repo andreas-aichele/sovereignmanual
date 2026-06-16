@@ -19,24 +19,36 @@ class CategoryFactory extends Factory
     public function definition(): array
     {
         $name = fake()->unique()->words(2, true);
+        $slug = Str::slug($name);
 
         return [
-            'slug' => Str::slug($name),
-            'name' => [
-                'en' => Str::of($name)->title()->toString(),
-                'de' => Str::of($name)->title()->toString(),
-            ],
+            'key' => $slug,
+            'lang' => 'en',
+            'slug' => $slug,
+            'name' => Str::of($name)->title()->toString(),
+            'description' => fake()->sentence(),
         ];
     }
 
     public function selfCustody(): static
     {
         return $this->state(fn (array $attributes): array => [
+            'key' => 'self-custody',
+            'lang' => 'en',
             'slug' => 'self-custody',
-            'name' => [
-                'en' => 'Self Custody',
-                'de' => 'Selbstverwahrung',
-            ],
+            'name' => 'Self Custody',
+            'description' => 'Practical guidance for holding keys, building recovery plans, and reducing custody risk.',
+        ]);
+    }
+
+    public function selbstverwahrung(): static
+    {
+        return $this->state(fn (array $attributes): array => [
+            'key' => 'self-custody',
+            'lang' => 'de',
+            'slug' => 'selbstverwahrung',
+            'name' => 'Selbstverwahrung',
+            'description' => 'Praktische Orientierung für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken.',
         ]);
     }
 }

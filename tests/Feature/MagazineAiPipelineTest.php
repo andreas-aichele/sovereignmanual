@@ -48,7 +48,7 @@ test('pipeline creates a published post with english and german translations', f
         ->and(mb_strlen($germanTranslation->meta_title))->toBeLessThanOrEqual(60)
         ->and(mb_strlen($germanTranslation->meta_description))->toBeLessThanOrEqual(160)
         ->and($germanTranslation->seo['keywords'])->toContain('bitcoin')
-        ->and($post->category?->slug)->toBe('self-custody')
+        ->and($post->category?->key)->toBe('self-custody')
         ->and($post->blocks()->where('locale', 'en')->count())->toBeGreaterThan(1)
         ->and($post->blocks()->where('locale', 'de')->count())->toBeGreaterThan(1)
         ->and($englishBlockTypes)->toContain('section')

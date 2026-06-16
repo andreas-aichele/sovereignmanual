@@ -685,8 +685,8 @@ class MagazineAiPipeline
 
                 return [
                     'title' => $translation->title,
-                    'url' => route($locale === 'de' ? 'magazine.de.show' : 'magazine.show', [
-                        'category' => $post->category?->slug ?? 'self-custody',
+                    'url' => $this->localizedRoute($locale, 'show', [
+                        'category' => $post->category?->localizedSlug($locale) ?? 'self-custody',
                         'slug' => $translation->slug,
                     ]),
                     'slug' => $translation->slug,
@@ -700,9 +700,28 @@ class MagazineAiPipeline
     private function defaultCategory(): Category
     {
         return Category::query()->firstOrCreate(
-            ['slug' => 'self-custody'],
-            ['name' => ['en' => 'Self Custody', 'de' => 'Selbstverwahrung']]
+            ['key' => 'self-custody', 'lang' => 'en'],
+            [
+                'slug' => 'self-custody',
+                'name' => 'Self Custody',
+                'description' => 'Guides for holding your own keys, planning recovery, and reducing custody risk without depending on custodians.',
+            ]
         );
+    }
+
+    /**
+     * @param  array<string, string>  $parameters
+     */
+    private function localizedRoute(string $locale, string $route, array $parameters = []): string
+    {
+        if ($locale === Locales::fallback()) {
+            return route("magazine.{$route}", $parameters);
+        }
+
+        return route("magazine.localized.{$route}", [
+            'locale' => $locale,
+            ...$parameters,
+        ]);
     }
 
     /**

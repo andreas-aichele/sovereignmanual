@@ -21,13 +21,25 @@ class ContentTopicFactory extends Factory
     public function definition(): array
     {
         $title = fake()->sentence(5);
+        Category::query()->firstOrCreate(
+            ['key' => 'self-custody', 'lang' => 'de'],
+            [
+                'slug' => 'selbstverwahrung',
+                'name' => 'Selbstverwahrung',
+                'description' => 'Praktische Orientierung für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken.',
+            ]
+        );
 
         return [
             'title' => $title,
             'slug' => Str::slug($title).'-'.fake()->unique()->numberBetween(1000, 9999),
             'category_id' => Category::query()->firstOrCreate(
-                ['slug' => 'self-custody'],
-                ['name' => ['en' => 'Self Custody', 'de' => 'Selbstverwahrung']]
+                ['key' => 'self-custody', 'lang' => 'en'],
+                [
+                    'slug' => 'self-custody',
+                    'name' => 'Self Custody',
+                    'description' => 'Practical guidance for holding keys, building recovery plans, and reducing custody risk.',
+                ]
             )->id,
             'status' => ContentTopicStatus::Scheduled,
             'priority' => fake()->numberBetween(1, 10),

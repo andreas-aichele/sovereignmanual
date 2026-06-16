@@ -7,22 +7,53 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Str;
 
 #[Fillable([
+    'key',
+    'lang',
     'slug',
     'name',
+    'description',
 ])]
 class Category extends Model
 {
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
 
-    public function label(string $locale): string
+    public function label(?string $locale = null): string
     {
-        return $this->name[$locale]
-            ?? $this->name['en']
-            ?? Str::of($this->slug)->replace('-', ' ')->title()->toString();
+        return $this->localized($locale)->name;
+    }
+
+    public function localizedSlug(?string $locale = null): string
+    {
+        return $this->localized($locale)->slug;
+    }
+
+    public function localizedDescription(?string $locale = null): string
+    {
+        return $this->localized($locale)->description;
+    }
+
+    public function matchesSlug(string $slug, string $locale): bool
+    {
+        return $this->localizedSlug($locale) === $slug
+            || $this->key === $slug;
+    }
+
+    public function localized(?string $locale = null): self
+    {
+        $locale ??= $this->lang;
+
+        if ($this->lang === $locale) {
+            return $this;
+        }
+
+        return self::query()
+            ->where('key', $this->key)
+            ->where('lang', $locale)
+            ->first()
+            ?? $this;
     }
 
     /**
@@ -39,15 +70,5 @@ class Category extends Model
     public function contentTopics(): HasMany
     {
         return $this->hasMany(ContentTopic::class);
-    }
-
-    /**
-     * @return array<string, string>
-     */
-    protected function casts(): array
-    {
-        return [
-            'name' => 'array',
-        ];
     }
 }

@@ -14,18 +14,65 @@ return new class extends Migration
     {
         $legacyCategoryMap = [
             'bitcoin' => [
-                'slug' => 'self-custody',
-                'name' => ['en' => 'Self Custody', 'de' => 'Selbstverwahrung'],
+                'key' => 'self-custody',
+                'translations' => [
+                    'en' => [
+                        'slug' => 'self-custody',
+                        'name' => 'Self Custody',
+                        'description' => 'Guides for holding your own keys, planning recovery, and reducing custody risk without depending on custodians.',
+                    ],
+                    'de' => [
+                        'slug' => 'selbstverwahrung',
+                        'name' => 'Selbstverwahrung',
+                        'description' => 'Anleitungen für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken ohne Abhängigkeit von Verwahrern.',
+                    ],
+                ],
             ],
             'financial-independence' => [
-                'slug' => 'financial-sovereignty',
-                'name' => ['en' => 'Financial Sovereignty', 'de' => 'Finanzielle Souveränität'],
+                'key' => 'financial-sovereignty',
+                'translations' => [
+                    'en' => [
+                        'slug' => 'financial-sovereignty',
+                        'name' => 'Financial Sovereignty',
+                        'description' => 'Frameworks for saving, spending, and making independent financial decisions in a Bitcoin context.',
+                    ],
+                    'de' => [
+                        'slug' => 'finanzielle-souveraenitaet',
+                        'name' => 'Finanzielle Souveränität',
+                        'description' => 'Denkmodelle für Sparen, Ausgeben und unabhängige finanzielle Entscheidungen im Bitcoin-Kontext.',
+                    ],
+                ],
             ],
             'self-custody' => [
-                'slug' => 'self-custody',
-                'name' => ['en' => 'Self Custody', 'de' => 'Selbstverwahrung'],
+                'key' => 'self-custody',
+                'translations' => [
+                    'en' => [
+                        'slug' => 'self-custody',
+                        'name' => 'Self Custody',
+                        'description' => 'Guides for holding your own keys, planning recovery, and reducing custody risk without depending on custodians.',
+                    ],
+                    'de' => [
+                        'slug' => 'selbstverwahrung',
+                        'name' => 'Selbstverwahrung',
+                        'description' => 'Anleitungen für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken ohne Abhängigkeit von Verwahrern.',
+                    ],
+                ],
             ],
         ];
+
+        $insertCategory = function (array $category): void {
+            collect($category['translations'])->each(function (array $translation, string $lang) use ($category): void {
+                DB::table('categories')->insertOrIgnore([
+                    'key' => $category['key'],
+                    'lang' => $lang,
+                    'slug' => $translation['slug'],
+                    'name' => $translation['name'],
+                    'description' => $translation['description'],
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            });
+        };
 
         DB::table('content_topics')
             ->select('category')
@@ -33,46 +80,58 @@ return new class extends Migration
             ->distinct()
             ->orderBy('category')
             ->get()
-            ->each(function (object $topic) use ($legacyCategoryMap): void {
+            ->each(function (object $topic) use ($insertCategory, $legacyCategoryMap): void {
                 $category = $legacyCategoryMap[$topic->category] ?? [
-                    'slug' => $topic->category,
-                    'name' => [
-                        'en' => str($topic->category)->replace('-', ' ')->title()->toString(),
-                        'de' => str($topic->category)->replace('-', ' ')->title()->toString(),
+                    'key' => $topic->category,
+                    'translations' => [
+                        'en' => [
+                            'slug' => $topic->category,
+                            'name' => str($topic->category)->replace('-', ' ')->title()->toString(),
+                            'description' => '',
+                        ],
+                        'de' => [
+                            'slug' => $topic->category,
+                            'name' => str($topic->category)->replace('-', ' ')->title()->toString(),
+                            'description' => '',
+                        ],
                     ],
                 ];
 
-                DB::table('categories')->insertOrIgnore([
-                    'slug' => $category['slug'],
-                    'name' => json_encode($category['name'], JSON_THROW_ON_ERROR),
-                    'created_at' => now(),
-                    'updated_at' => now(),
-                ]);
+                $insertCategory($category);
             });
 
-        DB::table('categories')->insertOrIgnore([
-            'slug' => 'self-custody',
-            'name' => json_encode(['en' => 'Self Custody', 'de' => 'Selbstverwahrung'], JSON_THROW_ON_ERROR),
-            'created_at' => now(),
-            'updated_at' => now(),
+        $insertCategory([
+            'key' => 'self-custody',
+            'translations' => [
+                'en' => [
+                    'slug' => 'self-custody',
+                    'name' => 'Self Custody',
+                    'description' => 'Guides for holding your own keys, planning recovery, and reducing custody risk without depending on custodians.',
+                ],
+                'de' => [
+                    'slug' => 'selbstverwahrung',
+                    'name' => 'Selbstverwahrung',
+                    'description' => 'Anleitungen für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken ohne Abhängigkeit von Verwahrern.',
+                ],
+            ],
         ]);
 
         Schema::table('content_topics', function (Blueprint $table): void {
             $table->foreignId('category_id')->nullable()->after('slug')->constrained()->nullOnDelete();
         });
 
-        $categoryIds = DB::table('categories')->pluck('id', 'slug');
+        $categoryIds = DB::table('categories')->where('lang', 'en')->pluck('id', 'key');
 
         DB::table('content_topics')
             ->select(['id', 'category'])
             ->orderBy('id')
             ->get()
             ->each(function (object $topic) use ($categoryIds, $legacyCategoryMap): void {
-                $categorySlug = $legacyCategoryMap[$topic->category]['slug'] ?? $topic->category;
+                $categoryKey = $legacyCategoryMap[$topic->category]['key'] ?? $topic->category;
 
                 DB::table('content_topics')
                     ->where('id', $topic->id)
-                    ->update(['category_id' => $categoryIds[$categorySlug] ?? $categoryIds['self-custody']]);
+                    ->update(['category_id' => $categoryIds[$categoryKey] ?? $categoryIds['self-custody']]);
             });
 
         Schema::table('posts', function (Blueprint $table): void {
@@ -104,16 +163,16 @@ return new class extends Migration
             $table->string('category')->default('self-custody')->after('slug');
         });
 
-        $categorySlugs = DB::table('categories')->pluck('slug', 'id');
+        $categoryKeys = DB::table('categories')->pluck('key', 'id');
 
         DB::table('content_topics')
             ->select(['id', 'category_id'])
             ->orderBy('id')
             ->get()
-            ->each(function (object $topic) use ($categorySlugs): void {
+            ->each(function (object $topic) use ($categoryKeys): void {
                 DB::table('content_topics')
                     ->where('id', $topic->id)
-                    ->update(['category' => $categorySlugs[$topic->category_id] ?? 'self-custody']);
+                    ->update(['category' => $categoryKeys[$topic->category_id] ?? 'self-custody']);
             });
 
         Schema::table('posts', function (Blueprint $table): void {

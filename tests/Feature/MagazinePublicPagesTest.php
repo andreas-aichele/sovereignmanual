@@ -5,14 +5,34 @@ use App\Models\Post;
 use App\Models\PostBlock;
 use App\Models\PostTranslation;
 
-test('published posts appear on the magazine index', function () {
-    $category = Category::query()->firstOrCreate(
-        ['slug' => 'self-custody'],
-        ['name' => [
-            'en' => 'Self custody',
-            'de' => 'Selbstverwahrung',
-        ]]
+function selfCustodyCategory(): Category
+{
+    selbstverwahrungCategory();
+
+    return Category::query()->updateOrCreate(
+        ['key' => 'self-custody', 'lang' => 'en'],
+        [
+            'slug' => 'self-custody',
+            'name' => 'Self Custody',
+            'description' => 'Practical guidance for holding keys, building recovery plans, and reducing custody risk.',
+        ],
     );
+}
+
+function selbstverwahrungCategory(): Category
+{
+    return Category::query()->updateOrCreate(
+        ['key' => 'self-custody', 'lang' => 'de'],
+        [
+            'slug' => 'selbstverwahrung',
+            'name' => 'Selbstverwahrung',
+            'description' => 'Praktische Orientierung für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken.',
+        ],
+    );
+}
+
+test('published posts appear on the magazine index', function () {
+    $category = selfCustodyCategory();
 
     $post = Post::factory()->published()->create([
         'category_id' => $category->id,
@@ -76,10 +96,7 @@ test('unpublished posts are hidden from the public magazine', function () {
 });
 
 test('localized german posts render through the german route', function () {
-    $category = Category::query()->firstOrCreate(
-        ['slug' => 'self-custody'],
-        ['name' => ['en' => 'Self Custody', 'de' => 'Selbstverwahrung']]
-    );
+    $category = selfCustodyCategory();
 
     $post = Post::factory()->published()->create([
         'category_id' => $category->id,
@@ -93,7 +110,7 @@ test('localized german posts render through the german route', function () {
         'markdown' => '# Bitcoin Selbstverwahrung',
     ]);
 
-    $this->get(route('magazine.de.show', ['category' => 'self-custody', 'slug' => 'bitcoin-selbstverwahrung']))
+    $this->get(route('magazine.localized.show', ['locale' => 'de', 'category' => 'selbstverwahrung', 'slug' => 'bitcoin-selbstverwahrung']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertViewHas('locale', 'de')
@@ -107,13 +124,7 @@ test('localized german posts render through the german route', function () {
 });
 
 test('article urls are scoped by their real category', function () {
-    $category = Category::query()->firstOrCreate(
-        ['slug' => 'self-custody'],
-        ['name' => [
-            'en' => 'Self custody',
-            'de' => 'Selbstverwahrung',
-        ]]
-    );
+    $category = selfCustodyCategory();
 
     $post = Post::factory()->published()->create([
         'category_id' => $category->id,
@@ -134,14 +145,8 @@ test('article urls are scoped by their real category', function () {
         ->assertNotFound();
 });
 
-test('legacy magazine article urls redirect to category urls', function () {
-    $category = Category::query()->firstOrCreate(
-        ['slug' => 'self-custody'],
-        ['name' => [
-            'en' => 'Self custody',
-            'de' => 'Selbstverwahrung',
-        ]]
-    );
+test('article pages link to their localized category page', function () {
+    $category = selfCustodyCategory();
 
     $post = Post::factory()->published()->create([
         'category_id' => $category->id,
@@ -149,24 +154,85 @@ test('legacy magazine article urls redirect to category urls', function () {
 
     PostTranslation::factory()->create([
         'post_id' => $post->id,
-        'locale' => 'en',
+        'locale' => 'de',
         'title' => 'Wallet Backups',
         'slug' => 'wallet-backups',
     ]);
 
-    $this->get(route('magazine.legacy.show', 'wallet-backups'))
-        ->assertMovedPermanently()
-        ->assertRedirect(route('magazine.show', ['category' => 'self-custody', 'slug' => 'wallet-backups']));
+    $this->get(route('magazine.localized.show', ['locale' => 'de', 'category' => 'selbstverwahrung', 'slug' => 'wallet-backups']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('/de/selbstverwahrung"', false);
+});
+
+test('category page renders heading description and paginated article listing', function () {
+    $category = selfCustodyCategory();
+
+    $post = Post::factory()->published()->create([
+        'category_id' => $category->id,
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'de',
+        'title' => 'Bitcoin Selbstverwahrung',
+        'slug' => 'bitcoin-selbstverwahrung',
+    ]);
+
+    $this->get(route('magazine.localized.category', ['locale' => 'de', 'category' => 'selbstverwahrung']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.category')
+        ->assertSee('Selbstverwahrung')
+        ->assertSee('Praktische Orientierung')
+        ->assertSee('Bitcoin Selbstverwahrung')
+        ->assertSee('fallback.jpg');
+});
+
+test('german category page also resolves the stable category key as a legacy alias', function () {
+    selfCustodyCategory();
+
+    $this->get(route('magazine.localized.category', ['locale' => 'de', 'category' => 'self-custody']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.category')
+        ->assertSee('Selbstverwahrung');
+});
+
+test('self custody route supports legacy published posts without a category', function () {
+    $post = Post::factory()->published()->create([
+        'category_id' => null,
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Legacy Self Custody',
+        'slug' => 'legacy-self-custody',
+    ]);
+
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'legacy-self-custody']))
+        ->assertSuccessful()
+        ->assertSee('Legacy Self Custody')
+        ->assertSee('Self Custody');
+
+    $this->get(route('magazine.show', ['category' => 'privacy-security', 'slug' => 'legacy-self-custody']))
+        ->assertNotFound();
 });
 
 test('german category labels use correct umlauts', function () {
-    $category = Category::query()->firstOrCreate(
-        ['slug' => 'financial-sovereignty'],
-        ['name' => [
-            'en' => 'Financial Sovereignty',
-            'de' => 'Finanzielle Souveränität',
-        ]]
-    );
+    $category = Category::factory()->create([
+        'key' => 'financial-sovereignty',
+        'lang' => 'en',
+        'slug' => 'financial-sovereignty',
+        'name' => 'Financial Sovereignty',
+        'description' => 'Financial sovereignty articles.',
+    ]);
+    Category::factory()->create([
+        'key' => 'financial-sovereignty',
+        'lang' => 'de',
+        'slug' => 'finanzielle-souveraenitaet',
+        'name' => 'Finanzielle Souveränität',
+        'description' => 'Artikel über finanzielle Souveränität.',
+    ]);
 
     $post = Post::factory()->published()->create([
         'category_id' => $category->id,
@@ -368,9 +434,9 @@ test('paginated sitemap lists public magazine urls for all translations', functi
         ->assertSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false)
         ->assertSee('<changefreq>daily</changefreq>', false)
         ->assertSee('<priority>1.0</priority>', false)
-        ->assertDontSee('<loc>'.route('magazine.de.index').'</loc>', false)
+        ->assertDontSee('<loc>'.route('magazine.localized.index', ['locale' => 'de']).'</loc>', false)
         ->assertSee(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-basics']), false)
-        ->assertSee(route('magazine.de.show', ['category' => 'self-custody', 'slug' => 'bitcoin-grundlagen']), false)
+        ->assertSee(route('magazine.localized.show', ['locale' => 'de', 'category' => 'selbstverwahrung', 'slug' => 'bitcoin-grundlagen']), false)
         ->assertSee('<lastmod>'.now()->subDay()->toDateString().'</lastmod>', false)
         ->assertSee('<changefreq>monthly</changefreq>', false)
         ->assertSee('<priority>0.8</priority>', false);
@@ -427,7 +493,7 @@ test('sitemap pages are split by configured page size', function () {
     $this->get(route('sitemap.page', 1))
         ->assertSuccessful()
         ->assertSee(route('magazine.index'), false)
-        ->assertSee(route('magazine.de.show', ['category' => 'self-custody', 'slug' => 'bitcoin-grundlagen']), false)
+        ->assertSee(route('magazine.localized.show', ['locale' => 'de', 'category' => 'selbstverwahrung', 'slug' => 'bitcoin-grundlagen']), false)
         ->assertDontSee(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-basics']), false);
 
     $this->get(route('sitemap.page', 2))

@@ -50,7 +50,7 @@ class ContentTopic extends Model implements Auditable
 
     public function categorySlug(): string
     {
-        return $this->category?->slug ?? 'self-custody';
+        return $this->category?->key ?? 'self-custody';
     }
 
     /**

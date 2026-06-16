@@ -7,10 +7,6 @@ return [
         'de' => 'Deutsch',
     ],
     'language_switcher' => 'Sprache',
-    'routes' => [
-        'index' => 'magazine.de.index',
-        'show' => 'magazine.de.show',
-    ],
     'meta' => [
         'title' => 'Sovereign Manual Magazine',
         'description' => 'Bitcoin, finanzielle Bildung und souveräne Unabhängigkeit.',
@@ -32,14 +28,5 @@ return [
         'language' => 'Sprache',
         'magazine' => 'Magazin',
         'toc' => 'Inhalt',
-    ],
-    'categories' => [
-        'self-custody' => 'Selbstverwahrung',
-        'privacy-security' => 'Privatsphäre & Sicherheit',
-        'financial-sovereignty' => 'Finanzielle Souveränität',
-        'family-legacy' => 'Familie & Nachlass',
-        'tools-practice' => 'Werkzeuge & Praxis',
-        'economics' => 'Ökonomie',
-        'mindset' => 'Denkweise',
     ],
 ];

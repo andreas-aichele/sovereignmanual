@@ -37,7 +37,7 @@ test('route locale is preferred over the stored locale', function () {
     ]);
 
     $this->withCookie('locale', 'de')
-        ->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'english-article']))
+        ->get(route('magazine.localized.show', ['locale' => 'en', 'category' => 'self-custody', 'slug' => 'english-article']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertViewHas('locale', 'en')

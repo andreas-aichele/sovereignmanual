@@ -23,14 +23,9 @@
                 href="{{ $featured['url'] }}" <article>
                 <div class="bg-base-300 block min-h-80"
                     href="{{ $featured['url'] }}">
-                    @if ($featured['image'])
-                        <img class="h-full w-full object-cover"
-                            src="{{ $featured['image'] }}"
-                            alt="{{ $featured['image_alt'] ?? $featured['title'] }}">
-                    @else
-                        <x-magazine-placeholder class="h-full min-h-80"
-                            :placeholder="$featured['image_placeholder']" />
-                    @endif
+                    <img class="h-full w-full object-cover"
+                        src="{{ $featured['image'] }}"
+                        alt="{{ $featured['image_alt'] ?? $featured['title'] }}">
                 </div>
 
                 <div class="flex flex-col justify-center p-6 sm:p-8">
@@ -59,14 +54,9 @@
                         <article
                             class="border-primary/15 bg-base-200/90 hover:border-primary/40 overflow-hidden rounded-lg border-2 shadow-lg shadow-fuchsia-950/10 transition hover:shadow-xl hover:shadow-fuchsia-950/40">
                             <div class="aspect-16/10 bg-base-300 block">
-                                @if ($post['image'])
-                                    <img class="h-full w-full object-cover"
-                                        src="{{ $post['image'] }}"
-                                        alt="{{ $post['image_alt'] ?? $post['title'] }}">
-                                @else
-                                    <x-magazine-placeholder class="h-full"
-                                        :placeholder="$post['image_placeholder']" />
-                                @endif
+                                <img class="h-full w-full object-cover"
+                                    src="{{ $post['image'] }}"
+                                    alt="{{ $post['image_alt'] ?? $post['title'] }}">
                                 <div>
 
                                     <div class="p-5">

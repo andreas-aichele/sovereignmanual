@@ -22,12 +22,24 @@ class PostFactory extends Factory
     public function definition(): array
     {
         $topic = fake()->sentence(4);
+        Category::query()->firstOrCreate(
+            ['key' => 'self-custody', 'lang' => 'de'],
+            [
+                'slug' => 'selbstverwahrung',
+                'name' => 'Selbstverwahrung',
+                'description' => 'Praktische Orientierung für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken.',
+            ]
+        );
 
         return [
             'content_topic_id' => ContentTopic::factory(),
             'category_id' => Category::query()->firstOrCreate(
-                ['slug' => 'self-custody'],
-                ['name' => ['en' => 'Self Custody', 'de' => 'Selbstverwahrung']]
+                ['key' => 'self-custody', 'lang' => 'en'],
+                [
+                    'slug' => 'self-custody',
+                    'name' => 'Self Custody',
+                    'description' => 'Practical guidance for holding keys, building recovery plans, and reducing custody risk.',
+                ]
             )->id,
             'slug' => Str::slug($topic).'-'.fake()->unique()->numberBetween(1000, 9999),
             'status' => PostStatus::Draft,
