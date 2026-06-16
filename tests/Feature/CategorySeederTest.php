@@ -12,6 +12,7 @@ test('category seeder creates the editorial taxonomy without a generic bitcoin c
         'family-legacy',
         'financial-sovereignty',
         'mindset',
+        'news',
         'privacy-security',
         'self-custody',
         'tools-practice',

@@ -1,12 +1,18 @@
-<x-auth-layout title="Verify email" description="Please verify your email address before continuing.">
-    <form method="POST" action="{{ route('verification.send') }}" class="space-y-4">
+<x-auth-layout title="Verify email"
+    description="Please verify your email address before continuing.">
+    <form class="space-y-4" method="POST"
+        action="{{ route('verification.send') }}">
         @csrf
 
-        <button type="submit" class="w-full rounded-md bg-primary px-4 py-2 font-semibold text-primary-content transition hover:brightness-110">Resend verification email</button>
+        <button
+            class="bg-primary text-primary-content w-full rounded-md px-4 py-2 font-semibold transition hover:brightness-110"
+            type="submit">Resend verification email</button>
     </form>
 
-    <form method="POST" action="{{ route('logout') }}" class="mt-4">
+    <form class="mt-4" method="POST" action="{{ route('logout') }}">
         @csrf
-        <button type="submit" class="w-full rounded-md border border-white/15 px-4 py-2 font-semibold hover:border-primary hover:text-primary">Log out</button>
+        <button
+            class="hover:border-primary hover:text-primary w-full rounded-md border border-white/15 px-4 py-2 font-semibold"
+            type="submit">Log out</button>
     </form>
 </x-auth-layout>

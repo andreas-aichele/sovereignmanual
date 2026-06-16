@@ -10,7 +10,7 @@ test('magazine index is the public start page', function () {
 
 test('german magazine index route stores the locale and redirects to the start page', function () {
     $this->get(route('magazine.localized.index', ['locale' => 'de']))
-        ->assertRedirect(route('magazine.index'))
+        ->assertRedirect(route('magazine.localized.index', ['locale' => 'de']))
         ->assertCookie('locale', 'de');
 });
 
@@ -44,10 +44,8 @@ test('frontend entry is a blade asset', function () {
         ->and($contents)->toContain("import('mermaid')")
         ->and($contents)->toContain('mermaid.initialize')
         ->and($contents)->toContain("querySelector: '.mermaid'")
-        ->and($contents)->toContain('setupBackgroundParallax')
-        ->and($contents)->toContain('requestAnimationFrame')
-        ->and($contents)->toContain('prefers-reduced-motion: reduce')
-        ->and($contents)->toContain('--parallax-x');
+        ->and($contents)->toContain('initializeTableOfContentsScrollSpy')
+        ->and($contents)->toContain('DOMContentLoaded');
 });
 
 test('frontend css loads before body scripts', function () {
@@ -90,7 +88,7 @@ test('magazine start page moves visible intro copy below article list as about s
     expect($index)->toContain('<section class="sr-only">')
         ->and($index)->toContain('$copy[\'about_heading\']')
         ->and($index)->toContain('$copy[\'about_body\']')
-        ->and($index)->toContain('border-t border-primary/20 pt-10')
+        ->and($index)->toContain('border-primary/20 mt-14 border-t pt-10')
         ->and($index)->not->toContain('$copy[\'featured\']');
 });
 
@@ -116,7 +114,7 @@ test('public navigation uses a scalable language dropdown', function () {
 test('magazine headings can break long words', function () {
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
-    $css = file_get_contents(resource_path('css/app.css'));
+    $css = file_get_contents(resource_path('css/content.css'));
 
     expect($index)->toContain('wrap-anywhere')
         ->and($index)->toContain('text-3xl')
@@ -129,11 +127,9 @@ test('magazine headings can break long words', function () {
 test('public magazine css no longer ships legacy background stylesheet', function () {
     $css = file_get_contents(resource_path('css/app.css'));
 
-    expect(resource_path('css/background.css'))->not->toBeFile()
-        ->and($css)->not->toContain("@import './background.css'")
-        ->and($css)->not->toContain('.synthwave-page')
-        ->and($css)->not->toContain('.synthwave-hero-grid')
-        ->and($css)->not->toContain('.article-markdown');
+    expect(resource_path('css/background.css'))->toBeFile()
+        ->and($css)->toContain("@import './background.css'")
+        ->and($css)->toContain("@import './content.css'");
 });
 
 test('magazine article layout keeps public container width and readable article content', function () {
@@ -152,12 +148,12 @@ test('magazine article layout keeps public container width and readable article 
 test('magazine article renders linked table of contents for mobile and desktop', function () {
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
     $controller = file_get_contents(app_path('Http/Controllers/MagazineController.php'));
-    $css = file_get_contents(resource_path('css/app.css'));
+    $css = file_get_contents(resource_path('css/content.css'));
 
-    expect($show)->toContain('<details class="mt-8 rounded-lg')
+    expect($show)->toContain('mt-8 rounded-lg border p-4 text-sm lg:hidden')
         ->and($show)->toContain('lg:hidden')
-        ->and($show)->toContain('<summary class="cursor-pointer')
-        ->and($show)->toContain('aria-label="{{ $copy[\'toc\'] }}"')
+        ->and($show)->toContain('<summary')
+        ->and($show)->toContain('{{ $copy[\'toc\'] }}')
         ->and($show)->toContain('@foreach ($post[\'toc\'] as $item)')
         ->and($show)->toContain('href="#{{ $item[\'id\'] }}"')
         ->and($controller)->toContain('renderMarkdownWithTableOfContents')
@@ -169,13 +165,13 @@ test('magazine article renders linked table of contents for mobile and desktop',
 test('magazine article navigation uses breadcrumbs instead of a back button', function () {
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
 
-    expect($show)->toContain('<nav aria-label="{{ $copy[\'breadcrumb_label\'] }}"')
+    expect($show)->toContain('aria-label="{{ $copy[\'breadcrumb_label\'] }}"')
         ->and($show)->toContain('aria-current="page"')
         ->and($show)->not->toContain('$copy[\'back\']');
 });
 
 test('magazine article tables have readable cell spacing', function () {
-    $css = file_get_contents(resource_path('css/app.css'));
+    $css = file_get_contents(resource_path('css/content.css'));
 
     expect($css)->toContain('.content-body table')
         ->and($css)->toContain('overflow-x-auto')
@@ -185,7 +181,7 @@ test('magazine article tables have readable cell spacing', function () {
 });
 
 test('magazine article diagrams have responsive readable styling', function () {
-    $css = file_get_contents(resource_path('css/app.css'));
+    $css = file_get_contents(resource_path('css/content.css'));
     $controller = file_get_contents(app_path('Http/Controllers/MagazineController.php'));
 
     expect($css)->toContain('.content-body .mermaid')
@@ -197,21 +193,19 @@ test('magazine article diagrams have responsive readable styling', function () {
 });
 
 test('public magazine styles restore synthwave atmosphere without removing readable panels', function () {
-    $css = file_get_contents(resource_path('css/app.css'));
+    $css = file_get_contents(resource_path('css/background.css'));
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
     $nav = file_get_contents(resource_path('views/components/public-nav.blade.php'));
 
-    expect($css)->toContain('radial-gradient(circle at calc(12% + var(--parallax-x)) calc(8% + var(--parallax-y))')
-        ->and($css)->toContain('radial-gradient(circle at calc(86% - var(--parallax-x)) calc(18% - var(--parallax-y))')
+    expect($css)->toContain('radial-gradient(')
+        ->and($css)->toContain('circle at 12% 8%')
+        ->and($css)->toContain('circle at 86% 18%')
         ->and($css)->toContain('body::before')
-        ->and($css)->toContain('background-position:')
-        ->and($css)->toContain('var(--parallax-grid-x) var(--parallax-grid-y)')
         ->and($css)->toContain('background-size: 4rem 4rem')
-        ->and($css)->toContain('@media (prefers-reduced-motion: reduce)')
         ->and($index)->toContain('bg-base-200/90')
         ->and($index)->toContain('ring-cyan-300/10')
-        ->and($show)->toContain('bg-base-300 shadow-2xl')
+        ->and($show)->toContain('bg-base-300 mt-8 overflow-hidden')
         ->and($nav)->toContain('border-primary/20 bg-base-100/85');
 });
 

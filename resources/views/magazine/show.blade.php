@@ -3,61 +3,61 @@
     <x-public-nav :locale="$locale" :language-options="$languageOptions" />
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
-        <nav aria-label="{{ $copy['breadcrumb_label'] }}"
-            class="text-sm text-base-content/65">
+        <nav class="text-base-content/65 text-sm"
+            aria-label="{{ $copy['breadcrumb_label'] }}">
             <ol class="flex flex-wrap items-center gap-2">
                 <li>
-                    <a href="{{ route('magazine.index') }}"
-                        class="font-semibold text-primary underline-offset-4 hover:underline">{{ $copy['magazine'] }}</a>
+                    <a class="text-primary font-semibold underline-offset-4 hover:underline"
+                        href="{{ route('magazine.index') }}">{{ $copy['magazine'] }}</a>
                 </li>
-                <li aria-hidden="true" class="text-base-content/35">/</li>
+                <li class="text-base-content/35" aria-hidden="true">/</li>
                 <li>
-                    <a href="{{ $post['category_url'] }}"
-                        class="text-base-content/80 underline-offset-4 hover:text-primary hover:underline">{{ $post['category_label'] }}</a>
+                    <a class="text-base-content/80 hover:text-primary underline-offset-4 hover:underline"
+                        href="{{ $post['category_url'] }}">{{ $post['category_label'] }}</a>
                 </li>
-                <li aria-hidden="true" class="text-base-content/35">/</li>
-                <li aria-current="page"
-                    class="max-w-full truncate text-base-content sm:max-w-96">
+                <li class="text-base-content/35" aria-hidden="true">/</li>
+                <li class="text-base-content max-w-full truncate sm:max-w-96"
+                    aria-current="page">
                     {{ $post['title'] }}</li>
             </ol>
         </nav>
 
         <article class="mt-8">
             <header class="max-w-3xl">
-                <a href="{{ $post['category_url'] }}"
-                    class="text-sm font-semibold uppercase tracking-[0.2em] text-primary underline-offset-4 hover:underline">
+                <a class="text-primary text-sm font-semibold uppercase tracking-[0.2em] underline-offset-4 hover:underline"
+                    href="{{ $post['category_url'] }}">
                     {{ $post['category_label'] }}</a>
                 <h1
                     class="wrap-anywhere mt-4 text-4xl font-semibold leading-tight sm:text-6xl">
                     {{ $post['title'] }}</h1>
 
                 @if ($post['excerpt'])
-                    <p class="mt-5 text-xl text-base-content/70">
+                    <p class="text-base-content/70 mt-5 text-xl">
                         {{ $post['excerpt'] }}</p>
                 @endif
             </header>
 
             <div
-                class="mt-8 overflow-hidden rounded-lg border border-primary/20 bg-base-300 shadow-2xl shadow-fuchsia-950/20 ring-1 ring-cyan-300/10">
+                class="border-primary/20 bg-base-300 mt-8 overflow-hidden rounded-lg border shadow-2xl shadow-fuchsia-950/20 ring-1 ring-cyan-300/10">
                 {{-- TODO: Implement a complete responsive image system using a new <x-img /> Blade component, upload/storage logic, automatic image resizing to multiple sizes, AVIF/WebP/JPEG generation, srcset/sizes/picture markup, CLS-safe width/height, lazy loading, and optional hero optimization via fetchpriority="high".  --}}
-                <img src="{{ $post['image'] }}"
-                    alt="{{ $post['image_alt'] ?? $post['title'] }}"
-                    class="max-h-[32rem] w-full object-cover">
+                <img class="max-h-[32rem] w-full object-cover"
+                    src="{{ $post['image'] }}"
+                    alt="{{ $post['image_alt'] ?? $post['title'] }}">
             </div>
 
             @if (count($post['toc']) > 0)
                 <details
-                    class="mt-8 rounded-lg border border-primary/20 bg-base-200/90 p-4 text-sm open:border-primary/50 lg:hidden">
+                    class="border-primary/20 bg-base-200/90 open:border-primary/50 mt-8 rounded-lg border p-4 text-sm lg:hidden">
                     <summary
-                        class="cursor-pointer select-none font-semibold uppercase tracking-[0.2em] text-primary">
+                        class="text-primary cursor-pointer select-none font-semibold uppercase tracking-[0.2em]">
                         {{ $copy['toc'] }}</summary>
 
                     <ol class="mt-4 space-y-3">
                         @foreach ($post['toc'] as $item)
                             <li
                                 class="{{ $item['level'] === 3 ? 'pl-4' : '' }}">
-                                <a href="#{{ $item['id'] }}" data-toc-link
-                                    class="block leading-snug text-base-content/75 underline-offset-4 transition hover:text-primary hover:underline aria-[current=location]:font-semibold aria-[current=location]:text-primary">
+                                <a class="text-base-content/75 hover:text-primary aria-[current=location]:text-primary block leading-snug underline-offset-4 transition hover:underline aria-[current=location]:font-semibold"
+                                    data-toc-link href="#{{ $item['id'] }}">
                                     {{ $item['title'] }}
                                 </a>
                             </li>
@@ -76,9 +76,9 @@
                     @foreach ($post['blocks'] as $block)
                         <section class="content-body mt-10 max-w-none">
                             @if ($block['asset'])
-                                <img src="{{ $block['asset']['url'] }}"
-                                    alt="{{ $block['asset']['alt'] ?? '' }}"
-                                    class="rounded-lg border border-white/10">
+                                <img class="rounded-lg border border-white/10"
+                                    src="{{ $block['asset']['url'] }}"
+                                    alt="{{ $block['asset']['alt'] ?? '' }}">
                             @endif
 
                             {!! $block['html'] !!}
@@ -89,18 +89,18 @@
                 <aside
                     class="hidden text-sm lg:sticky lg:top-8 lg:block lg:border-l lg:pl-6">
                     @if (count($post['toc']) > 0)
-                        <nav aria-label="{{ $copy['toc'] }}" class="mb-8">
+                        <nav class="mb-8" aria-label="{{ $copy['toc'] }}">
                             <p
-                                class="font-semibold uppercase tracking-[0.2em] text-primary">
+                                class="text-primary font-semibold uppercase tracking-[0.2em]">
                                 {{ $copy['toc'] }}</p>
 
                             <ol class="mt-4 space-y-3">
                                 @foreach ($post['toc'] as $item)
                                     <li
                                         class="{{ $item['level'] === 3 ? 'pl-4' : '' }}">
-                                        <a href="#{{ $item['id'] }}"
+                                        <a class="text-base-content/70 hover:text-primary aria-[current=location]:text-primary block leading-snug underline-offset-4 transition hover:underline aria-[current=location]:font-semibold"
                                             data-toc-link
-                                            class="block leading-snug text-base-content/70 underline-offset-4 transition hover:text-primary hover:underline aria-[current=location]:font-semibold aria-[current=location]:text-primary">
+                                            href="#{{ $item['id'] }}">
                                             {{ $item['title'] }}
                                         </a>
                                     </li>
@@ -110,28 +110,28 @@
                     @endif
 
                     <p
-                        class="font-semibold uppercase tracking-[0.2em] text-primary">
+                        class="text-primary font-semibold uppercase tracking-[0.2em]">
                         {{ $copy['details'] }}</p>
 
                     <dl class="mt-5 space-y-5">
                         <div>
                             <dt
-                                class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/45">
+                                class="text-base-content/45 text-xs font-semibold uppercase tracking-[0.18em]">
                                 {{ $copy['category'] }}</dt>
                             <dd class="mt-2">
-                                <a href="{{ $post['category_url'] }}"
-                                    class="text-base-content/85 underline-offset-4 hover:text-primary hover:underline">{{ $post['category_label'] }}</a>
+                                <a class="text-base-content/85 hover:text-primary underline-offset-4 hover:underline"
+                                    href="{{ $post['category_url'] }}">{{ $post['category_label'] }}</a>
                             </dd>
                         </div>
 
                         @if ($meta['alternate'])
                             <div>
                                 <dt
-                                    class="text-xs font-semibold uppercase tracking-[0.18em] text-base-content/45">
+                                    class="text-base-content/45 text-xs font-semibold uppercase tracking-[0.18em]">
                                     {{ $copy['language'] }}</dt>
                                 <dd class="mt-2">
-                                    <a href="{{ $meta['alternate'] }}"
-                                        class="font-semibold text-primary underline-offset-4 hover:underline">{{ $copy['alternate'] }}</a>
+                                    <a class="text-primary font-semibold underline-offset-4 hover:underline"
+                                        href="{{ $meta['alternate'] }}">{{ $copy['alternate'] }}</a>
                                 </dd>
                             </div>
                         @endif

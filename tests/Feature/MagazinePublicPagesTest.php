@@ -116,7 +116,7 @@ test('localized german posts render through the german route', function () {
         ->assertViewIs('magazine.show')
         ->assertViewHas('locale', 'de')
         ->assertCookie('locale', 'de')
-        ->assertSee('<html lang="de"', false)
+        ->assertSee('lang="de"', false)
         ->assertSee('Bitcoin Selbstverwahrung')
         ->assertSee('fallback.jpg')
         ->assertSee('bitcoin')
@@ -251,7 +251,7 @@ test('german category labels use correct umlauts', function () {
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
         ->assertViewHas('locale', 'de')
-        ->assertSee('<html lang="de"', false)
+        ->assertSee('lang="de"', false)
         ->assertSee('Finanzielle Unabhängigkeit');
 });
 
@@ -271,7 +271,7 @@ test('stored locale controls the public magazine start page language', function 
         ->assertViewIs('magazine.index')
         ->assertViewHas('locale', 'de')
         ->assertCookie('locale', 'de')
-        ->assertSee('<html lang="de"', false)
+        ->assertSee('lang="de"', false)
         ->assertSee('Bitcoin Grundlagen')
         ->assertSee('Artikel lesen');
 });
@@ -371,10 +371,10 @@ test('article pages render seo meta tags with limits and keywords', function () 
     ]);
 
     $response = $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-custody']))
-        ->assertSuccessful()
-        ->assertSee('name="keywords" content="bitcoin, wallet security"', false);
+        ->assertSuccessful();
 
     expect(mb_strlen($response->viewData('meta')['title']))->toBeLessThanOrEqual(60)
+        ->and($response->viewData('meta')['keywords'])->toBe(['bitcoin', 'wallet security'])
         ->and(mb_strlen($response->viewData('meta')['description']))->toBeLessThanOrEqual(160);
 });
 

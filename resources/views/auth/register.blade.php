@@ -1,36 +1,57 @@
-<x-auth-layout title="Create account" description="Register a new Sovereign Manual account.">
-    <form method="POST" action="{{ route('register.store') }}" class="space-y-4">
+<x-auth-layout title="Create account"
+    description="Register a new Sovereign Manual account.">
+    <form class="space-y-4" method="POST" action="{{ route('register.store') }}">
         @csrf
 
         <div>
-            <label for="name" class="block text-sm font-medium">Name</label>
-            <input id="name" name="name" type="text" value="{{ old('name') }}" required autofocus autocomplete="name" class="mt-2 w-full rounded-md border border-white/10 bg-base-300 px-3 py-2 outline-none focus:border-primary">
+            <label class="block text-sm font-medium" for="name">Name</label>
+            <input
+                class="bg-base-300 focus:border-primary mt-2 w-full rounded-md border border-white/10 px-3 py-2 outline-none"
+                id="name" name="name" type="text"
+                value="{{ old('name') }}" required autofocus
+                autocomplete="name">
             <x-input-error name="name" />
         </div>
 
         <div>
-            <label for="email" class="block text-sm font-medium">Email</label>
-            <input id="email" name="email" type="email" value="{{ old('email') }}" required autocomplete="username" class="mt-2 w-full rounded-md border border-white/10 bg-base-300 px-3 py-2 outline-none focus:border-primary">
+            <label class="block text-sm font-medium"
+                for="email">Email</label>
+            <input
+                class="bg-base-300 focus:border-primary mt-2 w-full rounded-md border border-white/10 px-3 py-2 outline-none"
+                id="email" name="email" type="email"
+                value="{{ old('email') }}" required autocomplete="username">
             <x-input-error name="email" />
         </div>
 
         <div>
-            <label for="password" class="block text-sm font-medium">Password</label>
-            <input id="password" name="password" type="password" required autocomplete="new-password" class="mt-2 w-full rounded-md border border-white/10 bg-base-300 px-3 py-2 outline-none focus:border-primary">
-            <p class="mt-2 text-xs text-base-content/60">{{ $passwordRules }}</p>
+            <label class="block text-sm font-medium"
+                for="password">Password</label>
+            <input
+                class="bg-base-300 focus:border-primary mt-2 w-full rounded-md border border-white/10 px-3 py-2 outline-none"
+                id="password" name="password" type="password" required
+                autocomplete="new-password">
+            <p class="text-base-content/60 mt-2 text-xs">{{ $passwordRules }}
+            </p>
             <x-input-error name="password" />
         </div>
 
         <div>
-            <label for="password_confirmation" class="block text-sm font-medium">Confirm password</label>
-            <input id="password_confirmation" name="password_confirmation" type="password" required autocomplete="new-password" class="mt-2 w-full rounded-md border border-white/10 bg-base-300 px-3 py-2 outline-none focus:border-primary">
+            <label class="block text-sm font-medium"
+                for="password_confirmation">Confirm password</label>
+            <input
+                class="bg-base-300 focus:border-primary mt-2 w-full rounded-md border border-white/10 px-3 py-2 outline-none"
+                id="password_confirmation" name="password_confirmation"
+                type="password" required autocomplete="new-password">
         </div>
 
-        <button type="submit" class="w-full rounded-md bg-primary px-4 py-2 font-semibold text-primary-content transition hover:brightness-110">Create account</button>
+        <button
+            class="bg-primary text-primary-content w-full rounded-md px-4 py-2 font-semibold transition hover:brightness-110"
+            type="submit">Create account</button>
     </form>
 
-    <p class="mt-6 text-sm text-base-content/70">
+    <p class="text-base-content/70 mt-6 text-sm">
         Already registered?
-        <a href="{{ route('login') }}" class="text-primary hover:brightness-110">Log in</a>
+        <a class="text-primary hover:brightness-110"
+            href="{{ route('login') }}">Log in</a>
     </p>
 </x-auth-layout>

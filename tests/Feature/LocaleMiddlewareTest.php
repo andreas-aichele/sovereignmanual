@@ -10,7 +10,7 @@ test('browser language is used on the initial request when no locale cookie exis
         ->assertViewIs('magazine.index')
         ->assertViewHas('locale', 'de')
         ->assertCookie('locale', 'de')
-        ->assertSee('<html lang="de"', false)
+        ->assertSee('lang="de"', false)
         ->assertSee('Noch keine veröffentlichten Artikel.');
 });
 
@@ -22,7 +22,7 @@ test('stored locale is preferred over the browser language', function () {
         ->assertViewIs('magazine.index')
         ->assertViewHas('locale', 'en')
         ->assertCookie('locale', 'en')
-        ->assertSee('<html lang="en"', false)
+        ->assertSee('lang="en"', false)
         ->assertSee('No published articles yet.');
 });
 
@@ -42,7 +42,7 @@ test('route locale is preferred over the stored locale', function () {
         ->assertViewIs('magazine.show')
         ->assertViewHas('locale', 'en')
         ->assertCookie('locale', 'en')
-        ->assertSee('<html lang="en"', false)
+        ->assertSee('lang="en"', false)
         ->assertSee('English Article');
 });
 
@@ -57,5 +57,5 @@ test('unsupported browser languages fall back to the configured fallback locale'
         ->assertViewIs('magazine.index')
         ->assertViewHas('locale', 'en')
         ->assertCookie('locale', 'en')
-        ->assertSee('<html lang="en"', false);
+        ->assertSee('lang="en"', false);
 });
