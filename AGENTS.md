@@ -1,3 +1,140 @@
+# Sovereign Manual
+
+## Mission
+
+Sovereign Manual is a Bitcoin-only platform focused on self-custody, sovereignty, privacy, security, mindset, and Bitcoin news.
+
+The goal is to help people understand and use Bitcoin independently through clear, practical, and educational content.
+
+Never promote or recommend:
+
+* Altcoins
+* Trading
+* Price predictions
+* Financial advice
+* Hype-driven content
+
+---
+
+## Audience
+
+* Bitcoin beginners
+* Intermediate Bitcoin users
+* Users moving from custodial services to self-custody
+
+Prioritize clarity first and depth second.
+
+---
+
+## Product Principles
+
+* Bitcoin only.
+* SEO is a first-class concern.
+* Prefer evergreen content over short-lived trends.
+* Design for multilingual content.
+* Current languages are English and German, but additional languages may be added.
+* Keep content, URLs, and data structures language-agnostic.
+
+---
+
+## Development Philosophy
+
+Follow a pragmatic Laravel approach.
+
+* Prefer simple solutions.
+* Write as little code as possible.
+* Avoid over-engineering.
+* Fix root causes, not symptoms.
+* Prefer framework conventions over custom abstractions.
+* Optimize for maintainability and developer productivity.
+
+The simplest solution that solves the problem is usually the correct one.
+
+---
+
+## Laravel Conventions
+
+### Controllers
+
+* Keep controllers thin.
+* Move business logic into Actions when appropriate.
+
+### Validation
+
+* Use Form Requests for non-trivial validation.
+
+### Enums
+
+* Prefer Enums over magic strings.
+
+### DTOs
+
+* Use DTOs only when they provide clear value.
+
+### Frontend
+
+* Blade first.
+* TailwindCSS and daisyUI are the default UI stack.
+* Avoid unnecessary JavaScript.
+
+### Dependencies
+
+* Prefer built-in Laravel features before adding packages.
+
+---
+
+## Testing
+
+Use Pest.
+
+Write tests for:
+
+* Core business logic
+* Critical workflows
+* Complex calculations
+
+Avoid excessive testing of simple CRUD functionality and framework behavior.
+
+---
+
+## Domain Models
+
+Current core models:
+
+* Post
+* Category
+* PostAsset
+* PostBlock
+* PostTranslation
+* AiRun
+
+Prefer extending existing concepts before introducing new ones.
+
+---
+
+## AI Content Generation
+
+Content is generated through a Laravel AI pipeline.
+
+Do not generate or manage article content directly unless explicitly requested.
+
+Focus on improving the systems, workflows, prompts, SEO capabilities, data structures, and tooling that enable content generation.
+
+---
+
+## AI Agent Guidelines
+
+Before significant architectural changes:
+
+1. Verify the change is necessary.
+2. Consider the simplest viable solution.
+3. Present a short plan when helpful.
+
+Favor incremental improvements over rewrites.
+
+Challenge unnecessary complexity.
+
+
 <laravel-boost-guidelines>
 === foundation rules ===
 
