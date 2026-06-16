@@ -9,7 +9,7 @@
 
             @if ($category['description'] !== '')
                 <p class="mt-5 text-lg leading-8 text-base-content/75">
-                    {{ $category['description'] }}</p>
+                    {!! Illuminate\Support\Str::markdown($category['description']) !!}</p>
             @endif
         </header>
 
