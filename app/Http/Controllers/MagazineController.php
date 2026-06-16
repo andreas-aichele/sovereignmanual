@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\Language;
 use App\Enums\PostStatus;
 use App\Models\Category;
 use App\Models\Post;
@@ -285,8 +286,10 @@ class MagazineController extends Controller
 
     private function findCategory(string $slug, string $locale): Category
     {
+        $language = Language::fromLocale($locale) ?? Language::fallback();
+
         return Category::query()
-            ->where('lang', $locale)
+            ->where('lang', $language)
             ->where(function (Builder $query) use ($slug): void {
                 $query->where('slug', $slug)
                     ->orWhere('key', $slug);

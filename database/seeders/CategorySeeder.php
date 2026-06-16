@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Enums\Language;
 use App\Models\Category;
 use Illuminate\Database\Seeder;
 
@@ -16,12 +17,12 @@ class CategorySeeder extends Seeder
             [
                 'key' => 'self-custody',
                 'translations' => [
-                    'en' => [
+                    Language::English->value => [
                         'slug' => 'self-custody',
                         'name' => 'Self Custody',
                         'description' => 'Guides for holding your own keys, planning recovery, and reducing custody risk without depending on custodians.',
                     ],
-                    'de' => [
+                    Language::German->value => [
                         'slug' => 'selbstverwahrung',
                         'name' => 'Selbstverwahrung',
                         'description' => 'Anleitungen für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken ohne Abhängigkeit von Verwahrern.',
@@ -31,12 +32,12 @@ class CategorySeeder extends Seeder
             [
                 'key' => 'privacy-security',
                 'translations' => [
-                    'en' => [
+                    Language::English->value => [
                         'slug' => 'privacy-security',
                         'name' => 'Privacy & Security',
                         'description' => 'Operational security, privacy habits, and threat models for using Bitcoin with less exposure.',
                     ],
-                    'de' => [
+                    Language::German->value => [
                         'slug' => 'privatsphaere-sicherheit',
                         'name' => 'Privatsphäre & Sicherheit',
                         'description' => 'Operative Sicherheit, Datenschutz-Routinen und Bedrohungsmodelle für weniger Angriffsfläche beim Umgang mit Bitcoin.',
@@ -46,12 +47,12 @@ class CategorySeeder extends Seeder
             [
                 'key' => 'financial-sovereignty',
                 'translations' => [
-                    'en' => [
+                    Language::English->value => [
                         'slug' => 'financial-sovereignty',
                         'name' => 'Financial Sovereignty',
                         'description' => 'Frameworks for saving, spending, and making independent financial decisions in a Bitcoin context.',
                     ],
-                    'de' => [
+                    Language::German->value => [
                         'slug' => 'finanzielle-souveraenitaet',
                         'name' => 'Finanzielle Souveränität',
                         'description' => 'Denkmodelle für Sparen, Ausgeben und unabhängige finanzielle Entscheidungen im Bitcoin-Kontext.',
@@ -61,12 +62,12 @@ class CategorySeeder extends Seeder
             [
                 'key' => 'family-legacy',
                 'translations' => [
-                    'en' => [
+                    Language::English->value => [
                         'slug' => 'family-legacy',
                         'name' => 'Family & Legacy',
                         'description' => 'Estate planning, family education, and practical continuity for long-term Bitcoin ownership.',
                     ],
-                    'de' => [
+                    Language::German->value => [
                         'slug' => 'familie-nachlass',
                         'name' => 'Familie & Nachlass',
                         'description' => 'Nachlassplanung, Familienbildung und praktische Kontinuität für langfristigen Bitcoin-Besitz.',
@@ -76,12 +77,12 @@ class CategorySeeder extends Seeder
             [
                 'key' => 'tools-practice',
                 'translations' => [
-                    'en' => [
+                    Language::English->value => [
                         'slug' => 'tools-practice',
                         'name' => 'Tools & Practice',
                         'description' => 'Hands-on workflows, wallet tools, checklists, and routines that make Bitcoin usage more reliable.',
                     ],
-                    'de' => [
+                    Language::German->value => [
                         'slug' => 'werkzeuge-praxis',
                         'name' => 'Werkzeuge & Praxis',
                         'description' => 'Praktische Abläufe, Wallet-Werkzeuge, Checklisten und Routinen für verlässlichere Bitcoin-Nutzung.',
@@ -91,12 +92,12 @@ class CategorySeeder extends Seeder
             [
                 'key' => 'economics',
                 'translations' => [
-                    'en' => [
+                    Language::English->value => [
                         'slug' => 'economics',
                         'name' => 'Economics',
                         'description' => 'Monetary history, incentives, scarcity, and economic thinking behind Bitcoin.',
                     ],
-                    'de' => [
+                    Language::German->value => [
                         'slug' => 'oekonomie',
                         'name' => 'Ökonomie',
                         'description' => 'Geldgeschichte, Anreize, Knappheit und ökonomisches Denken hinter Bitcoin.',
@@ -106,12 +107,12 @@ class CategorySeeder extends Seeder
             [
                 'key' => 'mindset',
                 'translations' => [
-                    'en' => [
+                    Language::English->value => [
                         'slug' => 'mindset',
                         'name' => 'Mindset',
                         'description' => 'Mental models, discipline, patience, and personal responsibility for living with Bitcoin.',
                     ],
-                    'de' => [
+                    Language::German->value => [
                         'slug' => 'denkweise',
                         'name' => 'Denkweise',
                         'description' => 'Denkmodelle, Disziplin, Geduld und Eigenverantwortung für ein Leben mit Bitcoin.',

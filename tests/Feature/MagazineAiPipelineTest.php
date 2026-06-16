@@ -69,10 +69,9 @@ test('pipeline creates a published post with english and german translations', f
         ->and($topic->refresh()->status)->toBe(ContentTopicStatus::Published);
 });
 
-test('pipeline only creates translations for configured supported locales', function () {
+test('pipeline creates translations for languages defined in the language enum', function () {
     config([
         'ai.providers.gemini.key' => null,
-        'app.supported_locales' => ['en'],
     ]);
 
     $topic = ContentTopic::factory()->due()->create([
@@ -81,9 +80,9 @@ test('pipeline only creates translations for configured supported locales', func
 
     $post = app(MagazineAiPipeline::class)->generatePost($topic);
 
-    expect($post->translations()->pluck('locale')->all())->toBe(['en'])
-        ->and($post->blocks()->pluck('locale')->unique()->values()->all())->toBe(['en'])
-        ->and($post->aiRuns()->where('type', AiRunType::Translation)->exists())->toBeFalse();
+    expect($post->translations()->pluck('locale')->sort()->values()->all())->toBe(['de', 'en'])
+        ->and($post->blocks()->pluck('locale')->unique()->sort()->values()->all())->toBe(['de', 'en'])
+        ->and($post->aiRuns()->where('type', AiRunType::Translation)->exists())->toBeTrue();
 });
 
 test('pipeline adds relevant internal links when published articles exist', function () {

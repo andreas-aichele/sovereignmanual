@@ -2,6 +2,8 @@
 
 namespace App\Support;
 
+use App\Enums\Language;
+
 class Locales
 {
     /**
@@ -9,25 +11,20 @@ class Locales
      */
     public static function supported(): array
     {
-        return collect(config('app.supported_locales', ['en']))
-            ->filter(fn (mixed $locale): bool => is_string($locale) && $locale !== '')
-            ->values()
-            ->all();
+        return Language::values();
     }
 
     public static function isSupported(string $locale): bool
     {
-        return in_array($locale, self::supported(), true);
+        return Language::fromLocale($locale) !== null;
     }
 
     public static function fallback(): string
     {
-        $fallbackLocale = config('app.fallback_locale', 'en');
+        $fallbackLocale = config('app.fallback_locale', Language::fallback()->value);
 
-        if (is_string($fallbackLocale) && self::isSupported($fallbackLocale)) {
-            return $fallbackLocale;
-        }
-
-        return 'en';
+        return is_string($fallbackLocale)
+            ? (Language::fromLocale($fallbackLocale)?->value ?? Language::fallback()->value)
+            : Language::fallback()->value;
     }
 }

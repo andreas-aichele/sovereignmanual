@@ -46,13 +46,12 @@ test('route locale is preferred over the stored locale', function () {
         ->assertSee('English Article');
 });
 
-test('unsupported browser languages fall back to the configured application locale', function () {
+test('unsupported browser languages fall back to the configured fallback locale', function () {
     config([
-        'app.locale' => 'en',
-        'app.supported_locales' => ['en'],
+        'app.fallback_locale' => 'en',
     ]);
 
-    $this->withHeader('Accept-Language', 'de-DE,de;q=0.9')
+    $this->withHeader('Accept-Language', 'fr-FR,fr;q=0.9')
         ->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertViewIs('magazine.index')

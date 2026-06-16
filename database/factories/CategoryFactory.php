@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Language;
 use App\Models\Category;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
@@ -23,7 +24,7 @@ class CategoryFactory extends Factory
 
         return [
             'key' => $slug,
-            'lang' => 'en',
+            'lang' => Language::English,
             'slug' => $slug,
             'name' => Str::of($name)->title()->toString(),
             'description' => fake()->sentence(),
@@ -34,7 +35,7 @@ class CategoryFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'key' => 'self-custody',
-            'lang' => 'en',
+            'lang' => Language::English,
             'slug' => 'self-custody',
             'name' => 'Self Custody',
             'description' => 'Practical guidance for holding keys, building recovery plans, and reducing custody risk.',
@@ -45,7 +46,7 @@ class CategoryFactory extends Factory
     {
         return $this->state(fn (array $attributes): array => [
             'key' => 'self-custody',
-            'lang' => 'de',
+            'lang' => Language::German,
             'slug' => 'selbstverwahrung',
             'name' => 'Selbstverwahrung',
             'description' => 'Praktische Orientierung für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken.',

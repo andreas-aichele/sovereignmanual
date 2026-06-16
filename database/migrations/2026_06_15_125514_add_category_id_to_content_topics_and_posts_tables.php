@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Language;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -16,12 +17,12 @@ return new class extends Migration
             'bitcoin' => [
                 'key' => 'self-custody',
                 'translations' => [
-                    'en' => [
+                    Language::English->value => [
                         'slug' => 'self-custody',
                         'name' => 'Self Custody',
                         'description' => 'Guides for holding your own keys, planning recovery, and reducing custody risk without depending on custodians.',
                     ],
-                    'de' => [
+                    Language::German->value => [
                         'slug' => 'selbstverwahrung',
                         'name' => 'Selbstverwahrung',
                         'description' => 'Anleitungen für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken ohne Abhängigkeit von Verwahrern.',
@@ -31,12 +32,12 @@ return new class extends Migration
             'financial-independence' => [
                 'key' => 'financial-sovereignty',
                 'translations' => [
-                    'en' => [
+                    Language::English->value => [
                         'slug' => 'financial-sovereignty',
                         'name' => 'Financial Sovereignty',
                         'description' => 'Frameworks for saving, spending, and making independent financial decisions in a Bitcoin context.',
                     ],
-                    'de' => [
+                    Language::German->value => [
                         'slug' => 'finanzielle-souveraenitaet',
                         'name' => 'Finanzielle Souveränität',
                         'description' => 'Denkmodelle für Sparen, Ausgeben und unabhängige finanzielle Entscheidungen im Bitcoin-Kontext.',
@@ -46,12 +47,12 @@ return new class extends Migration
             'self-custody' => [
                 'key' => 'self-custody',
                 'translations' => [
-                    'en' => [
+                    Language::English->value => [
                         'slug' => 'self-custody',
                         'name' => 'Self Custody',
                         'description' => 'Guides for holding your own keys, planning recovery, and reducing custody risk without depending on custodians.',
                     ],
-                    'de' => [
+                    Language::German->value => [
                         'slug' => 'selbstverwahrung',
                         'name' => 'Selbstverwahrung',
                         'description' => 'Anleitungen für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken ohne Abhängigkeit von Verwahrern.',
@@ -84,12 +85,12 @@ return new class extends Migration
                 $category = $legacyCategoryMap[$topic->category] ?? [
                     'key' => $topic->category,
                     'translations' => [
-                        'en' => [
+                        Language::English->value => [
                             'slug' => $topic->category,
                             'name' => str($topic->category)->replace('-', ' ')->title()->toString(),
                             'description' => '',
                         ],
-                        'de' => [
+                        Language::German->value => [
                             'slug' => $topic->category,
                             'name' => str($topic->category)->replace('-', ' ')->title()->toString(),
                             'description' => '',
@@ -103,12 +104,12 @@ return new class extends Migration
         $insertCategory([
             'key' => 'self-custody',
             'translations' => [
-                'en' => [
+                Language::English->value => [
                     'slug' => 'self-custody',
                     'name' => 'Self Custody',
                     'description' => 'Guides for holding your own keys, planning recovery, and reducing custody risk without depending on custodians.',
                 ],
-                'de' => [
+                Language::German->value => [
                     'slug' => 'selbstverwahrung',
                     'name' => 'Selbstverwahrung',
                     'description' => 'Anleitungen für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken ohne Abhängigkeit von Verwahrern.',
@@ -120,7 +121,7 @@ return new class extends Migration
             $table->foreignId('category_id')->nullable()->after('slug')->constrained()->nullOnDelete();
         });
 
-        $categoryIds = DB::table('categories')->where('lang', 'en')->pluck('id', 'key');
+        $categoryIds = DB::table('categories')->where('lang', Language::English->value)->pluck('id', 'key');
 
         DB::table('content_topics')
             ->select(['id', 'category'])

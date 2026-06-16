@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\AiRunStatus;
 use App\Enums\AiRunType;
 use App\Enums\ContentTopicStatus;
+use App\Enums\Language;
 use App\Enums\PostStatus;
 use App\Models\AiRun;
 use App\Models\Category;
@@ -700,7 +701,7 @@ class MagazineAiPipeline
     private function defaultCategory(): Category
     {
         return Category::query()->firstOrCreate(
-            ['key' => 'self-custody', 'lang' => 'en'],
+            ['key' => 'self-custody', 'lang' => Language::English],
             [
                 'slug' => 'self-custody',
                 'name' => 'Self Custody',

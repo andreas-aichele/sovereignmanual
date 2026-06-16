@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\Language;
 use Database\Factories\CategoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -19,6 +20,16 @@ class Category extends Model
 {
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
+
+    /**
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'lang' => Language::class,
+        ];
+    }
 
     public function label(?string $locale = null): string
     {
@@ -43,15 +54,17 @@ class Category extends Model
 
     public function localized(?string $locale = null): self
     {
-        $locale ??= $this->lang;
+        $language = $locale === null
+            ? $this->lang
+            : (Language::fromLocale($locale) ?? $this->lang);
 
-        if ($this->lang === $locale) {
+        if ($this->lang === $language) {
             return $this;
         }
 
         return self::query()
             ->where('key', $this->key)
-            ->where('lang', $locale)
+            ->where('lang', $language)
             ->first()
             ?? $this;
     }

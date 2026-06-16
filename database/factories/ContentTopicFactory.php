@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\ContentTopicStatus;
+use App\Enums\Language;
 use App\Models\Category;
 use App\Models\ContentTopic;
 use Illuminate\Database\Eloquent\Factories\Factory;
@@ -22,7 +23,7 @@ class ContentTopicFactory extends Factory
     {
         $title = fake()->sentence(5);
         Category::query()->firstOrCreate(
-            ['key' => 'self-custody', 'lang' => 'de'],
+            ['key' => 'self-custody', 'lang' => Language::German],
             [
                 'slug' => 'selbstverwahrung',
                 'name' => 'Selbstverwahrung',
@@ -34,7 +35,7 @@ class ContentTopicFactory extends Factory
             'title' => $title,
             'slug' => Str::slug($title).'-'.fake()->unique()->numberBetween(1000, 9999),
             'category_id' => Category::query()->firstOrCreate(
-                ['key' => 'self-custody', 'lang' => 'en'],
+                ['key' => 'self-custody', 'lang' => Language::English],
                 [
                     'slug' => 'self-custody',
                     'name' => 'Self Custody',

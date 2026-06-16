@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Language;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +20,7 @@ return new class extends Migration
         $localizedRows = [];
 
         Schema::table('categories', function (Blueprint $table): void {
-            $table->string('lang', 2)->nullable()->after('key');
+            $table->enum('lang', Language::values())->nullable()->after('key');
             $table->string('slug_value')->nullable()->after('lang');
             $table->string('name_value')->nullable()->after('slug_value');
             $table->text('description_value')->nullable()->after('name_value');
@@ -37,18 +38,18 @@ return new class extends Migration
                 DB::table('categories')
                     ->where('id', $category->id)
                     ->update([
-                        'lang' => 'en',
-                        'slug_value' => $slugs['en'] ?? $category->key,
-                        'name_value' => $names['en'] ?? $category->key,
-                        'description_value' => $descriptions['en'] ?? '',
+                        'lang' => Language::English->value,
+                        'slug_value' => $slugs[Language::English->value] ?? $category->key,
+                        'name_value' => $names[Language::English->value] ?? $category->key,
+                        'description_value' => $descriptions[Language::English->value] ?? '',
                     ]);
 
                 $localizedRows[] = [
                     'key' => $category->key,
-                    'lang' => 'de',
-                    'slug' => $slugs['de'] ?? $slugs['en'] ?? $category->key,
-                    'name' => $names['de'] ?? $names['en'] ?? $category->key,
-                    'description' => $descriptions['de'] ?? $descriptions['en'] ?? '',
+                    'lang' => Language::German->value,
+                    'slug' => $slugs[Language::German->value] ?? $slugs[Language::English->value] ?? $category->key,
+                    'name' => $names[Language::German->value] ?? $names[Language::English->value] ?? $category->key,
+                    'description' => $descriptions[Language::German->value] ?? $descriptions[Language::English->value] ?? '',
                     'created_at' => now(),
                     'updated_at' => now(),
                 ];
@@ -65,7 +66,7 @@ return new class extends Migration
             $table->renameColumn('description_value', 'description');
         });
 
-        DB::statement('ALTER TABLE categories MODIFY lang VARCHAR(2) NOT NULL');
+        DB::statement("ALTER TABLE categories MODIFY lang ENUM('".implode("','", Language::values())."') NOT NULL");
         DB::statement('ALTER TABLE categories MODIFY slug VARCHAR(255) NOT NULL');
         DB::statement('ALTER TABLE categories MODIFY name VARCHAR(255) NOT NULL');
 

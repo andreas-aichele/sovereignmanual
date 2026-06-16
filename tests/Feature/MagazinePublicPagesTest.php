@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\Language;
 use App\Models\Category;
 use App\Models\Post;
 use App\Models\PostBlock;
@@ -10,7 +11,7 @@ function selfCustodyCategory(): Category
     selbstverwahrungCategory();
 
     return Category::query()->updateOrCreate(
-        ['key' => 'self-custody', 'lang' => 'en'],
+        ['key' => 'self-custody', 'lang' => Language::English],
         [
             'slug' => 'self-custody',
             'name' => 'Self Custody',
@@ -22,7 +23,7 @@ function selfCustodyCategory(): Category
 function selbstverwahrungCategory(): Category
 {
     return Category::query()->updateOrCreate(
-        ['key' => 'self-custody', 'lang' => 'de'],
+        ['key' => 'self-custody', 'lang' => Language::German],
         [
             'slug' => 'selbstverwahrung',
             'name' => 'Selbstverwahrung',
@@ -221,14 +222,14 @@ test('self custody route supports legacy published posts without a category', fu
 test('german category labels use correct umlauts', function () {
     $category = Category::factory()->create([
         'key' => 'financial-sovereignty',
-        'lang' => 'en',
+        'lang' => Language::English,
         'slug' => 'financial-sovereignty',
         'name' => 'Financial Sovereignty',
         'description' => 'Financial sovereignty articles.',
     ]);
     Category::factory()->create([
         'key' => 'financial-sovereignty',
-        'lang' => 'de',
+        'lang' => Language::German,
         'slug' => 'finanzielle-souveraenitaet',
         'name' => 'Finanzielle Souveränität',
         'description' => 'Artikel über finanzielle Souveränität.',

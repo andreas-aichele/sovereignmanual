@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\Language;
 use App\Enums\PostStatus;
 use App\Models\Category;
 use App\Models\ContentTopic;
@@ -23,7 +24,7 @@ class PostFactory extends Factory
     {
         $topic = fake()->sentence(4);
         Category::query()->firstOrCreate(
-            ['key' => 'self-custody', 'lang' => 'de'],
+            ['key' => 'self-custody', 'lang' => Language::German],
             [
                 'slug' => 'selbstverwahrung',
                 'name' => 'Selbstverwahrung',
@@ -34,7 +35,7 @@ class PostFactory extends Factory
         return [
             'content_topic_id' => ContentTopic::factory(),
             'category_id' => Category::query()->firstOrCreate(
-                ['key' => 'self-custody', 'lang' => 'en'],
+                ['key' => 'self-custody', 'lang' => Language::English],
                 [
                     'slug' => 'self-custody',
                     'name' => 'Self Custody',
