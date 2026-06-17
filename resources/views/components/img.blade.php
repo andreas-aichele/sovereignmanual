@@ -1,7 +1,8 @@
 <picture>
     @foreach ($sourceSets() as $format => $srcset)
-        <source type="image/{{ $format === 'jpg' ? 'jpeg' : $format }}"
-            srcset="{{ $srcset }}" sizes="{{ $sizes }}">
+        <source srcset="{{ $srcset }}"
+            type="image/{{ $format === 'jpg' ? 'jpeg' : $format }}"
+            sizes="{{ $sizes }}">
     @endforeach
 
     <img

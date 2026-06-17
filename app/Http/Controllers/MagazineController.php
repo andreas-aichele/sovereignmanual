@@ -12,7 +12,6 @@ use App\Models\PostTranslation;
 use App\Support\Locales;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Facades\Storage;
@@ -38,7 +37,14 @@ class MagazineController extends Controller
             'languageOptions' => $this->languageOptions($locale),
             'posts' => $posts,
             'copy' => $this->translationArray('index', $locale),
-            'meta' => $this->translationArray('meta', $locale),
+            'meta' => [
+                ...$this->translationArray('meta', $locale),
+                'canonical' => $this->indexCanonical($locale),
+                'alternates' => $this->indexAlternates(),
+                'xDefault' => route('magazine.index'),
+                'ogType' => 'website',
+                'structuredData' => $this->websiteStructuredData($locale),
+            ],
         ]);
     }
 
@@ -122,7 +128,12 @@ class MagazineController extends Controller
                     'category' => $this->categorySlug($post->category, $locale),
                     'slug' => $translation->slug,
                 ]),
+                'alternates' => $this->postAlternates($post),
+                'xDefault' => $this->xDefaultPostUrl($post),
                 'alternate' => $this->alternateUrl($post, $locale),
+                'ogType' => 'article',
+                'ogImage' => $this->absoluteUrl($this->serializePostSummary($post, $locale)['image']),
+                'structuredData' => $this->articleStructuredData($post, $translation, $locale),
             ],
         ]);
     }
@@ -163,13 +174,28 @@ class MagazineController extends Controller
             'meta' => [
                 'title' => $this->truncateMeta($resolvedCategory->label($locale), 60),
                 'description' => $this->truncateMeta($resolvedCategory->localizedDescription($locale), 160),
+                'canonical' => $this->localizedRoute($locale, 'category', [
+                    'category' => $resolvedCategory->localizedSlug($locale),
+                ]),
+                'alternates' => $this->categoryAlternates($resolvedCategory),
+                'xDefault' => $this->localizedRoute(Locales::fallback(), 'category', [
+                    'category' => $resolvedCategory->localizedSlug(Locales::fallback()),
+                ]),
+                'ogType' => 'website',
+                'structuredData' => $this->collectionStructuredData(
+                    $resolvedCategory->label($locale),
+                    $resolvedCategory->localizedDescription($locale),
+                    $this->localizedRoute($locale, 'category', [
+                        'category' => $resolvedCategory->localizedSlug($locale),
+                    ]),
+                ),
             ],
         ]);
     }
 
-    public function switchLocale(): RedirectResponse
+    public function switchLocale(): View
     {
-        return redirect()->route('magazine.index');
+        return $this->index();
     }
 
     private function serializePostSummary(Post $post, string $locale): array
@@ -230,6 +256,152 @@ class MagazineController extends Controller
             ?? $post->assets
                 ->where('status', 'ready')
                 ->first(fn (PostAsset $asset): bool => ($asset->metadata['style'] ?? null) === 'synthwave-cypherpunk');
+    }
+
+    private function indexCanonical(string $locale): string
+    {
+        if (request()->route('locale') === $locale) {
+            return $this->explicitLocalizedRoute($locale, 'index');
+        }
+
+        return $locale === Locales::fallback()
+            ? route('magazine.index')
+            : $this->explicitLocalizedRoute($locale, 'index');
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function indexAlternates(): array
+    {
+        return collect(Locales::supported())
+            ->mapWithKeys(fn (string $locale): array => [
+                $locale => $this->explicitLocalizedRoute($locale, 'index'),
+            ])
+            ->all();
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function postAlternates(Post $post): array
+    {
+        return collect(Locales::supported())
+            ->mapWithKeys(function (string $locale) use ($post): array {
+                $translation = $this->exactTranslation($post, $locale);
+
+                if ($translation === null) {
+                    return [];
+                }
+
+                return [
+                    $locale => $this->explicitLocalizedRoute($locale, 'show', [
+                        'category' => $this->categorySlug($post->category, $locale),
+                        'slug' => $translation->slug,
+                    ]),
+                ];
+            })
+            ->all();
+    }
+
+    private function xDefaultPostUrl(Post $post): string
+    {
+        $alternates = $this->postAlternates($post);
+
+        return $alternates[Locales::fallback()] ?? (reset($alternates) ?: route('magazine.index'));
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function categoryAlternates(Category $category): array
+    {
+        $localizedCategories = Category::query()
+            ->where('key', $category->key)
+            ->get()
+            ->keyBy(fn (Category $category): string => $category->lang->value);
+
+        return collect(Locales::supported())
+            ->mapWithKeys(function (string $locale) use ($localizedCategories): array {
+                $category = $localizedCategories->get($locale);
+
+                if (! $category instanceof Category) {
+                    return [];
+                }
+
+                return [
+                    $locale => $this->explicitLocalizedRoute($locale, 'category', [
+                        'category' => $category->slug,
+                    ]),
+                ];
+            })
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function websiteStructuredData(string $locale): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'WebSite',
+            'name' => 'Sovereign Manual',
+            'url' => $this->indexCanonical($locale),
+            'inLanguage' => $locale,
+            'description' => $this->translation('meta.description', $locale),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function collectionStructuredData(string $title, string $description, string $url): array
+    {
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'CollectionPage',
+            'name' => $title,
+            'url' => $url,
+            'description' => $description,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function articleStructuredData(Post $post, PostTranslation $translation, string $locale): array
+    {
+        $summary = $this->serializePostSummary($post, $locale);
+
+        return [
+            '@context' => 'https://schema.org',
+            '@type' => 'Article',
+            'headline' => $translation->title,
+            'description' => $this->truncateMeta($translation->meta_description ?: $translation->excerpt, 160),
+            'image' => $this->absoluteUrl($summary['image']),
+            'datePublished' => $post->published_at?->toAtomString(),
+            'dateModified' => ($post->updated_at ?? $post->published_at)?->toAtomString(),
+            'inLanguage' => $locale,
+            'mainEntityOfPage' => [
+                '@type' => 'WebPage',
+                '@id' => $summary['url'],
+            ],
+            'publisher' => [
+                '@type' => 'Organization',
+                'name' => 'Sovereign Manual',
+                'url' => route('magazine.index'),
+            ],
+        ];
+    }
+
+    private function absoluteUrl(?string $url): ?string
+    {
+        if ($url === null || Str::startsWith($url, ['http://', 'https://'])) {
+            return $url;
+        }
+
+        return url($url);
     }
 
     private function alternateUrl(Post $post, string $locale): ?string
@@ -344,7 +516,7 @@ class MagazineController extends Controller
             ];
         }
 
-        if (! in_array($block->type, ['section', 'markdown'], true)) {
+        if (! in_array($block->type, ['section', 'markdown'], true) && trim((string) $block->markdown) === '') {
             return [
                 'html' => '',
                 'toc' => [],

@@ -1,11 +1,15 @@
 <x-layouts.app :title="$meta['title']" :description="$meta['description']" :keywords="$meta['keywords']"
-    :canonical="$meta['canonical']" :alternate="$meta['alternate']">
+    :canonical="$meta['canonical']" :alternates="$meta['alternates']" :x-default="$meta['xDefault']" :og-type="$meta['ogType']"
+    :og-image="$meta['ogImage']" :structured-data="$meta['structuredData']">
     <x-public-nav :locale="$locale" :language-options="$languageOptions" />
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <x-breadcrumbs :label="$copy['breadcrumb_label']" :items="[
             ['label' => $copy['magazine'], 'url' => route('magazine.index')],
-            ['label' => $post['category_label'], 'url' => $post['category_url']],
+            [
+                'label' => $post['category_label'],
+                'url' => $post['category_url'],
+            ],
             ['label' => $post['title'], 'current' => true],
         ]" />
 
@@ -27,9 +31,7 @@
             <div
                 class="border-primary/20 bg-base-300 mt-8 overflow-hidden rounded-lg border shadow-2xl shadow-fuchsia-950/20 ring-1 ring-cyan-300/10">
                 <x-img class="max-h-[32rem] w-full object-cover"
-                    :src="$post['image']"
-                    :alt="$post['image_alt'] ?? $post['title']"
-                    :responsive="$post['image_responsive']"
+                    :src="$post['image']" :alt="$post['image_alt'] ?? $post['title']" :responsive="$post['image_responsive']"
                     sizes="(min-width: 72rem) 72rem, 100vw" hero />
             </div>
 
@@ -65,8 +67,7 @@
                         <section class="content-body mt-10 max-w-none">
                             @if ($block['asset'])
                                 <x-img class="rounded-lg border border-white/10"
-                                    :src="$block['asset']['url']"
-                                    :alt="$block['asset']['alt'] ?? ''"
+                                    :src="$block['asset']['url']" :alt="$block['asset']['alt'] ?? ''"
                                     :responsive="$block['asset']['responsive']"
                                     sizes="(min-width: 64rem) 48rem, 100vw" />
                             @endif

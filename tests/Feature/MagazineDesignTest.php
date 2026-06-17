@@ -8,9 +8,12 @@ test('magazine index is the public start page', function () {
         ->assertSee('Sovereign Manual Magazine');
 });
 
-test('german magazine index route stores the locale and redirects to the start page', function () {
+test('german magazine index route stores the locale and renders an indexable page', function () {
     $this->get(route('magazine.localized.index', ['locale' => 'de']))
-        ->assertRedirect(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.index')
+        ->assertViewHas('locale', 'de')
+        ->assertSee('lang="de"', false)
         ->assertCookie('locale', 'de');
 });
 
@@ -82,10 +85,11 @@ test('magazine localization strings live in language files', function () {
         ->and($controller)->not->toContain('Latest article');
 });
 
-test('magazine start page moves visible intro copy below article list as about section', function () {
+test('magazine start page keeps visible intro copy and lower about section', function () {
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
 
-    expect($index)->toContain('<section class="sr-only">')
+    expect($index)->toContain('<section class="mb-10 max-w-3xl">')
+        ->and($index)->toContain('<h1')
         ->and($index)->toContain('$copy[\'about_heading\']')
         ->and($index)->toContain('$copy[\'about_body\']')
         ->and($index)->toContain('border-primary/20 mt-14 border-t pt-10')
@@ -121,6 +125,7 @@ test('magazine headings can break long words', function () {
         ->and($index)->toContain('text-xl')
         ->and($show)->toContain('wrap-anywhere')
         ->and($show)->toContain('text-4xl')
+        ->and($css)->toContain('@apply hyphens-auto')
         ->and($css)->toContain('overflow-wrap: anywhere;');
 });
 
@@ -164,9 +169,10 @@ test('magazine article renders linked table of contents for mobile and desktop',
 
 test('magazine article navigation uses breadcrumbs instead of a back button', function () {
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
+    $breadcrumbs = file_get_contents(resource_path('views/components/breadcrumbs.blade.php'));
 
-    expect($show)->toContain('aria-label="{{ $copy[\'breadcrumb_label\'] }}"')
-        ->and($show)->toContain('aria-current="page"')
+    expect($show)->toContain('<x-breadcrumbs :label="$copy[\'breadcrumb_label\']"')
+        ->and($breadcrumbs)->toContain('aria-current="page"')
         ->and($show)->not->toContain('$copy[\'back\']');
 });
 
