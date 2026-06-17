@@ -1,5 +1,6 @@
 <x-layouts.app :title="$meta['title']" :description="$meta['description']" :canonical="$meta['canonical']"
-    :alternates="$meta['alternates']" :x-default="$meta['xDefault']" :og-type="$meta['ogType']" :structured-data="$meta['structuredData']">
+    :alternates="$meta['alternates']" :x-default="$meta['xDefault']" :og-type="$meta['ogType']" :og-locale="$meta['ogLocale']"
+    :og-locale-alternates="$meta['ogLocaleAlternates']" :structured-data="$meta['structuredData']">
     <x-public-nav :locale="$locale" :language-options="$languageOptions" />
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">

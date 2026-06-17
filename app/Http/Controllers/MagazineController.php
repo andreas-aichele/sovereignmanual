@@ -43,6 +43,8 @@ class MagazineController extends Controller
                 'alternates' => $this->indexAlternates(),
                 'xDefault' => route('magazine.index'),
                 'ogType' => 'website',
+                'ogLocale' => $this->openGraphLocale($locale),
+                'ogLocaleAlternates' => $this->openGraphLocaleAlternates($locale),
                 'structuredData' => $this->websiteStructuredData($locale),
             ],
         ]);
@@ -132,7 +134,13 @@ class MagazineController extends Controller
                 'xDefault' => $this->xDefaultPostUrl($post),
                 'alternate' => $this->alternateUrl($post, $locale),
                 'ogType' => 'article',
+                'ogLocale' => $this->openGraphLocale($locale),
+                'ogLocaleAlternates' => $this->openGraphLocaleAlternates($locale),
                 'ogImage' => $this->absoluteUrl($this->serializePostSummary($post, $locale)['image']),
+                'author' => 'Sovereign Manual',
+                'articlePublishedTime' => $post->published_at?->toAtomString(),
+                'articleModifiedTime' => ($post->updated_at ?? $post->published_at)?->toAtomString(),
+                'articleSection' => $this->serializePostSummary($post, $locale)['category_label'],
                 'structuredData' => $this->articleStructuredData($post, $translation, $locale),
             ],
         ]);
@@ -182,6 +190,8 @@ class MagazineController extends Controller
                     'category' => $resolvedCategory->localizedSlug(Locales::fallback()),
                 ]),
                 'ogType' => 'website',
+                'ogLocale' => $this->openGraphLocale($locale),
+                'ogLocaleAlternates' => $this->openGraphLocaleAlternates($locale),
                 'structuredData' => $this->collectionStructuredData(
                     $resolvedCategory->label($locale),
                     $resolvedCategory->localizedDescription($locale),
@@ -309,6 +319,26 @@ class MagazineController extends Controller
         $alternates = $this->postAlternates($post);
 
         return $alternates[Locales::fallback()] ?? (reset($alternates) ?: route('magazine.index'));
+    }
+
+    private function openGraphLocale(string $locale): string
+    {
+        return match ($locale) {
+            'de' => 'de_DE',
+            default => 'en_US',
+        };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function openGraphLocaleAlternates(string $currentLocale): array
+    {
+        return collect(Locales::supported())
+            ->reject(fn (string $locale): bool => $locale === $currentLocale)
+            ->map(fn (string $locale): string => $this->openGraphLocale($locale))
+            ->values()
+            ->all();
     }
 
     /**

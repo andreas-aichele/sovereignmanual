@@ -1,6 +1,7 @@
 <x-layouts.app :title="$meta['title']" :description="$meta['description']" :keywords="$meta['keywords']"
     :canonical="$meta['canonical']" :alternates="$meta['alternates']" :x-default="$meta['xDefault']" :og-type="$meta['ogType']"
-    :og-image="$meta['ogImage']" :structured-data="$meta['structuredData']">
+    :og-locale="$meta['ogLocale']" :og-locale-alternates="$meta['ogLocaleAlternates']" :og-image="$meta['ogImage']" :author="$meta['author']"
+    :article-published-time="$meta['articlePublishedTime']" :article-modified-time="$meta['articleModifiedTime']" :article-section="$meta['articleSection']" :structured-data="$meta['structuredData']">
     <x-public-nav :locale="$locale" :language-options="$languageOptions" />
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">

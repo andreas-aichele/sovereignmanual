@@ -38,6 +38,10 @@ class SetLocale
             return $routeLocale;
         }
 
+        if ($this->isUnlocalizedMagazineRoute($request)) {
+            return Locales::fallback();
+        }
+
         $cookieLocale = $request->cookie(self::COOKIE);
 
         if (is_string($cookieLocale) && Locales::isSupported($cookieLocale)) {
@@ -51,5 +55,13 @@ class SetLocale
         }
 
         return Locales::fallback();
+    }
+
+    private function isUnlocalizedMagazineRoute(Request $request): bool
+    {
+        $routeName = $request->route()?->getName();
+
+        return is_string($routeName)
+            && in_array($routeName, ['magazine.index', 'magazine.category', 'magazine.show'], true);
     }
 }

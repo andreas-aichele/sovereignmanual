@@ -11,6 +11,11 @@
     <title>{{ $title ?? config('app.name', 'Sovereign Manual') }}</title>
 
     <meta name="robots" content="{{ $robots ?? 'index, follow' }}">
+    <meta name="theme-color" content="{{ $themeColor ?? '#1a103d' }}">
+
+    @isset($author)
+        <meta name="author" content="{{ $author }}">
+    @endisset
 
     @isset($description)
         <meta name="description" content="{{ $description }}">
@@ -37,6 +42,15 @@
     @endisset
 
     <meta property="og:type" content="{{ $ogType ?? 'website' }}">
+    @isset($ogLocale)
+        <meta property="og:locale" content="{{ $ogLocale }}">
+    @endisset
+    @isset($ogLocaleAlternates)
+        @foreach ($ogLocaleAlternates as $ogLocaleAlternate)
+            <meta property="og:locale:alternate"
+                content="{{ $ogLocaleAlternate }}">
+        @endforeach
+    @endisset
     <meta property="og:title"
         content="{{ $ogTitle ?? ($title ?? config('app.name', 'Sovereign Manual')) }}">
     @isset($description)
@@ -47,6 +61,17 @@
     @endisset
     @isset($ogImage)
         <meta property="og:image" content="{{ $ogImage }}">
+    @endisset
+    @isset($articlePublishedTime)
+        <meta property="article:published_time"
+            content="{{ $articlePublishedTime }}">
+    @endisset
+    @isset($articleModifiedTime)
+        <meta property="article:modified_time"
+            content="{{ $articleModifiedTime }}">
+    @endisset
+    @isset($articleSection)
+        <meta property="article:section" content="{{ $articleSection }}">
     @endisset
     <meta name="twitter:card"
         content="{{ isset($ogImage) ? 'summary_large_image' : 'summary' }}">

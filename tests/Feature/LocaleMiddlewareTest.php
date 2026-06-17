@@ -3,19 +3,19 @@
 use App\Models\Post;
 use App\Models\PostTranslation;
 
-test('browser language is used on the initial request when no locale cookie exists', function () {
+test('unlocalized magazine routes use the fallback locale for stable seo urls', function () {
     $this->withHeader('Accept-Language', 'de-DE,de;q=0.9,en;q=0.8')
         ->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
-        ->assertViewHas('locale', 'de')
-        ->assertCookie('locale', 'de')
-        ->assertSee('lang="de"', false)
-        ->assertSee('Noch keine veröffentlichten Artikel.');
+        ->assertViewHas('locale', 'en')
+        ->assertCookie('locale', 'en')
+        ->assertSee('lang="en"', false)
+        ->assertSee('No published articles yet.');
 });
 
-test('stored locale is preferred over the browser language', function () {
-    $this->withCookie('locale', 'en')
+test('stored locale does not change unlocalized magazine routes', function () {
+    $this->withCookie('locale', 'de')
         ->withHeader('Accept-Language', 'de-DE,de;q=0.9')
         ->get(route('magazine.index'))
         ->assertSuccessful()

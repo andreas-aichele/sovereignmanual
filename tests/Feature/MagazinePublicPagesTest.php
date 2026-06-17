@@ -258,8 +258,7 @@ test('german category labels use correct umlauts', function () {
         'slug' => 'finanzielle-unabhaengigkeit',
     ]);
 
-    $this->withCookie('locale', 'de')
-        ->get(route('magazine.index'))
+    $this->get(route('magazine.localized.index', ['locale' => 'de']))
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
         ->assertViewHas('locale', 'de')
@@ -267,25 +266,25 @@ test('german category labels use correct umlauts', function () {
         ->assertSee('Finanzielle Unabhängigkeit');
 });
 
-test('stored locale controls the public magazine start page language', function () {
+test('stored locale does not change the x default magazine start page language', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
         'post_id' => $post->id,
-        'locale' => 'de',
-        'title' => 'Bitcoin Grundlagen',
-        'slug' => 'bitcoin-grundlagen',
+        'locale' => 'en',
+        'title' => 'Bitcoin Basics',
+        'slug' => 'bitcoin-basics',
     ]);
 
     $this->withCookie('locale', 'de')
         ->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
-        ->assertViewHas('locale', 'de')
-        ->assertCookie('locale', 'de')
-        ->assertSee('lang="de"', false)
-        ->assertSee('Bitcoin Grundlagen')
-        ->assertSee('Artikel lesen');
+        ->assertViewHas('locale', 'en')
+        ->assertCookie('locale', 'en')
+        ->assertSee('lang="en"', false)
+        ->assertSee('Bitcoin Basics')
+        ->assertSee('Read article');
 });
 
 test('start page language switcher links directly to localized start pages', function () {
@@ -309,12 +308,12 @@ test('start page language switcher links directly to localized start pages', fun
     $germanResponse = $this->withCookie('locale', 'de')
         ->get(route('magazine.index'))
         ->assertSuccessful()
-        ->assertViewHas('locale', 'de');
+        ->assertViewHas('locale', 'en');
 
     expect($germanResponse->viewData('languageOptions'))->toContain([
-        'locale' => 'en',
-        'label' => 'English',
-        'url' => route('magazine.localized.index', ['locale' => 'en']),
+        'locale' => 'de',
+        'label' => 'Deutsch',
+        'url' => route('magazine.localized.index', ['locale' => 'de']),
         'current' => false,
     ]);
 
@@ -705,13 +704,18 @@ test('public index renders canonical alternate social and structured data tags',
     $this->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertSee('<meta name="robots" content="index, follow">', false)
+        ->assertSee('<meta name="theme-color" content="#1a103d">', false)
         ->assertSee('<link href="'.route('magazine.index').'" rel="canonical">', false)
-        ->assertSee('<link href="'.route('magazine.localized.index', ['locale' => 'en']).'" rel="alternate"', false)
+        ->assertSee('href="'.route('magazine.localized.index', ['locale' => 'en']).'"', false)
         ->assertSee('hreflang="en"', false)
-        ->assertSee('<link href="'.route('magazine.localized.index', ['locale' => 'de']).'" rel="alternate"', false)
+        ->assertSee('href="'.route('magazine.localized.index', ['locale' => 'de']).'"', false)
         ->assertSee('hreflang="de"', false)
-        ->assertSee('<link href="'.route('magazine.index').'" rel="alternate" hreflang="x-default">', false)
+        ->assertSee('href="'.route('magazine.index').'"', false)
+        ->assertSee('hreflang="x-default"', false)
         ->assertSee('<meta property="og:type" content="website">', false)
+        ->assertSee('<meta property="og:locale" content="en_US">', false)
+        ->assertSee('property="og:locale:alternate"', false)
+        ->assertSee('content="de_DE"', false)
         ->assertSee('property="og:title"', false)
         ->assertSee('content="Sovereign Manual Magazine"', false)
         ->assertSee('name="twitter:card"', false)
@@ -721,17 +725,41 @@ test('public index renders canonical alternate social and structured data tags',
         ->assertSee('Sovereign Manual Magazine');
 });
 
+test('localized start pages are indexable with their own canonical urls', function () {
+    $this->get(route('magazine.localized.index', ['locale' => 'en']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.index')
+        ->assertViewHas('locale', 'en')
+        ->assertSee('<link href="'.route('magazine.localized.index', ['locale' => 'en']).'" rel="canonical">', false)
+        ->assertDontSee('<link href="'.route('magazine.index').'" rel="canonical">', false)
+        ->assertSee('href="'.route('magazine.index').'"', false)
+        ->assertSee('hreflang="x-default"', false);
+
+    $this->get(route('magazine.localized.index', ['locale' => 'de']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.index')
+        ->assertViewHas('locale', 'de')
+        ->assertSee('<link href="'.route('magazine.localized.index', ['locale' => 'de']).'" rel="canonical">', false)
+        ->assertDontSee('<link href="'.route('magazine.index').'" rel="canonical">', false)
+        ->assertSee('<meta property="og:locale" content="de_DE">', false)
+        ->assertSee('content="en_US"', false)
+        ->assertSee('href="'.route('magazine.index').'"', false)
+        ->assertSee('hreflang="x-default"', false);
+});
+
 test('category pages render canonical alternate social and structured data tags', function () {
     selfCustodyCategory();
 
     $this->get(route('magazine.category', ['category' => 'self-custody']))
         ->assertSuccessful()
         ->assertSee('<meta name="robots" content="index, follow">', false)
+        ->assertSee('<meta name="theme-color" content="#1a103d">', false)
         ->assertSee('<link href="'.route('magazine.category', ['category' => 'self-custody']).'" rel="canonical">', false)
-        ->assertSee('<link href="'.route('magazine.localized.category', ['locale' => 'en', 'category' => 'self-custody']).'" rel="alternate"', false)
-        ->assertSee('<link href="'.route('magazine.localized.category', ['locale' => 'de', 'category' => 'selbstverwahrung']).'" rel="alternate"', false)
+        ->assertSee('href="'.route('magazine.localized.category', ['locale' => 'en', 'category' => 'self-custody']).'"', false)
+        ->assertSee('href="'.route('magazine.localized.category', ['locale' => 'de', 'category' => 'selbstverwahrung']).'"', false)
         ->assertSee('hreflang="x-default"', false)
         ->assertSee('<meta property="og:type" content="website">', false)
+        ->assertSee('<meta property="og:locale" content="en_US">', false)
         ->assertSee('"@type":"CollectionPage"', false);
 });
 
@@ -764,13 +792,23 @@ test('article pages render canonical hreflang social and article structured data
     $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-custody-seo']))
         ->assertSuccessful()
         ->assertSee('<meta name="robots" content="index, follow">', false)
+        ->assertSee('<meta name="theme-color" content="#1a103d">', false)
+        ->assertSee('<meta name="author" content="Sovereign Manual">', false)
         ->assertSee('<link href="'.route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-custody-seo']).'" rel="canonical">', false)
-        ->assertSee('<link href="'.route('magazine.localized.show', ['locale' => 'en', 'category' => 'self-custody', 'slug' => 'bitcoin-custody-seo']).'" rel="alternate"', false)
-        ->assertSee('<link href="'.route('magazine.localized.show', ['locale' => 'de', 'category' => 'selbstverwahrung', 'slug' => 'bitcoin-verwahrung-seo']).'" rel="alternate"', false)
+        ->assertSee('href="'.route('magazine.localized.show', ['locale' => 'en', 'category' => 'self-custody', 'slug' => 'bitcoin-custody-seo']).'"', false)
+        ->assertSee('href="'.route('magazine.localized.show', ['locale' => 'de', 'category' => 'selbstverwahrung', 'slug' => 'bitcoin-verwahrung-seo']).'"', false)
         ->assertSee('<meta property="og:type" content="article">', false)
+        ->assertSee('<meta property="og:locale" content="en_US">', false)
+        ->assertSee('property="og:locale:alternate"', false)
+        ->assertSee('content="de_DE"', false)
         ->assertSee('property="og:title"', false)
         ->assertSee('content="Bitcoin Custody SEO"', false)
         ->assertSee('<meta property="og:image"', false)
+        ->assertSee('property="article:published_time"', false)
+        ->assertSee('content="'.$post->published_at->toAtomString().'"', false)
+        ->assertSee('property="article:modified_time"', false)
+        ->assertSee('content="'.$post->updated_at->toAtomString().'"', false)
+        ->assertSee('<meta property="article:section" content="Self Custody">', false)
         ->assertSee('name="twitter:card"', false)
         ->assertSee('content="summary_large_image"', false)
         ->assertSee('"@type":"Article"', false)
