@@ -1,7 +1,7 @@
 @props(['label', 'items'])
 
 <nav class="text-base-content/65 text-sm" aria-label="{{ $label }}">
-    <ol class="hyphens-auto wrap-break-word">
+    <ol class="wrap-break-word hyphens-auto">
         @foreach ($items as $item)
             <li class="inline">
                 @if (!empty($item['url']) && !($item['current'] ?? false))

@@ -173,7 +173,7 @@ test('magazine article navigation uses breadcrumbs instead of a back button', fu
 
     expect($show)->toContain('<x-breadcrumbs :label="$copy[\'breadcrumb_label\']"')
         ->and($breadcrumbs)->toContain('aria-current="page"')
-        ->and($breadcrumbs)->toContain('<ol class="hyphens-auto wrap-break-word">')
+        ->and($breadcrumbs)->toContain('<ol class="wrap-break-word hyphens-auto">')
         ->and($breadcrumbs)->toContain('<li class="inline">')
         ->and($breadcrumbs)->not->toContain('flex')
         ->and($breadcrumbs)->not->toContain('truncate')
