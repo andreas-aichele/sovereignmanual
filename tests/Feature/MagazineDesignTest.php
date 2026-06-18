@@ -92,7 +92,10 @@ test('magazine start page keeps visible intro copy and lower about section', fun
         ->and($index)->toContain('<h1')
         ->and($index)->toContain('$copy[\'about_heading\']')
         ->and($index)->toContain('$copy[\'about_body\']')
-        ->and($index)->toContain('border-primary/20 mt-14 border-t pt-10')
+        ->and($index)->toContain('mt-14')
+        ->and($index)->toContain('border-t')
+        ->and($index)->toContain('border-base-300')
+        ->and($index)->toContain('pt-10')
         ->and($index)->not->toContain('$copy[\'featured\']');
 });
 
@@ -103,7 +106,8 @@ test('public navigation uses a scalable language dropdown', function () {
     $controller = file_get_contents(app_path('Http/Controllers/MagazineController.php'));
 
     expect($nav)->toContain('@props([\'locale\' => \'en\', \'languageOptions\' => []])')
-        ->and($nav)->toContain('<details class="group relative">')
+        ->and($nav)->toContain('<details class="dropdown dropdown-end">')
+        ->and($nav)->toContain('dropdown-content menu')
         ->and($nav)->toContain('@foreach ($languageOptions as $option)')
         ->and($nav)->toContain('svg(\'lucide-chevron-down\'')
         ->and($nav)->toContain('magazine.language_switcher')
@@ -122,7 +126,7 @@ test('magazine headings can break long words', function () {
 
     expect($index)->toContain('wrap-anywhere')
         ->and($index)->toContain('text-3xl')
-        ->and($index)->toContain('text-xl')
+        ->and($index)->toContain('card-title')
         ->and($show)->toContain('wrap-anywhere')
         ->and($show)->toContain('text-4xl')
         ->and($css)->toContain('@apply hyphens-auto')
@@ -155,7 +159,11 @@ test('magazine article renders linked table of contents for mobile and desktop',
     $controller = file_get_contents(app_path('Http/Controllers/MagazineController.php'));
     $css = file_get_contents(resource_path('css/content.css'));
 
-    expect($show)->toContain('mt-8 rounded-lg border p-4 text-sm lg:hidden')
+    expect($show)->toContain('collapse')
+        ->and($show)->toContain('collapse-arrow')
+        ->and($show)->toContain('collapse-title')
+        ->and($show)->toContain('collapse-content')
+        ->and($show)->toContain('menu menu-sm')
         ->and($show)->toContain('lg:hidden')
         ->and($show)->toContain('<summary')
         ->and($show)->toContain('{{ $copy[\'toc\'] }}')
@@ -202,7 +210,7 @@ test('magazine article diagrams have responsive readable styling', function () {
         ->and($controller)->toContain('mermaidFlowchart');
 });
 
-test('public magazine styles restore synthwave atmosphere without removing readable panels', function () {
+test('public magazine styles use theme-driven atmosphere and daisyUI panels', function () {
     $css = file_get_contents(resource_path('css/background.css'));
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
@@ -213,10 +221,33 @@ test('public magazine styles restore synthwave atmosphere without removing reada
         ->and($css)->toContain('circle at 86% 18%')
         ->and($css)->toContain('body::before')
         ->and($css)->toContain('background-size: 4rem 4rem')
-        ->and($index)->toContain('bg-base-200/90')
-        ->and($index)->toContain('ring-cyan-300/10')
-        ->and($show)->toContain('bg-base-300 mt-8 overflow-hidden')
-        ->and($nav)->toContain('border-primary/20 bg-base-100/85');
+        ->and($index)->toContain('card card-border bg-base-200')
+        ->and($index)->toContain('badge badge-primary')
+        ->and($show)->toContain('card card-border bg-base-300')
+        ->and($nav)->toContain('navbar bg-base-100/85')
+        ->and($nav)->not->toContain('fuchsia')
+        ->and($nav)->not->toContain('cyan');
+});
+
+test('frontend prefers daisyUI components and semantic theme colors', function () {
+    $agents = file_get_contents(base_path('AGENTS.md'));
+    $auth = file_get_contents(resource_path('views/auth/login.blade.php'));
+    $settings = file_get_contents(resource_path('views/settings/profile.blade.php'));
+    $settingsLayout = file_get_contents(resource_path('views/components/settings-layout.blade.php'));
+    $views = collect(glob(resource_path('views/**/*.blade.php')))
+        ->merge(glob(resource_path('views/**/**/*.blade.php')))
+        ->unique()
+        ->map(fn (string $file): string => file_get_contents($file))
+        ->implode("\n");
+
+    expect($agents)->toContain('Think in daisyUI components first')
+        ->and($agents)->toContain('Keep colors and visual accents theme-driven')
+        ->and($auth)->toContain('class="input w-full"')
+        ->and($auth)->toContain('class="btn btn-primary btn-block"')
+        ->and($settings)->toContain('card card-border bg-base-200')
+        ->and($settings)->toContain('alert alert-success alert-soft')
+        ->and($settingsLayout)->toContain('class="menu bg-base-200 rounded-box w-full"')
+        ->and($views)->not->toMatch('/(?:bg|text|border|shadow|ring)-(?:slate|gray|zinc|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose|black|white)(?:-|\\/|\\b)/');
 });
 
 test('public magazine frontend does not link login admin or unsplash', function () {

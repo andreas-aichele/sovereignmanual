@@ -75,6 +75,11 @@ The simplest solution that solves the problem is usually the correct one.
 
 * Blade first.
 * TailwindCSS and daisyUI are the default UI stack.
+* Think in daisyUI components first. Use component classes such as `btn`, `card`, `input`, `alert`, `menu`, `navbar`, `dropdown`, `badge`, and `collapse` before composing equivalent styles from low-level utilities.
+* Use Tailwind utilities primarily for layout, spacing, responsive behavior, and small project-specific adjustments.
+* Do not recreate daisyUI component appearance with long utility-class lists.
+* Keep colors and visual accents theme-driven through daisyUI semantic tokens such as `primary`, `secondary`, `accent`, `neutral`, `base-*`, and status colors. Do not use fixed Tailwind palette colors for application branding.
+* Keep plain semantic HTML when a daisyUI component's built-in behavior conflicts with the required UX.
 * Avoid unnecessary JavaScript.
 
 ### Dependencies

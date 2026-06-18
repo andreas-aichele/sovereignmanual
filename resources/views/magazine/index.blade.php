@@ -16,40 +16,40 @@
         </section>
 
         @if ($posts->isEmpty())
-            <div
-                class="bg-base-200 text-base-content/70 rounded-lg border border-white/10 p-8">
+            <div class="alert">
                 {{ $copy['empty'] }}
             </div>
         @else
             @php($featured = $posts->first())
 
             <article>
-                <a class="border-primary/20 bg-base-200/90 hover:border-primary/40 mb-10 grid overflow-hidden rounded-lg border-2 shadow-2xl shadow-fuchsia-950/25 ring-1 ring-cyan-300/10 transition hover:shadow-xl hover:shadow-fuchsia-950/40 lg:grid-cols-[1.1fr_0.9fr]"
+                <a class="card card-border bg-base-200 lg:card-side mb-10 overflow-hidden shadow-xl transition-shadow hover:shadow-2xl"
                     href="{{ $featured['url'] }}">
-                    <div class="bg-base-300 block min-h-80">
+                    <figure class="bg-base-300 min-h-80 lg:w-3/5">
                         <x-img class="h-full w-full object-cover"
                             :src="$featured['image']" :alt="$featured['image_alt'] ??
                                 $featured['title']"
                             :responsive="$featured['image_responsive']"
                             sizes="(min-width: 72rem) 40rem, 100vw" hero />
-                    </div>
+                    </figure>
 
-                    <div class="flex flex-col justify-center p-6 sm:p-8">
-                        <p class="text-base-content/60 text-sm">
-                            {{ $featured['category_label'] }}</p>
+                    <div class="card-body justify-center lg:w-2/5">
+                        <div class="badge badge-primary badge-outline">
+                            {{ $featured['category_label'] }}</div>
                         <h2
-                            class="wrap-anywhere mt-3 text-3xl font-semibold leading-tight">
+                            class="card-title wrap-anywhere text-3xl leading-tight">
                             {{ $featured['title'] }}</h2>
 
                         @if ($featured['excerpt'])
-                            <p class="text-base-content/70 mt-4">
+                            <p class="text-base-content/70">
                                 {{ $featured['excerpt'] }}</p>
                         @endif
 
-                        <span
-                            class="bg-primary text-primary-content mt-6 inline-flex w-fit rounded-md px-4 py-2 font-semibold transition hover:brightness-110">
-                            {{ $copy['read'] }}
-                        </span>
+                        <div class="card-actions mt-4">
+                            <span class="btn btn-primary">
+                                {{ $copy['read'] }}
+                            </span>
+                        </div>
                     </div>
                 </a>
             </article>
@@ -57,28 +57,28 @@
             <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($posts->skip(1) as $post)
                     <article>
-                        <a class="border-primary/15 bg-base-200/90 hover:border-primary/40 block overflow-hidden rounded-lg border-2 shadow-lg shadow-fuchsia-950/10 transition hover:shadow-xl hover:shadow-fuchsia-950/40"
+                        <a class="card card-border bg-base-200 h-full overflow-hidden shadow-sm transition-shadow hover:shadow-lg"
                             href="{{ $post['url'] }}">
-                            <div class="aspect-16/10 bg-base-300 block">
+                            <figure class="aspect-16/10 bg-base-300">
                                 <x-img class="h-full w-full object-cover"
                                     :src="$post['image']" :alt="$post['image_alt'] ??
                                         $post['title']"
                                     :responsive="$post['image_responsive']"
                                     sizes="(min-width: 64rem) 22rem, (min-width: 40rem) 50vw, 100vw" />
-                            </div>
+                            </figure>
 
-                            <div class="p-5">
-                                <p
-                                    class="text-primary text-xs font-semibold uppercase tracking-[0.2em]">
-                                    {{ $post['category_label'] }}</p>
+                            <div class="card-body">
+                                <div
+                                    class="badge badge-primary badge-outline badge-sm">
+                                    {{ $post['category_label'] }}</div>
                                 <h2
-                                    class="wrap-anywhere mt-3 text-xl font-semibold leading-tight">
+                                    class="card-title wrap-anywhere leading-tight">
                                     {{ $post['title'] }}
                                 </h2>
 
                                 @if ($post['excerpt'])
                                     <p
-                                        class="text-base-content/70 mt-3 line-clamp-3 text-sm">
+                                        class="text-base-content/70 line-clamp-3 text-sm">
                                         {{ $post['excerpt'] }}</p>
                                 @endif
                             </div>
@@ -91,7 +91,7 @@
                 {{ $posts->links() }}
             </div>
 
-            <section class="border-primary/20 mt-14 border-t pt-10">
+            <section class="border-base-300 mt-14 border-t pt-10">
                 <p
                     class="text-primary text-sm font-semibold uppercase tracking-[0.25em]">
                     {{ $copy['eyebrow'] }}</p>

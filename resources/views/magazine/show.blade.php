@@ -29,31 +29,34 @@
                 @endif
             </header>
 
-            <div
-                class="border-primary/20 bg-base-300 mt-8 overflow-hidden rounded-lg border shadow-2xl shadow-fuchsia-950/20 ring-1 ring-cyan-300/10">
+            <figure
+                class="card card-border bg-base-300 mt-8 overflow-hidden shadow-xl">
                 <x-img class="max-h-[32rem] w-full object-cover"
                     :src="$post['image']" :alt="$post['image_alt'] ?? $post['title']" :responsive="$post['image_responsive']"
                     sizes="(min-width: 72rem) 72rem, 100vw" hero />
-            </div>
+            </figure>
 
             @if (count($post['toc']) > 0)
                 <details
-                    class="border-primary/20 bg-base-200/90 open:border-primary/50 mt-8 rounded-lg border p-4 text-sm lg:hidden">
+                    class="collapse-arrow bg-base-200 border-base-300 collapse mt-8 border text-sm lg:hidden">
                     <summary
-                        class="text-primary cursor-pointer select-none font-semibold uppercase tracking-[0.2em]">
+                        class="collapse-title text-primary font-semibold uppercase tracking-[0.2em]">
                         {{ $copy['toc'] }}</summary>
 
-                    <ol class="mt-4 space-y-3">
-                        @foreach ($post['toc'] as $item)
-                            <li
-                                class="{{ $item['level'] === 3 ? 'pl-4' : '' }}">
-                                <a class="text-base-content/75 hover:text-primary aria-[current=location]:text-primary block leading-snug underline-offset-4 transition hover:underline aria-[current=location]:font-semibold"
-                                    data-toc-link href="#{{ $item['id'] }}">
-                                    {{ $item['title'] }}
-                                </a>
-                            </li>
-                        @endforeach
-                    </ol>
+                    <div class="collapse-content">
+                        <ol class="menu menu-sm w-full">
+                            @foreach ($post['toc'] as $item)
+                                <li
+                                    class="{{ $item['level'] === 3 ? 'ml-4' : '' }}">
+                                    <a class="aria-[current=location]:text-primary aria-[current=location]:font-semibold"
+                                        data-toc-link
+                                        href="#{{ $item['id'] }}">
+                                        {{ $item['title'] }}
+                                    </a>
+                                </li>
+                            @endforeach
+                        </ol>
+                    </div>
                 </details>
             @endif
 
@@ -67,7 +70,8 @@
                     @foreach ($post['blocks'] as $block)
                         <section class="content-body mt-10 max-w-none">
                             @if ($block['asset'])
-                                <x-img class="rounded-lg border border-white/10"
+                                <x-img
+                                    class="rounded-box border-base-300 border"
                                     :src="$block['asset']['url']" :alt="$block['asset']['alt'] ?? ''"
                                     :responsive="$block['asset']['responsive']"
                                     sizes="(min-width: 64rem) 48rem, 100vw" />
@@ -86,11 +90,11 @@
                                 class="text-primary font-semibold uppercase tracking-[0.2em]">
                                 {{ $copy['toc'] }}</p>
 
-                            <ol class="mt-4 space-y-3">
+                            <ol class="menu menu-sm mt-2 w-full">
                                 @foreach ($post['toc'] as $item)
                                     <li
-                                        class="{{ $item['level'] === 3 ? 'pl-4' : '' }}">
-                                        <a class="text-base-content/70 hover:text-primary aria-[current=location]:text-primary block leading-snug underline-offset-4 transition hover:underline aria-[current=location]:font-semibold"
+                                        class="{{ $item['level'] === 3 ? 'ml-4' : '' }}">
+                                        <a class="aria-[current=location]:text-primary aria-[current=location]:font-semibold"
                                             data-toc-link
                                             href="#{{ $item['id'] }}">
                                             {{ $item['title'] }}

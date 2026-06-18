@@ -3,22 +3,17 @@
         @csrf
 
         <div>
-            <label class="block text-sm font-medium" for="email">Email</label>
-            <input
-                class="bg-base-300 focus:border-primary mt-2 w-full rounded-md border border-white/10 px-3 py-2 outline-none"
-                id="email" name="email" type="email"
-                value="{{ old('email') }}" required autofocus
+            <label class="label" for="email">Email</label>
+            <input class="input w-full" id="email" name="email"
+                type="email" value="{{ old('email') }}" required autofocus
                 autocomplete="username">
             <x-input-error name="email" />
         </div>
 
         <div>
-            <label class="block text-sm font-medium"
-                for="password">Password</label>
-            <input
-                class="bg-base-300 focus:border-primary mt-2 w-full rounded-md border border-white/10 px-3 py-2 outline-none"
-                id="password" name="password" type="password" required
-                autocomplete="current-password">
+            <label class="label" for="password">Password</label>
+            <input class="input w-full" id="password" name="password"
+                type="password" required autocomplete="current-password">
             <x-input-error name="password" />
         </div>
 
@@ -27,18 +22,16 @@
             Remember me
         </label>
 
-        <button
-            class="bg-primary text-primary-content w-full rounded-md px-4 py-2 font-semibold transition hover:brightness-110"
-            type="submit">Log in</button>
+        <button class="btn btn-primary btn-block" type="submit">Log in</button>
     </form>
 
     <div class="mt-6 flex items-center justify-between gap-4 text-sm">
         @if ($canResetPassword)
-            <a class="text-primary hover:brightness-110"
+            <a class="link link-primary"
                 href="{{ route('password.request') }}">Forgot password?</a>
         @endif
 
-        <a class="text-base-content/70 hover:text-primary"
+        <a class="link link-hover text-base-content/70"
             href="{{ route('register') }}">Create account</a>
     </div>
 </x-auth-layout>
