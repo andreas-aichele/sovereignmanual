@@ -99,6 +99,24 @@ test('magazine start page keeps visible intro copy and lower about section', fun
         ->and($index)->not->toContain('$copy[\'featured\']');
 });
 
+test('magazine listing uses compact mobile article cards', function () {
+    $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
+    $image = file_get_contents(resource_path('views/components/img.blade.php'));
+
+    expect($index)->toContain('relative aspect-4/3')
+        ->and($index)->toContain('absolute inset-x-0 bottom-0')
+        ->and($index)->toContain('bg-linear-to-t')
+        ->and($index)->toContain('lg:hidden')
+        ->and($index)->toContain('card-body hidden justify-center lg:flex')
+        ->and($index)->toContain('card-side')
+        ->and($index)->toContain('sm:flex-col')
+        ->and($index)->toContain('aspect-square w-2/5')
+        ->and($index)->toContain('card-body w-3/5')
+        ->and($index)->toContain('max-sm:hidden')
+        ->and($index)->toContain('(min-width: 40rem) 50vw, 40vw')
+        ->and($image)->toContain('<picture class="block h-full w-full">');
+});
+
 test('public navigation uses a scalable language dropdown', function () {
     $nav = file_get_contents(resource_path('views/components/public-nav.blade.php'));
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));

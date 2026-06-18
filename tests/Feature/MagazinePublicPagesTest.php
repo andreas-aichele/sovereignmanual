@@ -53,7 +53,7 @@ test('published posts appear on the magazine index', function () {
     $this->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
-        ->assertSee('<picture>', false)
+        ->assertSee('<picture class="block h-full w-full">', false)
         ->assertSee('loading="eager"', false)
         ->assertSee('fetchpriority="high"', false)
         ->assertSee('Bitcoin self custody basics')
@@ -196,7 +196,7 @@ test('category page renders heading description and paginated article listing', 
         ->assertSee('Selbstverwahrung')
         ->assertSee('Praktische Orientierung')
         ->assertSee('Bitcoin Selbstverwahrung')
-        ->assertSee('<picture>', false)
+        ->assertSee('<picture class="block h-full w-full">', false)
         ->assertSee('loading="lazy"', false)
         ->assertSee('fallback.jpg');
 });
@@ -567,7 +567,7 @@ test('article images render responsive picture markup', function () {
 
     $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'responsive-images']))
         ->assertSuccessful()
-        ->assertSee('<picture>', false)
+        ->assertSee('<picture class="block h-full w-full">', false)
         ->assertSee('type="image/avif"', false)
         ->assertSee('/storage/post-assets/responsive/header-768.avif 768w, /storage/post-assets/responsive/header-1600.avif 1600w', false)
         ->assertSee('type="image/jpeg"', false)

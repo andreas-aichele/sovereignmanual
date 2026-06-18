@@ -1,4 +1,4 @@
-<picture>
+<picture class="block h-full w-full">
     @foreach ($sourceSets() as $format => $srcset)
         <source srcset="{{ $srcset }}"
             type="image/{{ $format === 'jpg' ? 'jpeg' : $format }}"
