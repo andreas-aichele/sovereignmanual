@@ -1,9 +1,14 @@
-<x-layouts.app :title="$meta['title']" :description="$meta['description']">
+<x-layouts.app :title="$meta['title']" :description="$meta['description']" :canonical="$meta['canonical']"
+    :alternates="$meta['alternates']" :x-default="$meta['xDefault']" :og-type="$meta['ogType']" :og-locale="$meta['ogLocale']"
+    :og-locale-alternates="$meta['ogLocaleAlternates']" :structured-data="$meta['structuredData']">
     <x-public-nav :locale="$locale" :language-options="$languageOptions" />
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <x-breadcrumbs :label="__('magazine.show.breadcrumb_label', [], $locale)" :items="[
-            ['label' => __('magazine.show.magazine', [], $locale), 'url' => route('magazine.index')],
+            [
+                'label' => __('magazine.show.magazine', [], $locale),
+                'url' => route('magazine.index'),
+            ],
             ['label' => $category['title'], 'current' => true],
         ]" />
 
@@ -19,35 +24,34 @@
         </header>
 
         @if ($posts->isEmpty())
-            <div
-                class="bg-base-200 text-base-content/70 mt-10 rounded-lg border border-white/10 p-8">
+            <div class="alert mt-10">
                 {{ $copy['empty'] }}
             </div>
         @else
             <div class="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
                 @foreach ($posts as $post)
-                    <a href="{{ $post['url'] }}">
-                        <article
-                            class="border-primary/15 bg-base-200/90 hover:border-primary/40 overflow-hidden rounded-lg border-2 shadow-lg shadow-fuchsia-950/10 transition hover:shadow-xl hover:shadow-fuchsia-950/40">
-                            <div class="aspect-16/10 bg-base-300">
+                    <a class="card card-border bg-base-200 h-full overflow-hidden shadow-sm transition-shadow hover:shadow-lg"
+                        href="{{ $post['url'] }}">
+                        <article>
+                            <figure class="aspect-16/10 bg-base-300">
                                 <x-img class="h-full w-full object-cover"
-                                    :src="$post['image']"
-                                    :alt="$post['image_alt'] ?? $post['title']"
+                                    :src="$post['image']" :alt="$post['image_alt'] ??
+                                        $post['title']"
                                     :responsive="$post['image_responsive']"
                                     sizes="(min-width: 64rem) 22rem, (min-width: 40rem) 50vw, 100vw" />
-                            </div>
+                            </figure>
 
-                            <div class="p-5">
-                                <p
-                                    class="text-primary text-xs font-semibold uppercase tracking-[0.2em]">
-                                    {{ $post['category_label'] }}</p>
+                            <div class="card-body">
+                                <div
+                                    class="badge badge-primary badge-outline badge-sm">
+                                    {{ $post['category_label'] }}</div>
                                 <h2
-                                    class="wrap-anywhere mt-3 text-xl font-semibold leading-tight">
+                                    class="card-title wrap-anywhere leading-tight">
                                     {{ $post['title'] }}</h2>
 
                                 @if ($post['excerpt'])
                                     <p
-                                        class="text-base-content/70 mt-3 line-clamp-3 text-sm">
+                                        class="text-base-content/70 line-clamp-3 text-sm">
                                         {{ $post['excerpt'] }}</p>
                                 @endif
                             </div>

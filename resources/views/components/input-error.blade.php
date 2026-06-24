@@ -1,6 +1,6 @@
 @props(['name'])
 
 @error($name)
-    <p {{ $attributes->merge(['class' => 'mt-2 text-sm text-error']) }}>
+    <p {{ $attributes->merge(['class' => 'label text-error']) }}>
         {{ $message }}</p>
 @enderror

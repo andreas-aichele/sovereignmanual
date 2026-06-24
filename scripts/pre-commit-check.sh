@@ -8,6 +8,10 @@ echo "==> PHP format check (Pint)"
 vendor/bin/pint --test
 
 echo
+echo "==> Frontend format (Prettier)"
+npm run format
+
+echo
 echo "==> Frontend format check (Prettier)"
 npm run format:check
 
