@@ -2,13 +2,16 @@
 
 use App\Enums\AiRunType;
 use App\Enums\ContentTopicStatus;
+use App\Enums\Language;
 use App\Enums\PostStatus;
 use App\Jobs\GeneratePostFromTopic;
+use App\Models\Category;
 use App\Models\ContentTopic;
 use App\Models\Post;
 use App\Models\PostTranslation;
 use App\Services\MagazineAiPipeline;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Psr\Log\LoggerInterface;
@@ -85,7 +88,7 @@ test('pipeline creates translations for languages defined in the language enum',
         ->and($post->aiRuns()->where('type', AiRunType::Translation)->exists())->toBeTrue();
 });
 
-test('pipeline adds relevant internal links when published articles exist', function () {
+test('pipeline no longer appends related reading blocks to new articles', function () {
     config(['ai.providers.gemini.key' => null]);
 
     $existingPost = Post::factory()->published()->create();
@@ -105,9 +108,10 @@ test('pipeline adds relevant internal links when published articles exist', func
     $englishTranslation = $post->translations()->where('locale', 'en')->firstOrFail();
 
     expect($englishTranslation->markdown)
-        ->toContain('Related reading')
-        ->toContain('[Bitcoin wallet backups]')
+        ->not->toContain('Related reading')
+        ->not->toContain('[Bitcoin wallet backups]')
         ->and($englishTranslation->seo['internal_links'][0]['slug'])->toBe('bitcoin-wallet-backups');
+    expect($post->blocks()->where('heading', 'Related reading')->exists())->toBeFalse();
 });
 
 test('pipeline keeps h1 title fallback within limits without cutting words', function () {
@@ -134,27 +138,6 @@ test('pipeline retries seo title generation until length requirements pass', fun
         ->and($pipeline)->toContain('previous_attempt_feedback')
         ->and($pipeline)->toContain('$problems = []')
         ->and($pipeline)->toContain('for ($attempt = 1; $attempt <= 3; $attempt++)');
-});
-
-test('pipeline keeps internal link blocks within the twelve block limit', function () {
-    $pipeline = app(MagazineAiPipeline::class);
-    $method = new ReflectionMethod(MagazineAiPipeline::class, 'withInternalLinks');
-    $blocks = collect(range(1, 12))
-        ->map(fn (int $index): array => [
-            'type' => 'section',
-            'heading' => "Section {$index}",
-            'anchor' => "section-{$index}",
-            'markdown' => "Text {$index}",
-            'data' => [],
-        ])
-        ->all();
-
-    $result = $method->invoke($pipeline, $blocks, [
-        ['title' => 'Bitcoin wallet backups', 'url' => '/self-custody/bitcoin-wallet-backups', 'slug' => 'bitcoin-wallet-backups'],
-    ], 'en');
-
-    expect($result)->toHaveCount(12)
-        ->and($result[11]['heading'])->toBe('Related reading');
 });
 
 test('pipeline fallback german titles use correct umlauts', function () {
@@ -190,6 +173,411 @@ test('topic ideation creates scheduled topics', function () {
 
     expect(ContentTopic::query()->count())->toBe(2)
         ->and(ContentTopic::query()->where('status', ContentTopicStatus::Scheduled)->count())->toBe(2);
+});
+
+test('evergreen topic ideation chooses a non news category before creating topics', function () {
+    config(['ai.providers.gemini.key' => null]);
+
+    $privacy = Category::factory()->create([
+        'key' => 'privacy-security',
+        'lang' => Language::English,
+        'slug' => 'privacy-security',
+        'name' => 'Privacy & Security',
+    ]);
+    Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+    Category::query()->whereNotIn('id', [$privacy->id])->where('key', '!=', 'news')->delete();
+
+    $this->artisan('app:ideate-magazine-topics --count=1')->assertSuccessful();
+
+    $topic = ContentTopic::query()
+        ->where('category_id', $privacy->id)
+        ->latest('id')
+        ->firstOrFail();
+
+    expect($topic->category_id)->toBe($privacy->id)
+        ->and($topic->category?->key)->toBe('privacy-security')
+        ->and($topic->category?->key)->not->toBe('news');
+});
+
+test('topic ideation stores existing category topics as similarity exclusions', function () {
+    config(['ai.providers.gemini.key' => null]);
+
+    $category = Category::factory()->create([
+        'key' => 'privacy-security',
+        'lang' => Language::English,
+        'slug' => 'privacy-security',
+        'name' => 'Privacy & Security',
+    ]);
+    Category::query()->whereKeyNot($category->id)->delete();
+
+    Post::factory()->published()->create([
+        'category_id' => $category->id,
+        'topic' => 'Bitcoin privacy threat models everyone keeps repeating',
+    ]);
+    Category::query()->whereKeyNot($category->id)->delete();
+
+    $this->artisan('app:ideate-magazine-topics --count=1')->assertSuccessful();
+
+    $topic = ContentTopic::query()
+        ->where('category_id', $category->id)
+        ->latest('id')
+        ->firstOrFail();
+
+    expect($topic->constraints['avoid_similar_topics'])->toContain('Bitcoin privacy threat models everyone keeps repeating');
+});
+
+test('news ideation without provider web research creates no topics', function () {
+    config(['ai.providers.gemini.key' => null]);
+
+    $this->artisan('app:ideate-news-topics --count=1')->assertFailed();
+
+    expect(ContentTopic::query()->count())->toBe(0);
+});
+
+test('news research must include at least two credible independent sources', function () {
+    Http::fake([
+        'bitcoincore.org/*' => Http::response('', 200),
+        'github.com/*' => Http::response('', 200),
+        'example.com/*' => Http::response('', 200),
+    ]);
+
+    $category = Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+    $pipeline = app(MagazineAiPipeline::class);
+    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
+
+    $topics = $method->invoke($pipeline, [
+        'grounding_citations' => [
+            [
+                'title' => 'Bitcoin Core release notes',
+                'url' => 'https://bitcoincore.org/en/releases/example/',
+            ],
+            [
+                'title' => 'GitHub release',
+                'url' => 'https://github.com/bitcoin/bitcoin/releases/tag/example',
+            ],
+        ],
+        'topics' => [
+            [
+                'title' => 'Bitcoin Core releases a security update',
+                'summary' => 'A sourced update about a Bitcoin Core release.',
+                'sources' => [
+                    [
+                        'title' => 'Bitcoin Core release notes',
+                        'url' => 'https://bitcoincore.org/en/releases/example/',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Bitcoin Core',
+                        'type' => 'primary',
+                        'credibility_note' => 'Primary project source.',
+                    ],
+                    [
+                        'title' => 'GitHub release',
+                        'url' => 'https://github.com/bitcoin/bitcoin/releases/tag/example',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'GitHub',
+                        'type' => 'technical',
+                        'credibility_note' => 'Technical release artifact.',
+                    ],
+                ],
+                'credibility_notes' => ['Two independent credible sources confirm the update.'],
+                'open_questions' => ['Deployment timing varies by user.'],
+            ],
+            [
+                'title' => 'Unverified Bitcoin rumor',
+                'summary' => 'A rumor with weak sourcing.',
+                'sources' => [
+                    [
+                        'title' => 'Anonymous post',
+                        'url' => 'https://example.com/rumor',
+                        'type' => 'supporting',
+                    ],
+                ],
+            ],
+        ],
+    ], $category, 2, []);
+
+    expect($topics)->toHaveCount(1);
+
+    $topic = $topics->first();
+
+    expect($topic->category?->key)->toBe('news')
+        ->and($topic->constraints['news_research']['sources'])->toHaveCount(2)
+        ->and($topic->constraints['news_research']['grounding_citations'])->toHaveCount(2)
+        ->and($topic->constraints['news_research']['credibility_notes'])->toContain('Two independent credible sources confirm the update.');
+});
+
+test('news topics without verified sources are not generated into posts', function () {
+    config(['ai.providers.gemini.key' => null]);
+    Http::fake();
+
+    $category = Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+    $topic = ContentTopic::factory()->due()->create([
+        'category_id' => $category->id,
+        'title' => 'Unverified Bitcoin news item',
+        'constraints' => ['tone' => 'clear, sourced, non-hype'],
+    ]);
+
+    expect(fn () => app(MagazineAiPipeline::class)->generatePost($topic))
+        ->toThrow(RuntimeException::class, 'News topics require at least two credible independent sources');
+
+    expect(Post::query()->count())->toBe(0)
+        ->and($topic->refresh()->status)->toBe(ContentTopicStatus::Archived);
+});
+
+test('generation job skips invalid news topics after archiving them', function () {
+    Http::fake();
+
+    $category = Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+    $topic = ContentTopic::factory()->due()->create([
+        'category_id' => $category->id,
+        'title' => 'Old news topic with dead sources',
+        'constraints' => ['news_research' => ['sources' => []]],
+    ]);
+
+    (new GeneratePostFromTopic($topic))->handle(app(MagazineAiPipeline::class));
+
+    expect(Post::query()->count())->toBe(0)
+        ->and($topic->refresh()->status)->toBe(ContentTopicStatus::Archived);
+});
+
+test('news research rejects unreachable source urls', function () {
+    Http::fake([
+        'bitcoincore.org/*' => Http::response('', 200),
+        'github.com/*' => Http::response('', 404),
+    ]);
+
+    $category = Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+    $pipeline = app(MagazineAiPipeline::class);
+    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
+
+    $topics = $method->invoke($pipeline, [
+        'grounding_citations' => [
+            [
+                'title' => 'Bitcoin Core release notes',
+                'url' => 'https://bitcoincore.org/en/releases/example/',
+            ],
+            [
+                'title' => 'Missing GitHub release',
+                'url' => 'https://github.com/bitcoin/bitcoin/releases/tag/missing',
+            ],
+        ],
+        'topics' => [
+            [
+                'title' => 'Bitcoin Core releases a security update',
+                'summary' => 'A sourced update about a Bitcoin Core release.',
+                'sources' => [
+                    [
+                        'title' => 'Bitcoin Core release notes',
+                        'url' => 'https://bitcoincore.org/en/releases/example/',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Bitcoin Core',
+                        'type' => 'primary',
+                        'credibility_note' => 'Primary project source.',
+                    ],
+                    [
+                        'title' => 'Missing GitHub release',
+                        'url' => 'https://github.com/bitcoin/bitcoin/releases/tag/missing',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'GitHub',
+                        'type' => 'technical',
+                        'credibility_note' => 'Technical release artifact.',
+                    ],
+                ],
+                'credibility_notes' => ['One source is unavailable.'],
+                'open_questions' => [],
+            ],
+        ],
+    ], $category, 1, []);
+
+    expect($topics)->toHaveCount(0);
+});
+
+test('news research accepts verified direct source urls even without google grounding citations', function () {
+    Http::fake([
+        'bitcoincore.org/*' => Http::response('', 200),
+        'github.com/*' => Http::response('', 200),
+    ]);
+
+    $category = Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+    $pipeline = app(MagazineAiPipeline::class);
+    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
+
+    $topics = $method->invoke($pipeline, [
+        'grounding_citations' => [],
+        'topics' => [
+            [
+                'title' => 'Bitcoin Core releases a security update',
+                'summary' => 'A sourced update about a Bitcoin Core release.',
+                'sources' => [
+                    [
+                        'title' => 'Bitcoin Core release notes',
+                        'url' => 'https://bitcoincore.org/en/releases/example/',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Bitcoin Core',
+                        'type' => 'primary',
+                        'credibility_note' => 'Primary project source.',
+                    ],
+                    [
+                        'title' => 'GitHub release',
+                        'url' => 'https://github.com/bitcoin/bitcoin/releases/tag/example',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'GitHub',
+                        'type' => 'technical',
+                        'credibility_note' => 'Technical release artifact.',
+                    ],
+                ],
+                'credibility_notes' => ['Sources are verified directly by URL.'],
+                'open_questions' => [],
+            ],
+        ],
+    ], $category, 1, []);
+
+    expect($topics)->toHaveCount(1)
+        ->and($topics->first()->constraints['news_research']['grounding_citations'])->toBe([]);
+});
+
+test('news research requires at least one strong primary technical or official source', function () {
+    Http::fake([
+        'example-news.com/*' => Http::response('', 200),
+        'another-news.com/*' => Http::response('', 200),
+    ]);
+
+    $category = Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+    $pipeline = app(MagazineAiPipeline::class);
+    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
+
+    $topics = $method->invoke($pipeline, [
+        'grounding_citations' => [],
+        'topics' => [
+            [
+                'title' => 'Bitcoin policy story with only secondary reporting',
+                'summary' => 'A story sourced only by secondary reporting.',
+                'sources' => [
+                    [
+                        'title' => 'First report',
+                        'url' => 'https://example-news.com/bitcoin-policy',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Example News',
+                        'type' => 'reputable_reporting',
+                        'credibility_note' => 'Known publication.',
+                    ],
+                    [
+                        'title' => 'Second report',
+                        'url' => 'https://another-news.com/bitcoin-policy',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Another News',
+                        'type' => 'reputable_reporting',
+                        'credibility_note' => 'Independent publication.',
+                    ],
+                ],
+                'credibility_notes' => ['No primary, technical, or official source is available.'],
+                'open_questions' => [],
+            ],
+        ],
+    ], $category, 1, []);
+
+    expect($topics)->toHaveCount(0);
+});
+
+test('news research stores google redirect citations as diagnostics', function () {
+    Http::fake([
+        'bitcoincore.org/*' => Http::response('', 200),
+        'github.com/*' => Http::response('', 200),
+    ]);
+
+    $category = Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+    $pipeline = app(MagazineAiPipeline::class);
+    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
+
+    $topics = $method->invoke($pipeline, [
+        'grounding_citations' => [
+            [
+                'title' => 'bitcoincore.org',
+                'url' => 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/bitcoin-core-release',
+            ],
+            [
+                'title' => 'github.com',
+                'url' => 'https://vertexaisearch.cloud.google.com/grounding-api-redirect/github-release',
+            ],
+        ],
+        'topics' => [
+            [
+                'title' => 'Bitcoin Core publishes a sourced update',
+                'summary' => 'A sourced update about Bitcoin Core.',
+                'sources' => [
+                    [
+                        'title' => 'Bitcoin Core release notes',
+                        'url' => 'https://bitcoincore.org/en/releases/example/',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Bitcoin Core',
+                        'type' => 'primary',
+                        'credibility_note' => 'Primary project source.',
+                    ],
+                    [
+                        'title' => 'GitHub release',
+                        'url' => 'https://github.com/bitcoin/bitcoin/releases/tag/example',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'GitHub',
+                        'type' => 'technical',
+                        'credibility_note' => 'Technical release artifact.',
+                    ],
+                ],
+                'credibility_notes' => ['Grounded by Google Search redirect citations.'],
+                'open_questions' => [],
+            ],
+        ],
+    ], $category, 1, []);
+
+    expect($topics)->toHaveCount(1)
+        ->and($topics->first()->constraints['news_research']['sources'])->toHaveCount(2);
+});
+
+test('console schedule includes the weekly news publishing slot', function () {
+    $schedule = file_get_contents(base_path('routes/console.php'));
+
+    expect($schedule)
+        ->toContain("Schedule::command('app:ideate-news-topics --count=1')")
+        ->toContain("->weeklyOn(3, '08:00')")
+        ->toContain("->weeklyOn(3, '08:10')");
 });
 
 test('generation command queues due topics', function () {

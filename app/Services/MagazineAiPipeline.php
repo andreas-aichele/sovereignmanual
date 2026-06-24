@@ -15,10 +15,13 @@ use App\Models\PostTranslation;
 use App\Support\Locales;
 use App\Support\ResponsiveImage;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Laravel\Ai\Image;
+use Laravel\Ai\Providers\Tools\WebSearch;
+use RuntimeException;
 use Throwable;
 
 use function Laravel\Ai\agent;
@@ -27,12 +30,25 @@ class MagazineAiPipeline
 {
     public function generatePost(ContentTopic $topic): Post
     {
+        if ($this->isNewsTopic($topic) && ! $this->hasCredibleNewsResearch($topic)) {
+            $topic->update([
+                'status' => ContentTopicStatus::Archived,
+            ]);
+
+            Log::channel('queue')->warning('News topic archived because its saved sources no longer pass verification.', [
+                'content_topic_id' => $topic->id,
+                'content_topic_title' => $topic->title,
+            ]);
+
+            throw new RuntimeException('News topics require at least two credible independent sources before article generation.');
+        }
+
         $draftRun = $this->startRun(AiRunType::Draft, $topic);
         $title = $topic->title;
         $internalLinks = $this->internalLinkCandidates('en');
         $draft = $this->promptWithFallback(
-            instructions: 'You write educational, non-hype Bitcoin and financial independence articles in clear English Markdown. Use concise article and section headings. Build a clear SEO-friendly structure with short paragraphs, H2/H3 headings, useful lists, and naturally repeated keywords. Do not keyword-stuff.',
-            prompt: "Write a practical article for {$topic->audience_level} readers.\nTopic: {$topic->title}\nBrief: {$topic->brief}\nUse these internal link candidates when relevant: ".json_encode($internalLinks, JSON_UNESCAPED_UNICODE),
+            instructions: $this->draftInstructions($topic),
+            prompt: $this->draftPrompt($topic, $internalLinks),
             fallback: $this->fallbackMarkdown($title, 'en'),
         );
         $this->finishRun($draftRun, $draft);
@@ -41,11 +57,7 @@ class MagazineAiPipeline
         $englishTitle = $englishSeo['article_title'];
         $englishSlug = $this->uniqueTranslationSlug($englishSeo['slug'], 'en');
         $englishExcerpt = $this->excerpt($draft, 180);
-        $englishBlocks = $this->withInternalLinks(
-            $this->articleBlocks($topic, 'en', $englishTitle, $draft, $englishSeo['keywords'], $internalLinks),
-            $internalLinks,
-            'en'
-        );
+        $englishBlocks = $this->articleBlocks($topic, 'en', $englishTitle, $draft, $englishSeo['keywords'], $internalLinks);
         $englishMarkdown = $this->markdownFromBlocks($englishBlocks, $draft);
 
         $post = Post::create([
@@ -98,7 +110,6 @@ class MagazineAiPipeline
             $germanTitle = $this->cleanText((string) ($germanArticle['title'] ?? $this->germanTitle($title)), $this->germanTitle($title));
             $germanBlocks = $this->sanitizeBlocks($germanArticle['blocks'] ?? null, 'de', $germanTitle, $this->fallbackMarkdown($title, 'de'));
             $germanInternalLinks = $this->internalLinkCandidates('de', $post->id);
-            $germanBlocks = $this->withInternalLinks($germanBlocks, $germanInternalLinks, 'de');
             $germanDraft = $this->markdownFromBlocks($germanBlocks, $this->fallbackMarkdown($title, 'de'));
             $this->finishRun($translationRun, $germanDraft, ['title' => $germanTitle]);
             $germanSeo = $this->seoPlan($topic, 'de', $germanTitle, $germanDraft, $germanInternalLinks);
@@ -148,16 +159,35 @@ class MagazineAiPipeline
      */
     public function createTopicIdeas(int $count = 2): Collection
     {
+        $category = $this->randomEvergreenCategory();
+        $avoidTopics = $this->recentTopicTitles($category);
         $run = $this->startRun(AiRunType::Topic);
         $response = $this->promptWithFallback(
-            instructions: 'You propose focused editorial topics for a Bitcoin sovereignty learning portal. Return one topic per line.',
-            prompt: "Create {$count} evergreen article ideas about Bitcoin, financial intelligence, independence, and self custody. Avoid market predictions.",
-            fallback: implode("\n", [
-                'Bitcoin self custody threat models for beginners',
-                'Why fiat debasement changes savings behavior',
-                'How to build a personal Bitcoin treasury policy',
-                'Financial independence without yield chasing',
-            ]),
+            instructions: 'You propose focused editorial topics for a Bitcoin-only sovereignty learning portal. Return one topic per line. Make each idea specific, practical, and clearly different from the avoided existing topics.',
+            prompt: json_encode([
+                'task' => "Create {$count} evergreen article ideas for this category.",
+                'category' => [
+                    'key' => $category->key,
+                    'name' => $category->name,
+                    'description' => strip_tags((string) Str::markdown($category->description)),
+                ],
+                'audience' => 'Bitcoin beginners and intermediate users moving toward independent custody.',
+                'avoid' => [
+                    'altcoins',
+                    'trading',
+                    'price predictions',
+                    'financial advice',
+                    'generic sovereignty psychology angles',
+                    ...$avoidTopics,
+                ],
+                'style' => [
+                    'concrete examples',
+                    'category-specific angle',
+                    'less AI-polished phrasing',
+                    'clear practical reader outcome',
+                ],
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            fallback: implode("\n", $this->fallbackTopicTitles($category)),
         );
 
         $topics = Str::of($response)
@@ -170,7 +200,7 @@ class MagazineAiPipeline
                 ['slug' => Str::slug($title)],
                 [
                     'title' => $title,
-                    'category_id' => $this->defaultCategory()->id,
+                    'category_id' => $category->id,
                     'status' => ContentTopicStatus::Scheduled,
                     'priority' => max(1, 10 - $index),
                     'audience_level' => 'intermediate',
@@ -181,11 +211,119 @@ class MagazineAiPipeline
                     'constraints' => [
                         'tone' => 'clear, practical, non-hype',
                         'brand' => 'synthwave-cypherpunk editorial',
+                        'category_key' => $category->key,
+                        'avoid_similar_topics' => $avoidTopics,
                     ],
                 ],
             ));
 
-        $this->finishRun($run, $response, ['created_topics' => $topics->pluck('id')->all()]);
+        $this->finishRun($run, $response, [
+            'created_topics' => $topics->pluck('id')->all(),
+            'category_key' => $category->key,
+            'avoid_similar_topics' => $avoidTopics,
+        ]);
+
+        return $topics;
+    }
+
+    /**
+     * @return Collection<int, ContentTopic>
+     */
+    public function createNewsTopicIdeas(int $count = 1): Collection
+    {
+        $run = $this->startRun(AiRunType::Topic);
+
+        if (! $this->hasAiProviderKey()) {
+            $message = 'News topic ideation skipped because the configured AI provider has no key for live web research.';
+            Log::channel('queue')->warning($message, [
+                'provider' => config('magazine_ai.provider', 'gemini'),
+                'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
+            ]);
+            $this->finishRun($run, $message, ['created_topics' => [], 'reason' => 'missing_ai_provider_key']);
+
+            return collect();
+        }
+
+        $newsCategory = $this->newsCategory();
+        $avoidTopics = $this->recentTopicTitles($newsCategory);
+        $research = null;
+        $topics = collect();
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $research = $this->promptGroundedJson(
+                instructions: 'Research current Bitcoin-only news using live Google Search grounding. Return only valid JSON. Exclude altcoins, trading, price predictions, and hype. Prefer primary sources, official publications, reputable mainstream financial/technology reporting, respected Bitcoin technical sources, and government or court records. Treat social posts, anonymous blogs, exchanges, and aggregators as supporting context only. Use direct canonical source URLs, not Google Search or Vertex grounding redirect URLs.',
+                prompt: json_encode([
+                    'task' => 'Find current Bitcoin news topic candidates suitable for Sovereign Manual.',
+                    'current_date' => now()->toDateString(),
+                    'attempt' => $attempt,
+                    'candidate_count' => max(3, $count * 3),
+                    'credibility_standard' => 'Each topic must have at least two independent credible sources. Prefer primary sources. Include publication dates, direct source urls, source types, credibility notes, and unresolved uncertainties.',
+                    'important' => 'Return candidate topics discovered through search even when some sources are weak; classify weak sources as supporting. Do not return an empty topics array unless no Bitcoin-only candidate can be found at all. The application will reject candidates that do not meet the final credibility threshold.',
+                    'avoid_similar_topics' => $avoidTopics,
+                    'schema' => [
+                        'topics' => [
+                            [
+                                'title' => 'Specific Bitcoin news topic',
+                                'summary' => 'Short factual brief with context and why it matters',
+                                'sources' => [
+                                    [
+                                        'title' => 'Source title',
+                                        'url' => 'https://example.com/source',
+                                        'published_at' => 'YYYY-MM-DD',
+                                        'publisher' => 'Publisher',
+                                        'type' => 'primary|reputable_reporting|technical|official|supporting',
+                                        'credibility_note' => 'Why this source is credible',
+                                    ],
+                                ],
+                                'credibility_notes' => ['Independent confirmation details'],
+                                'open_questions' => ['Known uncertainty'],
+                            ],
+                        ],
+                    ],
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+                tools: [
+                    new WebSearch(maxSearches: 8),
+                ],
+            );
+
+            if ($research === null) {
+                continue;
+            }
+
+            $topics = $this->createNewsTopicsFromResearch($research, $newsCategory, $count, $avoidTopics);
+
+            if ($topics->isNotEmpty()) {
+                break;
+            }
+
+            Log::channel('queue')->warning('News topic ideation attempt did not meet credibility threshold.', [
+                'attempt' => $attempt,
+                ...$this->newsResearchDiagnostics($research),
+            ]);
+        }
+
+        if ($research === null) {
+            $this->failRun($run, 'News topic ideation failed because the AI provider did not return valid structured research.', [
+                'category_key' => $newsCategory->key,
+            ]);
+
+            throw new RuntimeException('News topic ideation failed because the AI provider did not return valid structured research.');
+        }
+
+        if ($topics->isEmpty()) {
+            $this->failRun($run, 'News topic ideation found no topics with at least two credible independent sources.', [
+                'category_key' => $newsCategory->key,
+                ...$this->newsResearchDiagnostics($research),
+            ]);
+
+            throw new RuntimeException('News topic ideation found no topics with at least two credible independent sources.');
+        }
+
+        $this->finishRun($run, json_encode($research ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), [
+            'created_topics' => $topics->pluck('id')->all(),
+            'category_key' => $newsCategory->key,
+            'accepted_topics' => $topics->count(),
+        ]);
 
         return $topics;
     }
@@ -243,11 +381,7 @@ class MagazineAiPipeline
             $response = (string) agent($instructions)
                 ->prompt($prompt, provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.text_model', 'gemini-2.5-flash'));
 
-            $json = Str::of($response)
-                ->replaceMatches('/^```(?:json)?\s*/', '')
-                ->replaceMatches('/\s*```$/', '')
-                ->trim()
-                ->toString();
+            $json = $this->extractJsonPayload($response);
 
             $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
@@ -264,6 +398,134 @@ class MagazineAiPipeline
         }
     }
 
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function promptGroundedJson(string $instructions, string $prompt, array $tools = []): ?array
+    {
+        if (! $this->hasAiProviderKey()) {
+            return null;
+        }
+
+        try {
+            $response = agent(
+                instructions: $instructions,
+                tools: $tools,
+            )->prompt($prompt, provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.text_model', 'gemini-2.5-flash'));
+
+            $decoded = json_decode($this->extractJsonPayload((string) $response), true, 512, JSON_THROW_ON_ERROR);
+            $citations = $response->meta->citations
+                ->map(fn ($citation): array => [
+                    'title' => $citation->title,
+                    'url' => $citation->url,
+                ])
+                ->values()
+                ->all();
+
+            return is_array($decoded)
+                ? $decoded + ['grounding_citations' => $citations]
+                : null;
+        } catch (Throwable $exception) {
+            Log::channel('queue')->warning('Magazine AI grounded JSON prompt failed.', [
+                'provider' => config('magazine_ai.provider', 'gemini'),
+                'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
+                'exception_class' => $exception::class,
+                'exception_message' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function promptStructuredJson(string $instructions, string $prompt, array $tools = []): ?array
+    {
+        if (! $this->hasAiProviderKey()) {
+            return null;
+        }
+
+        try {
+            $response = agent(
+                instructions: $instructions,
+                tools: $tools,
+                schema: fn ($schema): array => [
+                    'topics' => $schema->array()
+                        ->items($schema->object([
+                            'title' => $schema->string()->required(),
+                            'summary' => $schema->string()->required(),
+                            'sources' => $schema->array()
+                                ->items($schema->object([
+                                    'title' => $schema->string()->required(),
+                                    'url' => $schema->string()->format('uri')->required(),
+                                    'published_at' => $schema->string()->required(),
+                                    'publisher' => $schema->string()->required(),
+                                    'type' => $schema->string()->enum(['primary', 'reputable_reporting', 'technical', 'official', 'supporting'])->required(),
+                                    'credibility_note' => $schema->string()->required(),
+                                ])->withoutAdditionalProperties())
+                                ->min(2)
+                                ->required(),
+                            'credibility_notes' => $schema->array()->items($schema->string())->required(),
+                            'open_questions' => $schema->array()->items($schema->string())->required(),
+                        ])->withoutAdditionalProperties())
+                        ->required(),
+                ],
+            )->prompt($prompt, provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.text_model', 'gemini-2.5-flash'));
+
+            $structured = $response->toArray();
+            $citations = $response->meta->citations
+                ->map(fn ($citation): array => [
+                    'title' => $citation->title,
+                    'url' => $citation->url,
+                ])
+                ->values()
+                ->all();
+
+            return is_array($structured)
+                ? $structured + ['grounding_citations' => $citations]
+                : null;
+        } catch (Throwable $exception) {
+            Log::channel('queue')->warning('Magazine AI structured JSON prompt failed.', [
+                'provider' => config('magazine_ai.provider', 'gemini'),
+                'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
+                'exception_class' => $exception::class,
+                'exception_message' => $exception->getMessage(),
+            ]);
+
+            return null;
+        }
+    }
+
+    private function extractJsonPayload(string $response): string
+    {
+        $json = Str::of($response)
+            ->replaceMatches('/^```(?:json)?\s*/', '')
+            ->replaceMatches('/\s*```$/', '')
+            ->trim()
+            ->toString();
+
+        if (str_starts_with($json, '{') || str_starts_with($json, '[')) {
+            return $json;
+        }
+
+        $objectStart = mb_strpos($json, '{');
+        $objectEnd = mb_strrpos($json, '}');
+
+        if ($objectStart !== false && $objectEnd !== false && $objectEnd > $objectStart) {
+            return mb_substr($json, $objectStart, $objectEnd - $objectStart + 1);
+        }
+
+        $arrayStart = mb_strpos($json, '[');
+        $arrayEnd = mb_strrpos($json, ']');
+
+        if ($arrayStart !== false && $arrayEnd !== false && $arrayEnd > $arrayStart) {
+            return mb_substr($json, $arrayStart, $arrayEnd - $arrayStart + 1);
+        }
+
+        return $json;
+    }
+
     private function hasAiProviderKey(): bool
     {
         return filled(config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key'));
@@ -272,6 +534,36 @@ class MagazineAiPipeline
     private function shouldTranslateLocale(string $locale): bool
     {
         return $locale !== 'en' && Locales::isSupported($locale);
+    }
+
+    private function draftInstructions(ContentTopic $topic): string
+    {
+        if ($this->isNewsTopic($topic)) {
+            return 'You write sourced Bitcoin-only news analysis in clear English Markdown. Lead with verified facts, explain why the development matters, distinguish fact from uncertainty, cite the provided sources naturally, and avoid hype, trading framing, price predictions, altcoins, and financial advice.';
+        }
+
+        return 'You write educational, non-hype Bitcoin and financial independence articles in clear English Markdown. Use concise article and section headings. Build a clear SEO-friendly structure with short paragraphs, H2/H3 headings, useful lists, concrete examples, category-specific reader outcomes, and naturally repeated keywords. Do not keyword-stuff. Avoid generic sovereignty psychology phrasing unless the topic specifically requires it.';
+    }
+
+    /**
+     * @param  array<int, array{title: string, url: string, slug: string}>  $internalLinks
+     */
+    private function draftPrompt(ContentTopic $topic, array $internalLinks): string
+    {
+        return json_encode([
+            'task' => "Write a practical article for {$topic->audience_level} readers.",
+            'category' => $topic->category?->label('en') ?? $topic->categorySlug(),
+            'topic' => $topic->title,
+            'brief' => $topic->brief,
+            'research' => $this->isNewsTopic($topic) ? ($topic->constraints['news_research'] ?? null) : null,
+            'internal_link_candidates' => $internalLinks,
+            'quality_bar' => [
+                'write like a careful editor, not a generic AI assistant',
+                'include concrete examples and practical implications',
+                'avoid repeated wording from recent articles',
+                'do not add a related reading section',
+            ],
+        ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     }
 
     /**
@@ -722,6 +1014,96 @@ class MagazineAiPipeline
         );
     }
 
+    private function randomEvergreenCategory(): Category
+    {
+        return Category::query()
+            ->where('lang', Language::English)
+            ->where('key', '!=', 'news')
+            ->inRandomOrder()
+            ->first()
+            ?? $this->defaultCategory();
+    }
+
+    private function newsCategory(): Category
+    {
+        return Category::query()->firstOrCreate(
+            ['key' => 'news', 'lang' => Language::English],
+            [
+                'slug' => 'news',
+                'name' => 'News',
+                'description' => 'Current Bitcoin developments explained with context and credible sources.',
+            ]
+        );
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function fallbackTopicTitles(Category $category): array
+    {
+        return match ($category->key) {
+            'privacy-security' => [
+                'How to build a simple Bitcoin privacy threat model',
+                'Everyday security habits for Bitcoin wallet users',
+            ],
+            'financial-sovereignty' => [
+                'How to write a personal Bitcoin treasury policy',
+                'Why savings rules matter more than market predictions',
+            ],
+            'family-legacy' => [
+                'How to prepare family members for Bitcoin recovery',
+                'A practical Bitcoin inheritance documentation checklist',
+            ],
+            'tools-practice' => [
+                'How to test a Bitcoin wallet backup safely',
+                'A practical checklist for your first Bitcoin node',
+            ],
+            'economics' => [
+                'What monetary scarcity means for everyday savers',
+                'How inflation changes long-term savings behavior',
+            ],
+            'mindset' => [
+                'How low time preference changes Bitcoin decisions',
+                'Why simple Bitcoin rules reduce emotional mistakes',
+            ],
+            default => [
+                'Bitcoin self custody threat models for beginners',
+                'How to avoid common wallet backup mistakes',
+            ],
+        };
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function recentTopicTitles(Category $category, int $limit = 12): array
+    {
+        $postTitles = Post::query()
+            ->with('translations')
+            ->whereBelongsTo($category)
+            ->latest('published_at')
+            ->limit($limit)
+            ->get()
+            ->flatMap(fn (Post $post): array => [
+                $post->topic,
+                ...$post->translations->pluck('title')->all(),
+            ]);
+
+        $topicTitles = ContentTopic::query()
+            ->whereBelongsTo($category)
+            ->latest()
+            ->limit($limit)
+            ->pluck('title');
+
+        return $postTitles
+            ->merge($topicTitles)
+            ->filter()
+            ->unique()
+            ->take($limit)
+            ->values()
+            ->all();
+    }
+
     /**
      * @param  array<string, string>  $parameters
      */
@@ -737,37 +1119,271 @@ class MagazineAiPipeline
         ]);
     }
 
-    /**
-     * @param  array<int, array<string, mixed>>  $blocks
-     * @param  array<int, array{title: string, url: string, slug: string}>  $internalLinks
-     * @return array<int, array<string, mixed>>
-     */
-    private function withInternalLinks(array $blocks, array $internalLinks, string $locale): array
+    private function isNewsTopic(ContentTopic $topic): bool
     {
-        if ($internalLinks === []) {
-            return $blocks;
+        return $topic->categorySlug() === 'news';
+    }
+
+    private function hasCredibleNewsResearch(ContentTopic $topic): bool
+    {
+        $research = $topic->constraints['news_research'] ?? null;
+
+        if (! is_array($research)) {
+            return false;
         }
 
-        $linksMarkdown = collect($internalLinks)
-            ->take(3)
-            ->map(fn (array $link): string => "- [{$link['title']}]({$link['url']})")
-            ->implode("\n");
-        $heading = $locale === 'de' ? 'Weitere Lektüre' : 'Related reading';
-        $anchor = $locale === 'de' ? 'weitere-lektuere' : 'related-reading';
+        return $this->hasCredibleSourceSet($research['sources'] ?? []);
+    }
 
-        if (count($blocks) >= 12) {
-            array_pop($blocks);
+    /**
+     * @return Collection<int, ContentTopic>
+     */
+    private function createNewsTopicsFromResearch(?array $research, Category $category, int $count, array $avoidTopics): Collection
+    {
+        $groundingCitations = $this->groundingCitations($research['grounding_citations'] ?? []);
+
+        $topics = collect($research['topics'] ?? [])
+            ->filter(fn (mixed $topic): bool => is_array($topic))
+            ->filter(fn (array $topic): bool => filled($topic['title'] ?? null))
+            ->map(function (array $topic): array {
+                $topic['credible_sources'] = $this->credibleSources($topic['sources'] ?? [])->values()->all();
+
+                return $topic;
+            })
+            ->filter(fn (array $topic): bool => $this->credibleSourceSetPasses(collect($topic['credible_sources'])))
+            ->take($count)
+            ->values()
+            ->map(function (array $topic, int $index) use ($category, $avoidTopics, $groundingCitations): ContentTopic {
+                $title = $this->cleanText((string) $topic['title'], 'Bitcoin news update');
+                $sources = $topic['credible_sources'];
+                $credibilityNotes = $this->stringList($topic['credibility_notes'] ?? []);
+                $openQuestions = $this->stringList($topic['open_questions'] ?? []);
+                $brief = $this->cleanText((string) ($topic['summary'] ?? ''), 'Current Bitcoin news item requiring sourced context.');
+
+                return ContentTopic::firstOrCreate(
+                    ['slug' => Str::slug($title)],
+                    [
+                        'title' => $title,
+                        'category_id' => $category->id,
+                        'status' => ContentTopicStatus::Scheduled,
+                        'priority' => max(1, 10 - $index),
+                        'audience_level' => 'intermediate',
+                        'primary_language' => 'en',
+                        'target_languages' => ['de'],
+                        'scheduled_for' => now(),
+                        'brief' => $brief,
+                        'constraints' => [
+                            'tone' => 'clear, sourced, non-hype',
+                            'brand' => 'synthwave-cypherpunk editorial',
+                            'category_key' => 'news',
+                            'avoid_similar_topics' => $avoidTopics,
+                            'news_research' => [
+                                'summary' => $brief,
+                                'sources' => $sources,
+                                'grounding_citations' => $groundingCitations,
+                                'credibility_notes' => $credibilityNotes,
+                                'open_questions' => $openQuestions,
+                                'researched_at' => now()->toAtomString(),
+                            ],
+                        ],
+                    ],
+                );
+            });
+
+        if ($topics->isEmpty()) {
+            Log::channel('queue')->warning('News topic ideation produced no topics that met the credibility threshold.', [
+                'required_credible_sources' => 2,
+                'candidate_topics' => is_countable($research['topics'] ?? null) ? count($research['topics']) : 0,
+            ]);
         }
 
-        $blocks[] = [
-            'type' => 'section',
-            'heading' => $heading,
-            'anchor' => $anchor,
-            'markdown' => $linksMarkdown,
-            'data' => [],
+        return $topics;
+    }
+
+    /**
+     * @return Collection<int, array<string, string>>
+     */
+    private function credibleSources(mixed $sources): Collection
+    {
+        if (! is_array($sources)) {
+            return collect();
+        }
+
+        return collect($sources)
+            ->filter(fn (mixed $source): bool => is_array($source))
+            ->map(function (array $source): array {
+                return [
+                    'title' => $this->cleanText((string) ($source['title'] ?? ''), ''),
+                    'url' => $this->cleanText((string) ($source['url'] ?? ''), ''),
+                    'published_at' => $this->cleanText((string) ($source['published_at'] ?? ''), ''),
+                    'publisher' => $this->cleanText((string) ($source['publisher'] ?? ''), ''),
+                    'type' => Str::of((string) ($source['type'] ?? ''))->lower()->trim()->toString(),
+                    'credibility_note' => $this->cleanText((string) ($source['credibility_note'] ?? ''), ''),
+                ];
+            })
+            ->filter(fn (array $source): bool => filter_var($source['url'], FILTER_VALIDATE_URL) !== false)
+            ->filter(fn (array $source): bool => str_starts_with($source['url'], 'https://'))
+            ->filter(fn (array $source): bool => in_array($source['type'], ['primary', 'reputable_reporting', 'technical', 'official'], true))
+            ->filter(fn (array $source): bool => $this->sourceUrlIsReachable($source['url']))
+            ->unique(fn (array $source): string => $this->urlHost($source['url']) ?? $this->normalizedUrl($source['url']))
+            ->values();
+    }
+
+    private function hasCredibleSourceSet(mixed $sources): bool
+    {
+        return $this->credibleSourceSetPasses($this->credibleSources($sources));
+    }
+
+    /**
+     * @param  Collection<int, array<string, string>>  $credibleSources
+     */
+    private function credibleSourceSetPasses(Collection $credibleSources): bool
+    {
+        return $credibleSources->count() >= 2
+            && $credibleSources->contains(fn (array $source): bool => in_array($source['type'], ['primary', 'technical', 'official'], true));
+    }
+
+    /**
+     * @return array<int, array{title: string, url: string}>
+     */
+    private function groundingCitations(mixed $citations): array
+    {
+        if (! is_array($citations)) {
+            return [];
+        }
+
+        return collect($citations)
+            ->filter(fn (mixed $citation): bool => is_array($citation))
+            ->map(fn (array $citation): array => [
+                'title' => $this->cleanText((string) ($citation['title'] ?? ''), ''),
+                'url' => $this->cleanText((string) ($citation['url'] ?? ''), ''),
+            ])
+            ->filter(fn (array $citation): bool => filter_var($citation['url'], FILTER_VALIDATE_URL) !== false)
+            ->filter(fn (array $citation): bool => str_starts_with($citation['url'], 'https://'))
+            ->unique(fn (array $citation): string => $this->normalizedUrl($citation['url']))
+            ->values()
+            ->all();
+    }
+
+    private function normalizedUrl(string $url): string
+    {
+        return Str::of($url)
+            ->lower()
+            ->replaceMatches('/#.*$/', '')
+            ->rtrim('/')
+            ->toString();
+    }
+
+    private function urlHost(string $url): ?string
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+
+        if (! is_string($host) || $host === '') {
+            return null;
+        }
+
+        return Str::of($host)
+            ->lower()
+            ->replaceMatches('/^www\./', '')
+            ->toString();
+    }
+
+    private function domainFromText(string $value): ?string
+    {
+        if (preg_match('/(?:[a-z0-9-]+\.)+[a-z]{2,}/i', $value, $matches) !== 1) {
+            return null;
+        }
+
+        return Str::of($matches[0])
+            ->lower()
+            ->replaceMatches('/^www\./', '')
+            ->toString();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function newsResearchDiagnostics(array $research): array
+    {
+        $topics = collect($research['topics'] ?? [])->filter(fn (mixed $topic): bool => is_array($topic));
+        $citations = $this->groundingCitations($research['grounding_citations'] ?? []);
+
+        return [
+            'candidate_topics' => $topics->count(),
+            'candidate_titles' => $topics
+                ->pluck('title')
+                ->filter()
+                ->take(5)
+                ->values()
+                ->all(),
+            'candidate_source_hosts' => $topics
+                ->flatMap(fn (array $topic): array => is_array($topic['sources'] ?? null) ? $topic['sources'] : [])
+                ->filter(fn (mixed $source): bool => is_array($source) && filled($source['url'] ?? null))
+                ->map(fn (array $source): ?string => $this->urlHost((string) $source['url']))
+                ->filter()
+                ->unique()
+                ->take(10)
+                ->values()
+                ->all(),
+            'grounding_citations' => count($citations),
+            'grounding_domains' => collect($citations)
+                ->map(fn (array $citation): ?string => $this->domainFromText($citation['title']) ?? $this->urlHost($citation['url']))
+                ->filter()
+                ->unique()
+                ->take(10)
+                ->values()
+                ->all(),
         ];
+    }
 
-        return $blocks;
+    private function sourceUrlIsReachable(string $url): bool
+    {
+        try {
+            $response = Http::timeout(10)
+                ->connectTimeout(5)
+                ->retry(2, 200)
+                ->head($url);
+
+            if ($response->successful()) {
+                return true;
+            }
+
+            if (! in_array($response->status(), [403, 405], true)) {
+                return false;
+            }
+
+            return Http::timeout(10)
+                ->connectTimeout(5)
+                ->retry(2, 200)
+                ->get($url)
+                ->successful();
+        } catch (Throwable $exception) {
+            Log::channel('queue')->warning('News source URL verification failed.', [
+                'url' => $url,
+                'exception_class' => $exception::class,
+                'exception_message' => $exception->getMessage(),
+            ]);
+
+            return false;
+        }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function stringList(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        return collect($items)
+            ->filter(fn (mixed $item): bool => is_scalar($item))
+            ->map(fn (mixed $item): string => $this->cleanText((string) $item, ''))
+            ->filter()
+            ->take(8)
+            ->values()
+            ->all();
     }
 
     private function uniqueTranslationSlug(string $slug, string $locale): string
@@ -833,6 +1449,18 @@ class MagazineAiPipeline
         ]);
 
         Log::channel('queue')->info('Magazine AI run completed.', $this->aiRunLogContext($run->refresh()));
+    }
+
+    private function failRun(AiRun $run, string $response, array $output = []): void
+    {
+        $run->update([
+            'status' => AiRunStatus::Failed,
+            'response' => $response,
+            'output' => $output,
+            'finished_at' => now(),
+        ]);
+
+        Log::channel('queue')->warning('Magazine AI run failed.', $this->aiRunLogContext($run->refresh()));
     }
 
     /**

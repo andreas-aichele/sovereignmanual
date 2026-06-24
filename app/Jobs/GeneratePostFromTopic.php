@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Enums\ContentTopicStatus;
 use App\Models\ContentTopic;
 use App\Services\MagazineAiPipeline;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -10,6 +11,7 @@ use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
 use Illuminate\Queue\Attributes\FailOnTimeout;
 use Illuminate\Queue\Middleware\WithoutOverlapping;
 use Illuminate\Support\Facades\Log;
+use RuntimeException;
 use Throwable;
 
 #[DeleteWhenMissingModels]
@@ -41,7 +43,20 @@ class GeneratePostFromTopic implements ShouldQueue
     {
         Log::channel('queue')->info('Magazine post generation started.', $this->logContext());
 
-        $pipeline->generatePost($this->topic);
+        try {
+            $pipeline->generatePost($this->topic);
+        } catch (RuntimeException $exception) {
+            if ($this->topic->refresh()->status === ContentTopicStatus::Archived) {
+                Log::channel('queue')->warning('Magazine post generation skipped for archived topic.', $this->logContext() + [
+                    'exception_class' => $exception::class,
+                    'exception_message' => $exception->getMessage(),
+                ]);
+
+                return;
+            }
+
+            throw $exception;
+        }
 
         Log::channel('queue')->info('Magazine post generation completed.', $this->logContext());
     }

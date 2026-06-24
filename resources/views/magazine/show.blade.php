@@ -15,7 +15,7 @@
                     href="{{ $post['category_url'] }}">
                     {{ $post['category_label'] }}</a>
                 <h1
-                    class="wrap-anywhere mt-4 text-4xl font-semibold leading-tight sm:text-6xl">
+                    class="wrap-anywhere mt-4 text-4xl font-semibold leading-tight sm:text-4xl">
                     {{ $post['title'] }}</h1>
 
                 @if ($post['excerpt'])
