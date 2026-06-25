@@ -816,6 +816,40 @@ test('article pages render canonical hreflang social and article structured data
         ->assertSee('"datePublished":"'.$post->published_at->toAtomString().'"', false);
 });
 
+test('article seo urls honor forwarded https scheme', function () {
+    $category = selfCustodyCategory();
+
+    $post = Post::factory()->published()->create([
+        'category_id' => $category->id,
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Bitcoin Custody SEO',
+        'slug' => 'bitcoin-custody-seo',
+        'meta_title' => 'Bitcoin Custody SEO',
+        'meta_description' => 'A practical article about Bitcoin self custody metadata.',
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'de',
+        'title' => 'Bitcoin Verwahrung SEO',
+        'slug' => 'bitcoin-verwahrung-seo',
+        'meta_description' => 'Ein praktischer Artikel uber Bitcoin Selbstverwahrung.',
+    ]);
+
+    $this->withHeader('X-Forwarded-Proto', 'https')
+        ->withHeader('X-Forwarded-Host', 'sovereignmanual.com')
+        ->get('http://sovereignmanual.com/self-custody/bitcoin-custody-seo')
+        ->assertSuccessful()
+        ->assertSee('<link href="https://sovereignmanual.com/self-custody/bitcoin-custody-seo" rel="canonical">', false)
+        ->assertSee('href="https://sovereignmanual.com/en/self-custody/bitcoin-custody-seo"', false)
+        ->assertSee('href="https://sovereignmanual.com/de/selbstverwahrung/bitcoin-verwahrung-seo"', false)
+        ->assertDontSee('href="http://sovereignmanual.com', false);
+});
+
 test('sitemap index links to content type sitemap files', function () {
     $post = Post::factory()->published()->create([
         'published_at' => now()->subDays(2),
