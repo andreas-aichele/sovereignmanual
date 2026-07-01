@@ -254,8 +254,8 @@ class MagazineAiPipeline
         $topics = collect();
 
         for ($attempt = 1; $attempt <= 3; $attempt++) {
-            $research = $this->promptGroundedJson(
-                instructions: 'Research current Bitcoin-only news using live Google Search grounding. Return only valid JSON. Exclude altcoins, trading, price predictions, and hype. Prefer primary sources, official publications, reputable mainstream financial/technology reporting, respected Bitcoin technical sources, and government or court records. Treat social posts, anonymous blogs, exchanges, and aggregators as supporting context only. Use direct canonical source URLs, not Google Search or Vertex grounding redirect URLs.',
+            $research = $this->promptStructuredJson(
+                instructions: 'Research current Bitcoin-only news using live Google Search grounding. Exclude altcoins, trading, price predictions, and hype. Prefer primary sources, official publications, reputable mainstream financial/technology reporting, respected Bitcoin technical sources, and government or court records. Treat social posts, anonymous blogs, exchanges, and aggregators as supporting context only. Use exact HTTPS source URLs from search results or citations. Do not invent URLs, dates, publishers, or article titles. Omit any source whose exact canonical URL is uncertain. At least one credible source per topic must be primary, technical, or official.',
                 prompt: json_encode([
                     'task' => 'Find current Bitcoin news topic candidates suitable for Sovereign Manual.',
                     'current_date' => now()->toDateString(),
@@ -392,45 +392,6 @@ class MagazineAiPipeline
             return is_array($decoded) ? $decoded : null;
         } catch (Throwable $exception) {
             Log::channel('queue')->warning('Magazine AI JSON prompt failed.', [
-                'provider' => config('magazine_ai.provider', 'gemini'),
-                'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
-                'exception_class' => $exception::class,
-                'exception_message' => $exception->getMessage(),
-            ]);
-
-            return null;
-        }
-    }
-
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function promptGroundedJson(string $instructions, string $prompt, array $tools = []): ?array
-    {
-        if (! $this->hasAiProviderKey()) {
-            return null;
-        }
-
-        try {
-            $response = agent(
-                instructions: $instructions,
-                tools: $tools,
-            )->prompt($prompt, provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.text_model', 'gemini-2.5-flash'));
-
-            $decoded = json_decode($this->extractJsonPayload((string) $response), true, 512, JSON_THROW_ON_ERROR);
-            $citations = $response->meta->citations
-                ->map(fn ($citation): array => [
-                    'title' => $citation->title,
-                    'url' => $citation->url,
-                ])
-                ->values()
-                ->all();
-
-            return is_array($decoded)
-                ? $decoded + ['grounding_citations' => $citations]
-                : null;
-        } catch (Throwable $exception) {
-            Log::channel('queue')->warning('Magazine AI grounded JSON prompt failed.', [
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
                 'exception_class' => $exception::class,
@@ -1409,24 +1370,28 @@ class MagazineAiPipeline
     private function sourceUrlIsReachable(string $url): bool
     {
         try {
-            $response = Http::timeout(10)
-                ->connectTimeout(5)
-                ->retry(2, 200)
+            $request = Http::timeout(5)
+                ->connectTimeout(3)
+                ->withUserAgent('SovereignManualBot/1.0 (+https://sovereignmanual.com)');
+
+            $response = $request
                 ->head($url);
 
             if ($response->successful()) {
                 return true;
             }
 
-            if (! in_array($response->status(), [403, 405], true)) {
+            if ($response->status() === 403) {
+                return true;
+            }
+
+            if ($response->status() !== 405) {
                 return false;
             }
 
-            return Http::timeout(10)
-                ->connectTimeout(5)
-                ->retry(2, 200)
-                ->get($url)
-                ->successful();
+            $response = $request->get($url);
+
+            return $response->successful() || $response->status() === 403;
         } catch (Throwable $exception) {
             Log::channel('queue')->warning('News source URL verification failed.', [
                 'url' => $url,

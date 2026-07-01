@@ -5,6 +5,7 @@ use App\Enums\ContentTopicStatus;
 use App\Enums\Language;
 use App\Enums\PostStatus;
 use App\Jobs\GeneratePostFromTopic;
+use App\Jobs\IdeateNewsTopicsJob;
 use App\Models\Category;
 use App\Models\ContentTopic;
 use App\Models\Post;
@@ -237,9 +238,17 @@ test('topic ideation stores existing category topics as similarity exclusions', 
 test('news ideation without provider web research creates no topics', function () {
     config(['ai.providers.gemini.key' => null]);
 
-    $this->artisan('app:ideate-news-topics --count=1')->assertFailed();
+    $this->artisan('app:ideate-news-topics --count=1 --sync')->assertFailed();
 
     expect(ContentTopic::query()->count())->toBe(0);
+});
+
+test('news ideation command queues by default', function () {
+    Queue::fake();
+
+    $this->artisan('app:ideate-news-topics --count=2')->assertSuccessful();
+
+    Queue::assertPushed(IdeateNewsTopicsJob::class, fn (IdeateNewsTopicsJob $job): bool => $job->count === 2);
 });
 
 test('news research must include at least two credible independent sources', function () {
@@ -466,6 +475,54 @@ test('news research accepts verified direct source urls even without google grou
 
     expect($topics)->toHaveCount(1)
         ->and($topics->first()->constraints['news_research']['grounding_citations'])->toBe([]);
+});
+
+test('news research accepts source urls blocked by publishers', function () {
+    Http::fake([
+        'bitcoincore.org/*' => Http::response('', 200),
+        'reputable-news.com/*' => Http::response('', 403),
+    ]);
+
+    $category = Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+    $pipeline = app(MagazineAiPipeline::class);
+    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
+
+    $topics = $method->invoke($pipeline, [
+        'grounding_citations' => [],
+        'topics' => [
+            [
+                'title' => 'Bitcoin Core publishes a sourced update',
+                'summary' => 'A sourced update about Bitcoin Core.',
+                'sources' => [
+                    [
+                        'title' => 'Bitcoin Core release notes',
+                        'url' => 'https://bitcoincore.org/en/releases/example/',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Bitcoin Core',
+                        'type' => 'primary',
+                        'credibility_note' => 'Primary project source.',
+                    ],
+                    [
+                        'title' => 'Reputable report',
+                        'url' => 'https://reputable-news.com/bitcoin-core-update',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Reputable News',
+                        'type' => 'reputable_reporting',
+                        'credibility_note' => 'Independent reporting from a known publication.',
+                    ],
+                ],
+                'credibility_notes' => ['One publisher blocks automated requests.'],
+                'open_questions' => [],
+            ],
+        ],
+    ], $category, 1, []);
+
+    expect($topics)->toHaveCount(1);
 });
 
 test('news research requires at least one strong primary technical or official source', function () {

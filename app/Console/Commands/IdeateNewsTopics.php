@@ -2,13 +2,14 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\IdeateNewsTopicsJob;
 use App\Services\MagazineAiPipeline;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use RuntimeException;
 
-#[Signature('app:ideate-news-topics {--count=1 : Number of researched news topic ideas to create}')]
+#[Signature('app:ideate-news-topics {--count=1 : Number of researched news topic ideas to create} {--sync : Run immediately instead of dispatching a queue job}')]
 #[Description('Create sourced AI-researched Bitcoin news topic ideas for scheduled publication')]
 class IdeateNewsTopics extends Command
 {
@@ -17,6 +18,14 @@ class IdeateNewsTopics extends Command
      */
     public function handle(MagazineAiPipeline $pipeline): int
     {
+        if (! $this->option('sync')) {
+            IdeateNewsTopicsJob::dispatch((int) $this->option('count'));
+
+            $this->components->info('Queued news topic ideation job.');
+
+            return self::SUCCESS;
+        }
+
         try {
             $topics = $pipeline->createNewsTopicIdeas((int) $this->option('count'));
         } catch (RuntimeException $exception) {
