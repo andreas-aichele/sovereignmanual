@@ -1,11 +1,6 @@
 <?php
 
 return [
-    'alternate_locale' => 'de',
-    'locales' => [
-        'en' => 'English',
-        'de' => 'Deutsch',
-    ],
     'language_switcher' => 'Language',
     'meta' => [
         'title' => 'Sovereign Manual Magazine',
@@ -21,7 +16,7 @@ return [
         'about_body' => 'Sovereign Manual is a practical Bitcoin magazine for people who want to understand custody, money, and independence without hype. The articles focus on clear mental models, personal routines, and decisions you can actually apply.',
     ],
     'show' => [
-        'alternate' => 'Read in German',
+        'alternate' => 'Read in another language',
         'breadcrumb_label' => 'Breadcrumb',
         'category' => 'Category',
         'details' => 'Article details',

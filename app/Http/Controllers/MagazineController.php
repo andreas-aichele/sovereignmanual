@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\Language;
 use App\Enums\PostStatus;
 use App\Models\Category;
 use App\Models\Post;
@@ -334,10 +333,7 @@ class MagazineController extends Controller
 
     private function openGraphLocale(string $locale): string
     {
-        return match ($locale) {
-            'de' => 'de_DE',
-            default => 'en_US',
-        };
+        return Locales::language($locale)->openGraphLocale();
     }
 
     /**
@@ -447,7 +443,14 @@ class MagazineController extends Controller
 
     private function alternateUrl(Post $post, string $locale): ?string
     {
-        $alternateLocale = $this->translation('alternate_locale', $locale);
+        $alternateLocale = collect(Locales::supported())
+            ->reject(fn (string $alternateLocale): bool => $alternateLocale === $locale)
+            ->first(fn (string $alternateLocale): bool => $this->exactTranslation($post, $alternateLocale) !== null);
+
+        if (! is_string($alternateLocale)) {
+            return null;
+        }
+
         $translation = $this->exactTranslation($post, $alternateLocale);
 
         if ($translation === null) {
@@ -465,8 +468,8 @@ class MagazineController extends Controller
      */
     private function languageOptions(string $currentLocale, ?Post $post = null): array
     {
-        return collect($this->translationArray('locales', $currentLocale))
-            ->map(function (string $label, string $locale) use ($currentLocale, $post): ?array {
+        return collect(Locales::supported())
+            ->map(function (string $locale) use ($currentLocale, $post): ?array {
                 $translation = $post === null ? null : $this->exactTranslation($post, $locale);
 
                 if ($post !== null && $translation === null) {
@@ -475,7 +478,7 @@ class MagazineController extends Controller
 
                 return [
                     'locale' => $locale,
-                    'label' => $label,
+                    'label' => Locales::language($locale)->nativeName(),
                     'url' => $translation === null
                         ? $this->localeSwitchUrl($locale)
                         : $this->explicitLocalizedRoute($locale, 'show', [
@@ -528,7 +531,7 @@ class MagazineController extends Controller
 
     private function findCategory(string $slug, string $locale): Category
     {
-        $language = Language::fromLocale($locale) ?? Language::fallback();
+        $language = Locales::language($locale);
 
         return Category::query()
             ->where('lang', $language)

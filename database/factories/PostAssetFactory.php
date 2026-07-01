@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Post;
 use App\Models\PostAsset;
+use App\Support\Locales;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -23,7 +24,7 @@ class PostAssetFactory extends Factory
             'type' => 'image',
             'disk' => 'public',
             'url' => 'https://images.unsplash.com/photo-1518546305927-5a555bb7020d',
-            'locale' => 'en',
+            'locale' => Locales::fallback(),
             'provider' => 'gemini',
             'model' => 'gemini-image',
             'prompt' => fake()->sentence(12),

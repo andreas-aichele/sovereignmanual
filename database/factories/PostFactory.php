@@ -7,6 +7,7 @@ use App\Enums\PostStatus;
 use App\Models\Category;
 use App\Models\ContentTopic;
 use App\Models\Post;
+use App\Support\Locales;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -35,7 +36,7 @@ class PostFactory extends Factory
         return [
             'content_topic_id' => ContentTopic::factory(),
             'category_id' => Category::query()->firstOrCreate(
-                ['key' => 'self-custody', 'lang' => Language::English],
+                ['key' => 'self-custody', 'lang' => Locales::fallbackLanguage()],
                 [
                     'slug' => 'self-custody',
                     'name' => 'Self Custody',
@@ -46,7 +47,7 @@ class PostFactory extends Factory
             'status' => PostStatus::Draft,
             'topic' => $topic,
             'audience_level' => 'beginner',
-            'primary_language' => 'en',
+            'primary_language' => Locales::fallback(),
             'scheduled_for' => now()->addDay(),
             'seo' => ['keywords' => ['bitcoin', 'financial independence']],
             'ai_metadata' => ['provider' => 'gemini'],

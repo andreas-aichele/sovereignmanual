@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Enums\AiRunStatus;
 use App\Enums\AiRunType;
 use App\Enums\ContentTopicStatus;
-use App\Enums\Language;
 use App\Enums\PostStatus;
 use App\Models\AiRun;
 use App\Models\Category;
@@ -44,33 +43,34 @@ class MagazineAiPipeline
         }
 
         $draftRun = $this->startRun(AiRunType::Draft, $topic);
+        $sourceLocale = Locales::fallback();
         $title = $topic->title;
-        $internalLinks = $this->internalLinkCandidates('en');
+        $internalLinks = $this->internalLinkCandidates($sourceLocale);
         $draft = $this->promptWithFallback(
             instructions: $this->draftInstructions($topic),
             prompt: $this->draftPrompt($topic, $internalLinks),
-            fallback: $this->fallbackMarkdown($title, 'en'),
+            fallback: $this->fallbackMarkdown($title, $sourceLocale),
         );
         $this->finishRun($draftRun, $draft);
 
-        $englishSeo = $this->seoPlan($topic, 'en', $title, $draft, $internalLinks);
-        $englishTitle = $englishSeo['article_title'];
-        $englishSlug = $this->uniqueTranslationSlug($englishSeo['slug'], 'en');
-        $englishExcerpt = $this->excerpt($draft, 180);
-        $englishBlocks = $this->articleBlocks($topic, 'en', $englishTitle, $draft, $englishSeo['keywords'], $internalLinks);
-        $englishMarkdown = $this->markdownFromBlocks($englishBlocks, $draft);
+        $sourceSeo = $this->seoPlan($topic, $sourceLocale, $title, $draft, $internalLinks);
+        $sourceTitle = $sourceSeo['article_title'];
+        $sourceSlug = $this->uniqueTranslationSlug($sourceSeo['slug'], $sourceLocale);
+        $sourceExcerpt = $this->excerpt($draft, 180);
+        $sourceBlocks = $this->articleBlocks($topic, $sourceLocale, $sourceTitle, $draft, $sourceSeo['keywords'], $internalLinks);
+        $sourceMarkdown = $this->markdownFromBlocks($sourceBlocks, $draft);
 
         $post = Post::create([
             'content_topic_id' => $topic->id,
             'category_id' => $topic->category_id ?? $this->defaultCategory()->id,
-            'slug' => $englishSlug,
+            'slug' => $sourceSlug,
             'status' => PostStatus::Draft,
             'topic' => $topic->title,
             'audience_level' => $topic->audience_level,
-            'primary_language' => $topic->primary_language,
+            'primary_language' => $sourceLocale,
             'scheduled_for' => $topic->scheduled_for,
             'seo' => [
-                'keywords' => $englishSeo['keywords'],
+                'keywords' => $sourceSeo['keywords'],
                 'internal_links' => $internalLinks,
             ],
             'ai_metadata' => [
@@ -81,59 +81,63 @@ class MagazineAiPipeline
         ]);
 
         $post->translations()->create([
-            'locale' => 'en',
-            'title' => $englishTitle,
-            'slug' => $englishSlug,
-            'excerpt' => $englishExcerpt,
-            'markdown' => $englishMarkdown,
-            'meta_title' => $englishSeo['meta_title'],
-            'meta_description' => $englishSeo['meta_description'],
+            'locale' => $sourceLocale,
+            'title' => $sourceTitle,
+            'slug' => $sourceSlug,
+            'excerpt' => $sourceExcerpt,
+            'markdown' => $sourceMarkdown,
+            'meta_title' => $sourceSeo['meta_title'],
+            'meta_description' => $sourceSeo['meta_description'],
             'seo' => [
-                'canonical_locale' => 'en',
-                'keywords' => $englishSeo['keywords'],
+                'canonical_locale' => $sourceLocale,
+                'keywords' => $sourceSeo['keywords'],
                 'internal_links' => $internalLinks,
             ],
         ]);
 
         $translatedBlocks = [];
 
-        if ($this->shouldTranslateLocale('de')) {
+        foreach ($this->translationLocales($sourceLocale) as $locale) {
             $translationRun = $this->startRun(AiRunType::Translation, $topic, $post);
-            $germanArticle = $this->promptJson(
-                instructions: 'Translate Bitcoin magazine articles into precise, natural German. Return only valid JSON. Use real German umlauts and ß. Keep article and section headings compact. Never leave English headings or UI-like labels untranslated unless they are proper nouns.',
+            $targetLanguage = Locales::language($locale)->englishName();
+            $translatedArticle = $this->promptJson(
+                instructions: "Translate Bitcoin magazine articles into precise, natural {$targetLanguage}. Return only valid JSON. Keep article and section headings compact. Never leave source-language headings or UI-like labels untranslated unless they are proper nouns.",
                 prompt: json_encode([
-                    'title' => $englishTitle,
-                    'excerpt' => $englishExcerpt,
-                    'blocks' => $englishBlocks,
+                    'source_locale' => $sourceLocale,
+                    'target_locale' => $locale,
+                    'target_language' => $targetLanguage,
+                    'title' => $sourceTitle,
+                    'excerpt' => $sourceExcerpt,
+                    'blocks' => $sourceBlocks,
                 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            ) ?? $this->fallbackTranslatedArticle($title, $englishBlocks);
-            $germanTitle = $this->cleanText((string) ($germanArticle['title'] ?? $this->germanTitle($title)), $this->germanTitle($title));
-            $germanBlocks = $this->sanitizeBlocks($germanArticle['blocks'] ?? null, 'de', $germanTitle, $this->fallbackMarkdown($title, 'de'));
-            $germanInternalLinks = $this->internalLinkCandidates('de', $post->id);
-            $germanDraft = $this->markdownFromBlocks($germanBlocks, $this->fallbackMarkdown($title, 'de'));
-            $this->finishRun($translationRun, $germanDraft, ['title' => $germanTitle]);
-            $germanSeo = $this->seoPlan($topic, 'de', $germanTitle, $germanDraft, $germanInternalLinks);
-            $germanSlug = $this->uniqueTranslationSlug($germanSeo['slug'], 'de');
+            ) ?? $this->fallbackTranslatedArticle($title, $locale);
+            $translatedTitle = $this->cleanText((string) ($translatedArticle['title'] ?? $title), $title);
+            $blocks = $this->sanitizeBlocks($translatedArticle['blocks'] ?? null, $locale, $translatedTitle, $this->fallbackMarkdown($title, $locale));
+            $localizedInternalLinks = $this->internalLinkCandidates($locale, $post->id);
+            $localizedDraft = $this->markdownFromBlocks($blocks, $this->fallbackMarkdown($title, $locale));
+            $this->finishRun($translationRun, $localizedDraft, ['title' => $translatedTitle, 'locale' => $locale]);
+            $localizedSeo = $this->seoPlan($topic, $locale, $translatedTitle, $localizedDraft, $localizedInternalLinks);
+            $localizedSlug = $this->uniqueTranslationSlug($localizedSeo['slug'], $locale);
 
             $post->translations()->create([
-                'locale' => 'de',
-                'title' => $germanTitle,
-                'slug' => $germanSlug,
-                'excerpt' => $this->cleanText((string) ($germanArticle['excerpt'] ?? $this->excerpt($germanDraft, 180)), $this->excerpt($germanDraft, 180)),
-                'markdown' => $germanDraft,
-                'meta_title' => $germanSeo['meta_title'],
-                'meta_description' => $germanSeo['meta_description'],
+                'locale' => $locale,
+                'title' => $translatedTitle,
+                'slug' => $localizedSlug,
+                'excerpt' => $this->cleanText((string) ($translatedArticle['excerpt'] ?? $this->excerpt($localizedDraft, 180)), $this->excerpt($localizedDraft, 180)),
+                'markdown' => $localizedDraft,
+                'meta_title' => $localizedSeo['meta_title'],
+                'meta_description' => $localizedSeo['meta_description'],
                 'seo' => [
-                    'canonical_locale' => 'de',
-                    'keywords' => $germanSeo['keywords'],
-                    'internal_links' => $germanInternalLinks,
+                    'canonical_locale' => $locale,
+                    'keywords' => $localizedSeo['keywords'],
+                    'internal_links' => $localizedInternalLinks,
                 ],
             ]);
 
-            $translatedBlocks['de'] = $germanBlocks;
+            $translatedBlocks[$locale] = $blocks;
         }
 
-        $this->createBlocks($post, 'en', $englishBlocks);
+        $this->createBlocks($post, $sourceLocale, $sourceBlocks);
 
         foreach ($translatedBlocks as $locale => $blocks) {
             $this->createBlocks($post, $locale, $blocks);
@@ -204,8 +208,8 @@ class MagazineAiPipeline
                     'status' => ContentTopicStatus::Scheduled,
                     'priority' => max(1, 10 - $index),
                     'audience_level' => 'intermediate',
-                    'primary_language' => 'en',
-                    'target_languages' => ['de'],
+                    'primary_language' => Locales::fallback(),
+                    'target_languages' => $this->translationLocales(Locales::fallback()),
                     'scheduled_for' => now(),
                     'brief' => 'AI-proposed topic for Sovereign Manual with practical, non-hype educational framing.',
                     'constraints' => [
@@ -531,18 +535,26 @@ class MagazineAiPipeline
         return filled(config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key'));
     }
 
-    private function shouldTranslateLocale(string $locale): bool
+    /**
+     * @return array<int, string>
+     */
+    private function translationLocales(string $sourceLocale): array
     {
-        return $locale !== 'en' && Locales::isSupported($locale);
+        return collect(Locales::supported())
+            ->reject(fn (string $locale): bool => $locale === $sourceLocale)
+            ->values()
+            ->all();
     }
 
     private function draftInstructions(ContentTopic $topic): string
     {
+        $language = Locales::fallbackLanguage()->englishName();
+
         if ($this->isNewsTopic($topic)) {
-            return 'You write sourced Bitcoin-only news analysis in clear English Markdown. Lead with verified facts, explain why the development matters, distinguish fact from uncertainty, cite the provided sources naturally, and avoid hype, trading framing, price predictions, altcoins, and financial advice.';
+            return "You write sourced Bitcoin-only news analysis in clear {$language} Markdown. Lead with verified facts, explain why the development matters, distinguish fact from uncertainty, cite the provided sources naturally, and avoid hype, trading framing, price predictions, altcoins, and financial advice.";
         }
 
-        return 'You write educational, non-hype Bitcoin and financial independence articles in clear English Markdown. Use concise article and section headings. Build a clear SEO-friendly structure with short paragraphs, H2/H3 headings, useful lists, concrete examples, category-specific reader outcomes, and naturally repeated keywords. Do not keyword-stuff. Avoid generic sovereignty psychology phrasing unless the topic specifically requires it.';
+        return "You write educational, non-hype Bitcoin and financial independence articles in clear {$language} Markdown. Use concise article and section headings. Build a clear SEO-friendly structure with short paragraphs, H2/H3 headings, useful lists, concrete examples, category-specific reader outcomes, and naturally repeated keywords. Do not keyword-stuff. Avoid generic sovereignty psychology phrasing unless the topic specifically requires it.";
     }
 
     /**
@@ -552,7 +564,7 @@ class MagazineAiPipeline
     {
         return json_encode([
             'task' => "Write a practical article for {$topic->audience_level} readers.",
-            'category' => $topic->category?->label('en') ?? $topic->categorySlug(),
+            'category' => $topic->category?->label(Locales::fallback()) ?? $topic->categorySlug(),
             'topic' => $topic->title,
             'brief' => $topic->brief,
             'research' => $this->isNewsTopic($topic) ? ($topic->constraints['news_research'] ?? null) : null,
@@ -636,11 +648,11 @@ class MagazineAiPipeline
         $allowedTypes = ['section', 'markdown', 'insight', 'checklist', 'flow_diagram', 'sketch'];
         $sanitized = collect($blocks)
             ->filter(fn (mixed $block): bool => is_array($block))
-            ->map(function (array $block) use ($allowedTypes, $locale): array {
+            ->map(function (array $block) use ($allowedTypes): array {
                 $type = in_array($block['type'] ?? null, $allowedTypes, true) ? $block['type'] : 'markdown';
                 $data = is_array($block['data'] ?? null) ? $this->sanitizeBlockData($block['data']) : [];
                 $heading = $type === 'section'
-                    ? $this->seoText((string) ($block['heading'] ?? ''), $locale === 'de' ? 'Praxis' : 'Practice', 72)
+                    ? $this->seoText((string) ($block['heading'] ?? ''), 'Practice', 72)
                     : null;
                 $anchor = filled($heading) ? Str::slug((string) ($block['anchor'] ?? $heading)) : null;
 
@@ -735,6 +747,7 @@ class MagazineAiPipeline
 
     private function generatePostImage(Post $post, ContentTopic $topic): void
     {
+        $sourceLocale = Locales::fallback();
         $prompt = $this->synthwaveImagePrompt($topic);
         $altTexts = $this->imageAltTexts($post, $topic);
         $run = $this->startRun(AiRunType::Image, $topic, $post, config('magazine_ai.image_model', 'gemini-2.5-flash-image'));
@@ -749,11 +762,11 @@ class MagazineAiPipeline
         if (! config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key')) {
             $post->assets()->create([
                 'type' => 'image',
-                'locale' => 'en',
+                'locale' => $sourceLocale,
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
-                'alt_text' => $altTexts['en'] ?? $this->fallbackImageAltText($post, $topic, 'en'),
+                'alt_text' => $altTexts[$sourceLocale] ?? $this->fallbackImageAltText($post, $topic, $sourceLocale),
                 'status' => 'pending',
                 'metadata' => $metadata + ['reason' => 'image_generation_not_configured'],
             ]);
@@ -787,11 +800,11 @@ class MagazineAiPipeline
                 'disk' => 'public',
                 'path' => $path,
                 'url' => is_string($path) ? Storage::disk('public')->url($path) : null,
-                'locale' => 'en',
+                'locale' => $sourceLocale,
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
-                'alt_text' => $altTexts['en'] ?? $this->fallbackImageAltText($post, $topic, 'en'),
+                'alt_text' => $altTexts[$sourceLocale] ?? $this->fallbackImageAltText($post, $topic, $sourceLocale),
                 'status' => is_string($path) ? 'ready' : 'pending',
                 'metadata' => $responsiveImage === null ? $metadata : $metadata + ['responsive_image' => $responsiveImage],
             ]);
@@ -809,11 +822,11 @@ class MagazineAiPipeline
 
             $post->assets()->create([
                 'type' => 'image',
-                'locale' => 'en',
+                'locale' => $sourceLocale,
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
-                'alt_text' => $altTexts['en'] ?? $this->fallbackImageAltText($post, $topic, 'en'),
+                'alt_text' => $altTexts[$sourceLocale] ?? $this->fallbackImageAltText($post, $topic, $sourceLocale),
                 'status' => 'pending',
                 'metadata' => $metadata + ['error' => $exception->getMessage()],
             ]);
@@ -856,10 +869,11 @@ class MagazineAiPipeline
                     'max_characters' => 140,
                 ],
                 'schema' => [
-                    'alt_texts' => [
-                        'en' => 'Concise English alt text',
-                        'de' => 'Concise German alt text',
-                    ],
+                    'alt_texts' => collect(Locales::supported())
+                        ->mapWithKeys(fn (string $locale): array => [
+                            $locale => 'Concise alt text',
+                        ])
+                        ->all(),
                 ],
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
         );
@@ -879,12 +893,10 @@ class MagazineAiPipeline
     private function fallbackImageAltText(Post $post, ContentTopic $topic, string $locale): string
     {
         $title = $post->translation($locale)?->title
-            ?? $post->translation('en')?->title
+            ?? $post->translation(Locales::fallback())?->title
             ?? $topic->title;
 
-        return $locale === 'de'
-            ? "Titelbild zum Artikel {$title}."
-            : "Header image for the article {$title}.";
+        return "Header image for the article {$title}.";
     }
 
     /**
@@ -987,15 +999,13 @@ class MagazineAiPipeline
      */
     private function fallbackSeoPlan(ContentTopic $topic, string $locale, string $title, string $markdown): array
     {
-        $articleTitle = $this->seoText($title, $locale === 'de' ? 'Bitcoin-Strategie' : 'Bitcoin strategy', 70);
+        $articleTitle = $this->seoText($title, 'Bitcoin strategy', 70);
         $keywords = $this->keywordsFor($topic, $locale);
 
         return [
             'article_title' => $articleTitle,
             'meta_title' => $this->seoText($articleTitle, $articleTitle, 60),
-            'meta_description' => $this->seoText($this->excerpt($markdown, 160), $locale === 'de'
-                ? 'Praxisnaher Leitfaden zu Bitcoin, Selbstverwahrung und finanzieller Souveränität.'
-                : 'A practical guide to Bitcoin, self custody, and financial sovereignty.', 160),
+            'meta_description' => $this->seoText($this->excerpt($markdown, 160), 'A practical guide to Bitcoin, self custody, and financial sovereignty.', 160),
             'slug' => $this->shortSlug($articleTitle, $locale),
             'keywords' => $keywords,
         ];
@@ -1006,12 +1016,10 @@ class MagazineAiPipeline
      */
     private function keywordsFor(ContentTopic $topic, string $locale): array
     {
-        $base = $locale === 'de'
-            ? ['bitcoin', 'selbstverwahrung', 'finanzielle souveränität']
-            : ['bitcoin', 'self custody', 'financial sovereignty'];
-
         return collect([
-            ...$base,
+            'bitcoin',
+            'self custody',
+            'financial sovereignty',
             $topic->categorySlug(),
             ...Str::of($topic->title.' '.$topic->brief)
                 ->lower()
@@ -1067,7 +1075,7 @@ class MagazineAiPipeline
     private function defaultCategory(): Category
     {
         return Category::query()->firstOrCreate(
-            ['key' => 'self-custody', 'lang' => Language::English],
+            ['key' => 'self-custody', 'lang' => Locales::fallbackLanguage()],
             [
                 'slug' => 'self-custody',
                 'name' => 'Self Custody',
@@ -1079,7 +1087,7 @@ class MagazineAiPipeline
     private function randomEvergreenCategory(): Category
     {
         return Category::query()
-            ->where('lang', Language::English)
+            ->where('lang', Locales::fallbackLanguage())
             ->where('key', '!=', 'news')
             ->inRandomOrder()
             ->first()
@@ -1089,7 +1097,7 @@ class MagazineAiPipeline
     private function newsCategory(): Category
     {
         return Category::query()->firstOrCreate(
-            ['key' => 'news', 'lang' => Language::English],
+            ['key' => 'news', 'lang' => Locales::fallbackLanguage()],
             [
                 'slug' => 'news',
                 'name' => 'News',
@@ -1230,8 +1238,8 @@ class MagazineAiPipeline
                         'status' => ContentTopicStatus::Scheduled,
                         'priority' => max(1, 10 - $index),
                         'audience_level' => 'intermediate',
-                        'primary_language' => 'en',
-                        'target_languages' => ['de'],
+                        'primary_language' => Locales::fallback(),
+                        'target_languages' => $this->translationLocales(Locales::fallback()),
                         'scheduled_for' => now(),
                         'brief' => $brief,
                         'constraints' => [
@@ -1481,7 +1489,7 @@ class MagazineAiPipeline
             ->take(6)
             ->implode('-');
 
-        return filled($words) ? $words : ($locale === 'de' ? 'bitcoin-strategie' : 'bitcoin-strategy');
+        return filled($words) ? $words : 'bitcoin-strategy';
     }
 
     private function startRun(AiRunType $type, ?ContentTopic $topic = null, ?Post $post = null, ?string $model = null): AiRun
@@ -1547,28 +1555,18 @@ class MagazineAiPipeline
 
     private function fallbackMarkdown(string $title, string $locale): string
     {
-        if ($locale === 'de') {
-            $germanTitle = $this->germanTitle($title);
-
-            return "# {$germanTitle}\n\nDieser Beitrag erklärt das Thema praxisnah und mit Fokus auf finanzielle Souveränität.\n\n## Kerngedanke\n\nBitcoin kann als Werkzeug zur langfristigen Unabhängigkeit verstanden werden, wenn Risiko, Verwahrung und Zeithorizont sauber eingeordnet werden.\n\n## Praktische Schritte\n\n- Grundlagen lernen.\n- Sicherheitsmodell verstehen.\n- Kleine Beträge testen.\n- Entscheidungen regelmäßig aktualisieren.";
-        }
-
         return "# {$title}\n\nThis article explains the topic with a practical focus on financial sovereignty.\n\n## Core idea\n\nBitcoin can be understood as a tool for long-term independence when risk, custody, and time horizon are handled carefully.\n\n## Practical steps\n\n- Learn the basics.\n- Understand the security model.\n- Test with small amounts.\n- Update decisions regularly.";
     }
 
     /**
-     * @param  array<int, array<string, mixed>>  $englishBlocks
      * @return array<string, mixed>
      */
-    private function fallbackTranslatedArticle(string $title, array $englishBlocks): array
+    private function fallbackTranslatedArticle(string $title, string $locale): array
     {
-        $germanTitle = $this->germanTitle($title);
-
         return [
-            'title' => $germanTitle,
-            'excerpt' => 'Ein praxisnaher Magazinbeitrag über Bitcoin, Selbstverwahrung und finanzielle Souveränität.',
-            'blocks' => $this->fallbackBlocks($germanTitle, 'de', $this->fallbackMarkdown($title, 'de')),
-            'source_blocks' => count($englishBlocks),
+            'title' => $title,
+            'excerpt' => 'A practical guide to Bitcoin, self custody, and financial sovereignty.',
+            'blocks' => $this->fallbackBlocks($title, $locale, $this->fallbackMarkdown($title, $locale)),
         ];
     }
 
@@ -1577,18 +1575,6 @@ class MagazineAiPipeline
      */
     private function fallbackBlocks(string $title, string $locale, string $markdown): array
     {
-        $copy = $locale === 'de'
-            ? [
-                'insight' => ['Kernaussage', 'Souveränität entsteht nicht durch Tempo, sondern durch klare Regeln, kleine Tests und wiederholbare Entscheidungen.'],
-                'flow' => ['Entscheidungspfad', ['Ziel klären', 'Risiko bewerten', 'Verwahrung testen', 'Regelmäßig prüfen']],
-                'checklist' => ['Prüfliste', ['Zeithorizont notieren', 'Seed-Aufbewahrung planen', 'Kleine Testtransaktion senden', 'Dokumentation aktualisieren']],
-            ]
-            : [
-                'insight' => ['Core insight', 'Sovereignty improves when decisions are explicit, tested at small scale, and reviewed on a schedule.'],
-                'flow' => ['Decision path', ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly']],
-                'checklist' => ['Field checklist', ['Write the time horizon', 'Plan seed storage', 'Send a small test transaction', 'Update the policy note']],
-            ];
-
         return [
             [
                 'type' => 'section',
@@ -1601,24 +1587,24 @@ class MagazineAiPipeline
                 'type' => 'insight',
                 'markdown' => null,
                 'data' => [
-                    'title' => $copy['insight'][0],
-                    'body' => $copy['insight'][1],
+                    'title' => 'Core insight',
+                    'body' => 'Sovereignty improves when decisions are explicit, tested at small scale, and reviewed on a schedule.',
                 ],
             ],
             [
                 'type' => 'flow_diagram',
                 'markdown' => null,
                 'data' => [
-                    'title' => $copy['flow'][0],
-                    'steps' => $copy['flow'][1],
+                    'title' => 'Decision path',
+                    'steps' => ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly'],
                 ],
             ],
             [
                 'type' => 'checklist',
                 'markdown' => null,
                 'data' => [
-                    'title' => $copy['checklist'][0],
-                    'items' => $copy['checklist'][1],
+                    'title' => 'Field checklist',
+                    'items' => ['Write the time horizon', 'Plan seed storage', 'Send a small test transaction', 'Update the policy note'],
                 ],
             ],
         ];
@@ -1632,22 +1618,8 @@ class MagazineAiPipeline
         return [
             'type' => 'flow_diagram',
             'markdown' => null,
-            'data' => $locale === 'de'
-                ? ['title' => 'Entscheidungspfad', 'steps' => ['Ziel', 'Risiko', 'Test', 'Review']]
-                : ['title' => 'Decision path', 'steps' => ['Goal', 'Risk', 'Test', 'Review']],
+            'data' => ['title' => 'Decision path', 'steps' => ['Goal', 'Risk', 'Test', 'Review']],
         ];
-    }
-
-    private function germanTitle(string $title): string
-    {
-        return match (Str::of($title)->lower()->toString()) {
-            'why bitcoin custody matters' => 'Warum Bitcoin-Verwahrung wichtig ist',
-            'bitcoin self custody threat models for beginners' => 'Bitcoin-Selbstverwahrung: Bedrohungsmodelle für Einsteiger',
-            'why fiat debasement changes savings behavior' => 'Warum Fiat-Entwertung das Sparverhalten verändert',
-            'how to build a personal bitcoin treasury policy' => 'Wie du eine persönliche Bitcoin-Treasury-Policy entwickelst',
-            'financial independence without yield chasing' => 'Finanzielle Unabhängigkeit ohne Renditejagd',
-            default => 'Souveräne Finanzstrategie',
-        };
     }
 
     private function cleanMarkdown(mixed $markdown): string

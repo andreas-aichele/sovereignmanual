@@ -1,4 +1,8 @@
-@props(['locale' => 'en', 'languageOptions' => []])
+@props(['locale' => null, 'languageOptions' => []])
+
+@php
+    $locale ??= \App\Support\Locales::fallback();
+@endphp
 
 <header
     class="navbar bg-base-100/85 border-base-300 border-b shadow-sm backdrop-blur">

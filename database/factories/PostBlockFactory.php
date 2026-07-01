@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Post;
 use App\Models\PostBlock;
+use App\Support\Locales;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -20,7 +21,7 @@ class PostBlockFactory extends Factory
     {
         return [
             'post_id' => Post::factory(),
-            'locale' => 'en',
+            'locale' => Locales::fallback(),
             'type' => 'section',
             'sort_order' => fake()->numberBetween(0, 10),
             'heading' => fake()->sentence(3),

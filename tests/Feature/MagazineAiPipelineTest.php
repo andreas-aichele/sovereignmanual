@@ -46,8 +46,8 @@ test('pipeline creates a published post with english and german translations', f
         ->and(mb_strlen($englishTranslation->meta_description))->toBeLessThanOrEqual(160)
         ->and($englishTranslation->seo['keywords'])->toContain('bitcoin')
         ->and($englishTranslation->slug)->toBe('why-bitcoin-custody-matters')
-        ->and($germanTranslation->title)->toBe('Warum Bitcoin-Verwahrung wichtig ist')
-        ->and($germanTranslation->slug)->toBe('warum-bitcoin-verwahrung-wichtig-ist')
+        ->and($germanTranslation->title)->toBe('Why Bitcoin custody matters')
+        ->and($germanTranslation->slug)->toBe('why-bitcoin-custody-matters-2')
         ->and(mb_strlen($germanTranslation->meta_title))->toBeLessThanOrEqual(60)
         ->and(mb_strlen($germanTranslation->meta_description))->toBeLessThanOrEqual(160)
         ->and($germanTranslation->seo['keywords'])->toContain('bitcoin')
@@ -65,7 +65,7 @@ test('pipeline creates a published post with english and german translations', f
         ->and($asset->alt_text)->toBe('Header image for the article Why Bitcoin custody matters.')
         ->and($asset->alt_text)->not->toContain('Synthwave')
         ->and($asset->metadata['alt_texts']['en'])->toBe('Header image for the article Why Bitcoin custody matters.')
-        ->and($asset->metadata['alt_texts']['de'])->toBe('Titelbild zum Artikel Warum Bitcoin-Verwahrung wichtig ist.')
+        ->and($asset->metadata['alt_texts']['de'])->toBe('Header image for the article Why Bitcoin custody matters.')
         ->and($asset->prompt)->toContain('Full-bleed synthwave editorial website background')
         ->and($asset->prompt)->toContain('no border, no frame, no book')
         ->and($asset->prompt)->toContain('human-scale personal scene details')
@@ -144,7 +144,7 @@ test('pipeline retries seo title generation until length requirements pass', fun
         ->and($pipeline)->toContain('for ($attempt = 1; $attempt <= 3; $attempt++)');
 });
 
-test('pipeline fallback german titles use correct umlauts', function () {
+test('pipeline fallback translations are created for supported locales without locale-specific copy', function () {
     config(['ai.providers.gemini.key' => null]);
 
     $topic = ContentTopic::factory()->due()->create([
@@ -155,10 +155,9 @@ test('pipeline fallback german titles use correct umlauts', function () {
     $germanTranslation = $post->translations()->where('locale', 'de')->firstOrFail();
     $germanInsight = $post->blocks()->where('locale', 'de')->where('type', 'insight')->firstOrFail();
 
-    expect($germanTranslation->title)->toBe('Bitcoin-Selbstverwahrung: Bedrohungsmodelle für Einsteiger')
-        ->and($germanInsight->data['title'])->toBe('Kernaussage')
-        ->and($germanTranslation->markdown)->not->toContain('Souveraene')
-        ->and($germanTranslation->markdown)->not->toContain('Unabhaengigkeit');
+    expect($germanTranslation->title)->toBe('Bitcoin self custody threat models for beginners')
+        ->and($germanInsight->data['title'])->toBe('Core insight')
+        ->and($germanTranslation->markdown)->toContain('Bitcoin self custody threat models for beginners');
 });
 
 test('pipeline block planning preserves article detail up to twelve blocks', function () {

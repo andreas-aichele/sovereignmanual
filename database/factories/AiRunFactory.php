@@ -7,6 +7,7 @@ use App\Enums\AiRunType;
 use App\Models\AiRun;
 use App\Models\ContentTopic;
 use App\Models\Post;
+use App\Support\Locales;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -30,7 +31,7 @@ class AiRunFactory extends Factory
             'model' => 'gemini-2.5-flash',
             'prompt' => fake()->paragraph(),
             'response' => fake()->paragraphs(2, true),
-            'input' => ['locale' => 'en'],
+            'input' => ['locale' => Locales::fallback()],
             'output' => ['publish' => true],
             'metrics' => ['score' => 92],
             'started_at' => now()->subMinute(),

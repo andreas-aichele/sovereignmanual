@@ -70,8 +70,10 @@ test('magazine localization strings live in language files', function () {
 
     expect(lang_path('en/magazine.php'))->toBeReadableFile()
         ->and(lang_path('de/magazine.php'))->toBeReadableFile()
-        ->and($englishTranslations)->toHaveKeys(['index', 'show', 'language_switcher', 'locales', 'meta'])
-        ->and($germanTranslations)->toHaveKeys(['index', 'show', 'language_switcher', 'locales', 'meta'])
+        ->and($englishTranslations)->toHaveKeys(['index', 'show', 'language_switcher', 'meta'])
+        ->and($germanTranslations)->toHaveKeys(['index', 'show', 'language_switcher', 'meta'])
+        ->and($englishTranslations)->not->toHaveKeys(['alternate_locale', 'locales'])
+        ->and($germanTranslations)->not->toHaveKeys(['alternate_locale', 'locales'])
         ->and($englishTranslations)->not->toHaveKey('categories')
         ->and($germanTranslations)->not->toHaveKey('categories')
         ->and($englishTranslations['index'])->toHaveKeys(['about_body', 'about_heading'])
@@ -123,7 +125,8 @@ test('public navigation uses a scalable language dropdown', function () {
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
     $controller = file_get_contents(app_path('Http/Controllers/MagazineController.php'));
 
-    expect($nav)->toContain('@props([\'locale\' => \'en\', \'languageOptions\' => []])')
+    expect($nav)->toContain('@props([\'locale\' => null, \'languageOptions\' => []])')
+        ->and($nav)->toContain('$locale ??= \App\Support\Locales::fallback();')
         ->and($nav)->toContain('<details class="dropdown dropdown-end">')
         ->and($nav)->toContain('dropdown-content menu')
         ->and($nav)->toContain('@foreach ($languageOptions as $option)')
@@ -134,7 +137,8 @@ test('public navigation uses a scalable language dropdown', function () {
         ->and($index)->toContain(':language-options="$languageOptions"')
         ->and($show)->toContain(':language-options="$languageOptions"')
         ->and($controller)->toContain('private function languageOptions')
-        ->and($controller)->toContain('$this->translationArray(\'locales\', $currentLocale)');
+        ->and($controller)->toContain('Locales::supported()')
+        ->and($controller)->toContain('Locales::language($locale)->nativeName()');
 });
 
 test('magazine headings can break long words', function () {

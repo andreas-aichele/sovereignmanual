@@ -21,10 +21,20 @@ class Locales
 
     public static function fallback(): string
     {
+        return self::fallbackLanguage()->value;
+    }
+
+    public static function fallbackLanguage(): Language
+    {
         $fallbackLocale = config('app.fallback_locale', Language::fallback()->value);
 
         return is_string($fallbackLocale)
-            ? (Language::fromLocale($fallbackLocale)?->value ?? Language::fallback()->value)
-            : Language::fallback()->value;
+            ? (Language::fromLocale($fallbackLocale) ?? Language::fallback())
+            : Language::fallback();
+    }
+
+    public static function language(string $locale): Language
+    {
+        return Language::fromLocale($locale) ?? self::fallbackLanguage();
     }
 }

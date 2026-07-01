@@ -4,6 +4,7 @@ namespace Database\Factories;
 
 use App\Models\Post;
 use App\Models\PostTranslation;
+use App\Support\Locales;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
 
@@ -23,14 +24,14 @@ class PostTranslationFactory extends Factory
 
         return [
             'post_id' => Post::factory(),
-            'locale' => 'en',
+            'locale' => Locales::fallback(),
             'title' => $title,
             'slug' => Str::slug($title).'-'.fake()->unique()->numberBetween(1000, 9999),
             'excerpt' => fake()->paragraph(),
             'markdown' => "# {$title}\n\n".fake()->paragraphs(4, true),
             'meta_title' => $title,
             'meta_description' => fake()->sentence(12),
-            'seo' => ['canonical_locale' => 'en'],
+            'seo' => ['canonical_locale' => Locales::fallback()],
         ];
     }
 
