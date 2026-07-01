@@ -736,12 +736,14 @@ class MagazineAiPipeline
     private function generatePostImage(Post $post, ContentTopic $topic): void
     {
         $prompt = $this->synthwaveImagePrompt($topic);
+        $altTexts = $this->imageAltTexts($post, $topic);
         $run = $this->startRun(AiRunType::Image, $topic, $post, config('magazine_ai.image_model', 'gemini-2.5-flash-image'));
         $metadata = [
             'style' => 'synthwave-cypherpunk',
             'role' => 'header',
             'prompt_version' => 2,
             'no_unsplash' => true,
+            'alt_texts' => $altTexts,
         ];
 
         if (! config('ai.providers.'.config('magazine_ai.provider', 'gemini').'.key')) {
@@ -751,7 +753,7 @@ class MagazineAiPipeline
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
-                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty background for {$topic->title}",
+                'alt_text' => $altTexts['en'] ?? $this->fallbackImageAltText($post, $topic, 'en'),
                 'status' => 'pending',
                 'metadata' => $metadata + ['reason' => 'image_generation_not_configured'],
             ]);
@@ -789,7 +791,7 @@ class MagazineAiPipeline
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
-                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty background for {$topic->title}",
+                'alt_text' => $altTexts['en'] ?? $this->fallbackImageAltText($post, $topic, 'en'),
                 'status' => is_string($path) ? 'ready' : 'pending',
                 'metadata' => $responsiveImage === null ? $metadata : $metadata + ['responsive_image' => $responsiveImage],
             ]);
@@ -811,7 +813,7 @@ class MagazineAiPipeline
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.image_model', 'gemini-2.5-flash-image'),
                 'prompt' => $prompt,
-                'alt_text' => "Synthwave cypherpunk Bitcoin sovereignty background for {$topic->title}",
+                'alt_text' => $altTexts['en'] ?? $this->fallbackImageAltText($post, $topic, 'en'),
                 'status' => 'pending',
                 'metadata' => $metadata + ['error' => $exception->getMessage()],
             ]);
@@ -823,6 +825,66 @@ class MagazineAiPipeline
     private function synthwaveImagePrompt(ContentTopic $topic): string
     {
         return "Full-bleed synthwave editorial website background for article topic: {$topic->title}. Audience level: {$topic->audience_level}. Bitcoin financial sovereignty context, dark readable magazine atmosphere, Bitcoin orange focal light, restrained neon cyan and magenta accents, subtle grid lines, abstract ledger details, human-scale personal scene details like warm desk light, hands, notes, or a non-identifiable silhouette, modern handcrafted editorial character, cinematic depth, natural imperfections. Edge-to-edge background art only; no border, no frame, no book, no magazine mockup, no poster, no device mockup, no page layout, no floating card, no text in image, no logos, no identifiable real people, no stock-photo look, no glossy AI-slop aesthetic.";
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function imageAltTexts(Post $post, ContentTopic $topic): array
+    {
+        $fallback = collect(Locales::supported())
+            ->mapWithKeys(fn (string $locale): array => [
+                $locale => $this->fallbackImageAltText($post, $topic, $locale),
+            ])
+            ->all();
+
+        if (! $this->hasAiProviderKey()) {
+            return $fallback;
+        }
+
+        $response = $this->promptJson(
+            instructions: 'Write concise accessible alt text for an editorial Bitcoin article header image. Return only valid JSON. Describe the image meaningfully for screen readers. Do not include prompt/style labels such as synthwave, cypherpunk, AI art, background, or illustration unless visually necessary. Do not mention Bitcoin price, trading, altcoins, or financial advice. Translate each alt text naturally for its locale.',
+            prompt: json_encode([
+                'topic' => $topic->title,
+                'audience_level' => $topic->audience_level,
+                'article_titles' => $post->translations()
+                    ->get(['locale', 'title'])
+                    ->pluck('title', 'locale')
+                    ->all(),
+                'locales' => Locales::supported(),
+                'limits' => [
+                    'max_characters' => 140,
+                ],
+                'schema' => [
+                    'alt_texts' => [
+                        'en' => 'Concise English alt text',
+                        'de' => 'Concise German alt text',
+                    ],
+                ],
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+        );
+
+        $generated = is_array($response['alt_texts'] ?? null) ? $response['alt_texts'] : [];
+
+        return collect(Locales::supported())
+            ->mapWithKeys(fn (string $locale): array => [
+                $locale => Str::of($this->cleanText(
+                    is_scalar($generated[$locale] ?? null) ? (string) $generated[$locale] : '',
+                    $fallback[$locale],
+                ))->limit(140, '')->toString(),
+            ])
+            ->all();
+    }
+
+    private function fallbackImageAltText(Post $post, ContentTopic $topic, string $locale): string
+    {
+        $title = $post->translation($locale)?->title
+            ?? $post->translation('en')?->title
+            ?? $topic->title;
+
+        return $locale === 'de'
+            ? "Titelbild zum Artikel {$title}."
+            : "Header image for the article {$title}.";
     }
 
     /**

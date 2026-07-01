@@ -130,6 +130,47 @@ test('localized german posts render through the german route', function () {
         ->assertSee('Artikeldetails');
 });
 
+test('localized posts render image alt text for the current locale', function () {
+    $category = selfCustodyCategory();
+
+    $post = Post::factory()->published()->create([
+        'category_id' => $category->id,
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Bitcoin custody basics',
+        'slug' => 'bitcoin-custody-basics',
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'de',
+        'title' => 'Bitcoin-Verwahrung verstehen',
+        'slug' => 'bitcoin-verwahrung-verstehen',
+    ]);
+
+    PostAsset::factory()->create([
+        'post_id' => $post->id,
+        'url' => '/storage/post-assets/header.png',
+        'alt_text' => 'English header alt text',
+        'status' => 'ready',
+        'metadata' => [
+            'role' => 'header',
+            'alt_texts' => [
+                'en' => 'English header alt text',
+                'de' => 'Deutscher Titelbild-Alt-Text',
+            ],
+        ],
+    ]);
+
+    $this->get(route('magazine.localized.show', ['locale' => 'de', 'category' => 'selbstverwahrung', 'slug' => 'bitcoin-verwahrung-verstehen']))
+        ->assertSuccessful()
+        ->assertSee('alt="Deutscher Titelbild-Alt-Text"', false)
+        ->assertDontSee('alt="English header alt text"', false);
+});
+
 test('article urls are scoped by their real category', function () {
     $category = selfCustodyCategory();
 

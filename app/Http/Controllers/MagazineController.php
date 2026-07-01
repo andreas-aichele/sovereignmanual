@@ -88,7 +88,7 @@ class MagazineController extends Controller
             : ['html' => '', 'toc' => []];
         $tableOfContents = $article['toc'];
         $blocks = $localizedBlocks
-            ->map(function (PostBlock $block) use (&$usedHeadingIds, &$tableOfContents): array {
+            ->map(function (PostBlock $block) use ($locale, &$usedHeadingIds, &$tableOfContents): array {
                 $renderedBlock = $this->renderBlock($block, $usedHeadingIds);
                 $tableOfContents = [
                     ...$tableOfContents,
@@ -105,7 +105,7 @@ class MagazineController extends Controller
                     'data' => $block->data,
                     'asset' => $block->asset ? [
                         'url' => $this->assetUrl($block->asset),
-                        'alt' => $block->asset->alt_text,
+                        'alt' => $this->assetAltText($block->asset, $locale),
                         'responsive' => $block->asset->metadata['responsive_image'] ?? null,
                     ] : null,
                 ];
@@ -234,9 +234,20 @@ class MagazineController extends Controller
                 'slug' => $translation?->slug ?? $post->slug,
             ]),
             'image' => $coverImage ? $this->assetUrl($coverImage) : asset('fallback.jpg'),
-            'image_alt' => $coverImage?->alt_text ?? $title,
+            'image_alt' => $coverImage ? $this->assetAltText($coverImage, $locale, $title) : $title,
             'image_responsive' => $coverImage?->metadata['responsive_image'] ?? null,
         ];
+    }
+
+    private function assetAltText(PostAsset $asset, string $locale, ?string $fallback = null): string
+    {
+        $localizedAltText = $asset->metadata['alt_texts'][$locale] ?? null;
+
+        if (is_string($localizedAltText) && filled($localizedAltText)) {
+            return $localizedAltText;
+        }
+
+        return $asset->alt_text ?? $fallback ?? '';
     }
 
     private function assetUrl(PostAsset $asset): ?string
