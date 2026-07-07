@@ -48,7 +48,7 @@ test('pipeline creates a published post with english and german translations', f
         ->and($englishTranslation->seo['keywords'])->toContain('bitcoin')
         ->and($englishTranslation->slug)->toBe('why-bitcoin-custody-matters')
         ->and($germanTranslation->title)->toBe('Why Bitcoin custody matters')
-        ->and($germanTranslation->slug)->toBe('why-bitcoin-custody-matters-2')
+        ->and($germanTranslation->slug)->toBe('why-bitcoin-custody-matters')
         ->and(mb_strlen($germanTranslation->meta_title))->toBeLessThanOrEqual(60)
         ->and(mb_strlen($germanTranslation->meta_description))->toBeLessThanOrEqual(160)
         ->and($germanTranslation->seo['keywords'])->toContain('bitcoin')
@@ -274,9 +274,13 @@ test('topic ideation stores existing category topics as similarity exclusions', 
     ]);
     Category::query()->whereKeyNot($category->id)->delete();
 
-    Post::factory()->published()->create([
+    $post = Post::factory()->published()->create([
         'category_id' => $category->id,
-        'topic' => 'Bitcoin privacy threat models everyone keeps repeating',
+    ]);
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Bitcoin privacy threat models everyone keeps repeating',
     ]);
     Category::query()->whereKeyNot($category->id)->delete();
 

@@ -40,7 +40,6 @@ test('published posts appear on the magazine index', function () {
 
     $post = Post::factory()->published()->create([
         'category_id' => $category->id,
-        'topic' => 'Bitcoin self custody basics',
     ]);
 
     PostTranslation::factory()->create([

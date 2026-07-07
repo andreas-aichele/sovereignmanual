@@ -14,7 +14,7 @@ test('magazine models record audit entries', function () {
     ]);
 
     $post->update([
-        'topic' => 'Updated topic',
+        'audience_level' => 'intermediate',
     ]);
 
     expect(Audit::query()->where('auditable_type', Post::class)->count())->toBeGreaterThanOrEqual(2)

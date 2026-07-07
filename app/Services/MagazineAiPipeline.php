@@ -63,9 +63,7 @@ class MagazineAiPipeline
         $post = Post::create([
             'content_topic_id' => $topic->id,
             'category_id' => $topic->category_id ?? $this->defaultCategory()->id,
-            'slug' => $sourceSlug,
             'status' => PostStatus::Draft,
-            'topic' => $topic->title,
             'audience_level' => $topic->audience_level,
             'primary_language' => $sourceLocale,
             'scheduled_for' => $topic->scheduled_for,
@@ -344,7 +342,7 @@ class MagazineAiPipeline
         $this->generatePostImage(
             $post,
             $post->contentTopic ?? new ContentTopic([
-                'title' => $post->topic,
+                'title' => $post->translation($post->primary_language)?->title ?? 'Bitcoin article',
                 'audience_level' => $post->audience_level,
                 'primary_language' => $post->primary_language,
             ]),
@@ -943,6 +941,12 @@ class MagazineAiPipeline
         $prompt = $this->synthwaveImagePrompt($topic);
         $altTexts = $this->imageAltTexts($post, $topic);
         $run = $this->startRun(AiRunType::Image, $topic, $post, config('magazine_ai.image_model', 'gemini-2.5-flash-image'));
+        $imageSlug = $post->translation($sourceLocale)?->slug ?? Str::slug($topic->title);
+
+        if (! filled($imageSlug)) {
+            $imageSlug = "post-{$post->id}";
+        }
+
         $metadata = [
             'style' => 'synthwave-cypherpunk',
             'role' => 'header',
@@ -974,9 +978,9 @@ class MagazineAiPipeline
                 ->quality('medium')
                 ->generate(provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.image_model', 'gemini-2.5-flash-image'));
 
-            $temporaryPath = $image->storePubliclyAs("post-assets/{$post->id}", "{$post->slug}.png", 'public');
+            $temporaryPath = $image->storePubliclyAs("post-assets/{$post->id}", "{$imageSlug}.png", 'public');
             $path = is_string($temporaryPath)
-                ? app(ResponsiveImage::class)->convertToJpeg('public', $temporaryPath, "post-assets/{$post->id}/{$post->slug}.jpg") ?? $temporaryPath
+                ? app(ResponsiveImage::class)->convertToJpeg('public', $temporaryPath, "post-assets/{$post->id}/{$imageSlug}.jpg") ?? $temporaryPath
                 : null;
 
             if (is_string($temporaryPath) && $path !== $temporaryPath) {
@@ -1346,10 +1350,7 @@ class MagazineAiPipeline
             ->latest('published_at')
             ->limit($limit)
             ->get()
-            ->flatMap(fn (Post $post): array => [
-                $post->topic,
-                ...$post->translations->pluck('title')->all(),
-            ]);
+            ->flatMap(fn (Post $post): array => $post->translations->pluck('title')->all());
 
         $topicTitles = ContentTopic::query()
             ->whereBelongsTo($category)
@@ -1658,8 +1659,7 @@ class MagazineAiPipeline
         $slug = $baseSlug;
         $suffix = 2;
 
-        while (Post::query()->where('slug', $slug)->exists()
-            || PostTranslation::query()->where('locale', $locale)->where('slug', $slug)->exists()) {
+        while (PostTranslation::query()->where('locale', $locale)->where('slug', $slug)->exists()) {
             $slug = "{$baseSlug}-{$suffix}";
             $suffix++;
         }

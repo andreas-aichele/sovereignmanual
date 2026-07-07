@@ -14,9 +14,7 @@ use OwenIt\Auditing\Contracts\Auditable;
 #[Fillable([
     'content_topic_id',
     'category_id',
-    'slug',
     'status',
-    'topic',
     'audience_level',
     'primary_language',
     'published_at',

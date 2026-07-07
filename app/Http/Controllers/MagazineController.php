@@ -212,11 +212,11 @@ class MagazineController extends Controller
         $translation = $post->translation($locale);
         $category = $this->categorySlug($post->category, $locale);
         $coverImage = $this->coverImage($post);
-        $title = $translation?->title ?? $post->topic;
+        $title = $translation?->title ?? 'Untitled article';
+        $slug = $translation?->slug ?? '';
 
         return [
             'id' => $post->id,
-            'topic' => $post->topic,
             'status' => $post->status->value,
             'audience_level' => $post->audience_level,
             'category' => $category,
@@ -226,11 +226,11 @@ class MagazineController extends Controller
             ]),
             'published_at' => $post->published_at?->toAtomString(),
             'title' => $title,
-            'slug' => $translation?->slug ?? $post->slug,
+            'slug' => $slug,
             'excerpt' => $translation?->excerpt,
             'url' => $this->localizedRoute($locale, 'show', [
                 'category' => $category,
-                'slug' => $translation?->slug ?? $post->slug,
+                'slug' => $slug,
             ]),
             'image' => $coverImage ? $this->assetUrl($coverImage) : asset('fallback.jpg'),
             'image_alt' => $coverImage ? $this->assetAltText($coverImage, $locale, $title) : $title,

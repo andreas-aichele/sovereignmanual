@@ -9,7 +9,6 @@ use App\Models\ContentTopic;
 use App\Models\Post;
 use App\Support\Locales;
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Illuminate\Support\Str;
 
 /**
  * @extends Factory<Post>
@@ -23,7 +22,6 @@ class PostFactory extends Factory
      */
     public function definition(): array
     {
-        $topic = fake()->sentence(4);
         Category::query()->firstOrCreate(
             ['key' => 'self-custody', 'lang' => Language::German],
             [
@@ -43,9 +41,7 @@ class PostFactory extends Factory
                     'description' => 'Practical guidance for holding keys, building recovery plans, and reducing custody risk.',
                 ]
             )->id,
-            'slug' => Str::slug($topic).'-'.fake()->unique()->numberBetween(1000, 9999),
             'status' => PostStatus::Draft,
-            'topic' => $topic,
             'audience_level' => 'beginner',
             'primary_language' => Locales::fallback(),
             'scheduled_for' => now()->addDay(),
