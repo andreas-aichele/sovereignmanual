@@ -560,6 +560,20 @@ class MagazineController extends Controller
             ];
         }
 
+        $structuredHtml = match ($block->type) {
+            'insight' => $this->renderInsightData($block->data),
+            'checklist' => $this->renderChecklistData($block->data),
+            'sketch' => $this->renderSketchData($block->data),
+            default => '',
+        };
+
+        if ($structuredHtml !== '') {
+            return [
+                'html' => $structuredHtml,
+                'toc' => [],
+            ];
+        }
+
         if (! in_array($block->type, ['section', 'markdown'], true) && trim((string) $block->markdown) === '') {
             return [
                 'html' => '',
@@ -644,6 +658,75 @@ class MagazineController extends Controller
             ->toString();
 
         return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $data
+     */
+    private function renderInsightData(?array $data): string
+    {
+        $title = is_scalar($data['title'] ?? null) ? trim((string) $data['title']) : '';
+        $body = is_scalar($data['body'] ?? null) ? trim((string) $data['body']) : '';
+
+        if ($title === '' && $body === '') {
+            return '';
+        }
+
+        $titleHtml = $title === '' ? '' : '<h3 class="m-0 text-base font-semibold">'.e($title).'</h3>';
+        $bodyHtml = $body === '' ? '' : '<p class="text-base-content/80 m-0">'.e($body).'</p>';
+
+        return '<aside class="rounded-box border border-info/25 bg-info/10 p-5"><div class="flex flex-col gap-2">'.$titleHtml.$bodyHtml.'</div></aside>';
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $data
+     */
+    private function renderChecklistData(?array $data): string
+    {
+        $items = collect($data['items'] ?? [])
+            ->filter(fn (mixed $item): bool => is_scalar($item) && trim((string) $item) !== '')
+            ->map(fn (mixed $item): string => trim((string) $item))
+            ->values()
+            ->all();
+
+        if ($items === []) {
+            return '';
+        }
+
+        $title = is_scalar($data['title'] ?? null) ? trim((string) $data['title']) : '';
+        $titleHtml = $title === '' ? '' : '<h3 class="m-0 text-base font-semibold">'.e($title).'</h3>';
+        $itemsHtml = collect($items)
+            ->map(fn (string $item, int $index): string => '<li class="rounded-box border border-base-300 bg-base-200 p-3 text-base-content shadow-sm"><div class="flex items-start gap-3"><span class="badge badge-primary h-7 w-7 shrink-0 rounded-full p-0 font-semibold">'.($index + 1).'</span><span class="pt-0.5 font-medium">'.e($item).'</span></div></li>')
+            ->implode('');
+
+        return '<aside class="rounded-box border border-primary/40 bg-base-100 p-5 shadow-sm"><div class="flex flex-col gap-4">'.$titleHtml.'<ol class="m-0 grid list-none gap-2 p-0">'.$itemsHtml.'</ol></div></aside>';
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $data
+     */
+    private function renderSketchData(?array $data): string
+    {
+        $title = is_scalar($data['title'] ?? null) ? trim((string) $data['title']) : '';
+        $caption = is_scalar($data['caption'] ?? null) ? trim((string) $data['caption']) : '';
+        $labels = collect($data['labels'] ?? [])
+            ->filter(fn (mixed $label): bool => is_scalar($label) && trim((string) $label) !== '')
+            ->map(fn (mixed $label): string => trim((string) $label))
+            ->values()
+            ->all();
+
+        if ($title === '' && $caption === '' && $labels === []) {
+            return '';
+        }
+
+        $titleHtml = $title === '' ? '' : '<h3 class="m-0 text-base font-semibold">'.e($title).'</h3>';
+        $captionHtml = $caption === '' ? '' : '<p class="text-base-content/75 m-0">'.e($caption).'</p>';
+        $labelsHtml = collect($labels)
+            ->map(fn (string $label): string => '<span class="badge badge-outline">'.e($label).'</span>')
+            ->implode('');
+        $labelGroupHtml = $labelsHtml === '' ? '' : '<div class="flex flex-wrap gap-2">'.$labelsHtml.'</div>';
+
+        return '<aside class="rounded-box border border-base-300 bg-base-200/70 p-5"><div class="flex flex-col gap-3">'.$titleHtml.$captionHtml.$labelGroupHtml.'</div></aside>';
     }
 
     /**

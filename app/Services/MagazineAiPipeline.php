@@ -551,7 +551,7 @@ class MagazineAiPipeline
         ];
 
         $response = $this->promptJson(
-            instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Keep every section heading compact, ideally 3 to 7 words. Naturally use the provided SEO keywords in headings and body text where they fit. Add relevant internal Markdown links from the provided candidates. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for article sections with a heading, anchor, and markdown body that does not repeat the heading. Visual blocks may supplement the article, but must not replace section text. Store every process, tree, branch, wallet-allocation, comparison, sequence, timeline, or relationship diagram as a flow_diagram block with a structured data.diagram object, never as a Markdown code fence. Use data.diagram.kind to describe the diagram family. Do not include raw HTML, raw SVG, or Mermaid syntax.',
+            instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Keep every section heading compact, ideally 3 to 7 words. Naturally use the provided SEO keywords in headings and body text where they fit. Add relevant internal Markdown links from the provided candidates. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for article sections with a heading, anchor, and markdown body that does not repeat the heading. Place visual/support blocks immediately after the section they clarify; do not group insight, checklist, flow_diagram, or sketch blocks at the end of the article. Visual blocks may supplement the article, but must not replace section text. Store every process, tree, branch, wallet-allocation, comparison, sequence, timeline, or relationship diagram as a flow_diagram block with a structured data.diagram object, never as a Markdown code fence. Use data.diagram.kind to describe the diagram family. Do not include raw HTML, raw SVG, or Mermaid syntax.',
             prompt: json_encode([
                 'locale' => $locale,
                 'topic' => $topic->title,
@@ -1771,41 +1771,95 @@ class MagazineAiPipeline
      */
     private function fallbackBlocks(string $title, string $locale, string $markdown): array
     {
-        return [
-            [
+        $sections = $this->fallbackSectionBlocks($title, $locale, $markdown);
+        $lastSectionIndex = array_key_last($sections);
+        $insightAfterIndex = min(1, $lastSectionIndex ?? 0);
+        $blocks = [];
+
+        foreach ($sections as $index => $section) {
+            $blocks[] = $section;
+
+            if ($index === $insightAfterIndex) {
+                $blocks[] = $this->fallbackInsightBlock();
+            }
+
+            if ($index === $lastSectionIndex) {
+                $blocks[] = $this->fallbackFlowDiagramBlock();
+                $blocks[] = $this->fallbackChecklistBlock();
+            }
+        }
+
+        return $blocks;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function fallbackSectionBlocks(string $title, string $locale, string $markdown): array
+    {
+        $body = $this->markdownWithoutLeadingHeading($markdown);
+        $parts = preg_split('/^##\s+(.+)$/m', $body, -1, PREG_SPLIT_DELIM_CAPTURE);
+
+        if (! is_array($parts) || count($parts) < 3) {
+            return [[
                 'type' => 'section',
                 'heading' => $title,
                 'anchor' => Str::slug($title, '-', $locale),
-                'markdown' => $this->markdownWithoutLeadingHeading($markdown),
+                'markdown' => $body,
                 'data' => [],
-            ],
-            [
-                'type' => 'insight',
-                'markdown' => null,
-                'data' => [
-                    'title' => 'Core insight',
-                    'body' => 'Sovereignty improves when decisions are explicit, tested at small scale, and reviewed on a schedule.',
-                ],
-            ],
-            [
-                'type' => 'flow_diagram',
-                'markdown' => null,
-                'data' => [
-                    'title' => 'Decision path',
-                    'diagram' => [
-                        'kind' => 'flowchart',
-                        'direction' => 'LR',
-                        'steps' => ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly'],
-                    ],
-                ],
-            ],
-            [
-                'type' => 'checklist',
-                'markdown' => null,
-                'data' => [
-                    'title' => 'Field checklist',
-                    'items' => ['Write the time horizon', 'Plan seed storage', 'Send a small test transaction', 'Update the policy note'],
-                ],
+            ]];
+        }
+
+        $sections = [];
+        $intro = trim((string) array_shift($parts));
+
+        if ($intro !== '') {
+            $sections[] = [
+                'type' => 'section',
+                'heading' => $title,
+                'anchor' => Str::slug($title, '-', $locale),
+                'markdown' => $intro,
+                'data' => [],
+            ];
+        }
+
+        foreach (array_chunk($parts, 2) as $section) {
+            $heading = trim((string) ($section[0] ?? ''));
+            $sectionMarkdown = trim((string) ($section[1] ?? ''));
+
+            if ($heading === '' || $sectionMarkdown === '') {
+                continue;
+            }
+
+            $sections[] = [
+                'type' => 'section',
+                'heading' => $this->seoText($heading, 'Practice', 72),
+                'anchor' => Str::slug($heading, '-', $locale),
+                'markdown' => $sectionMarkdown,
+                'data' => [],
+            ];
+        }
+
+        return $sections !== [] ? $sections : [[
+            'type' => 'section',
+            'heading' => $title,
+            'anchor' => Str::slug($title, '-', $locale),
+            'markdown' => $body,
+            'data' => [],
+        ]];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fallbackInsightBlock(): array
+    {
+        return [
+            'type' => 'insight',
+            'markdown' => null,
+            'data' => [
+                'title' => 'Core insight',
+                'body' => 'Sovereignty improves when decisions are explicit, tested at small scale, and reviewed on a schedule.',
             ],
         ];
     }
@@ -1813,7 +1867,7 @@ class MagazineAiPipeline
     /**
      * @return array<string, mixed>
      */
-    private function fallbackVisualBlock(string $locale): array
+    private function fallbackFlowDiagramBlock(): array
     {
         return [
             'type' => 'flow_diagram',
@@ -1823,10 +1877,33 @@ class MagazineAiPipeline
                 'diagram' => [
                     'kind' => 'flowchart',
                     'direction' => 'LR',
-                    'steps' => ['Goal', 'Risk', 'Test', 'Review'],
+                    'steps' => ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly'],
                 ],
             ],
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fallbackChecklistBlock(): array
+    {
+        return [
+            'type' => 'checklist',
+            'markdown' => null,
+            'data' => [
+                'title' => 'Field checklist',
+                'items' => ['Write the time horizon', 'Plan seed storage', 'Send a small test transaction', 'Update the policy note'],
+            ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function fallbackVisualBlock(string $locale): array
+    {
+        return $this->fallbackFlowDiagramBlock();
     }
 
     private function cleanMarkdown(mixed $markdown): string

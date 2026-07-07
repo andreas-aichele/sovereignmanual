@@ -68,7 +68,11 @@
                     </div>
 
                     @foreach ($post['blocks'] as $block)
-                        <section class="content-body mt-10 max-w-none">
+                        <section @class([
+                            'content-body max-w-none',
+                            'mt-10' => in_array($block['type'], ['section', 'markdown'], true),
+                            'mt-6' => ! in_array($block['type'], ['section', 'markdown'], true),
+                        ])>
                             @if ($block['asset'])
                                 <x-img
                                     class="rounded-box border-base-300 border"

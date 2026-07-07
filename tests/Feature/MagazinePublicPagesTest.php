@@ -1148,6 +1148,107 @@ test('structured flow diagram rows render shared branch nodes once', function ()
         ->assertDontSee('node_1_0[&quot;Income / Exchange&quot;]', false);
 });
 
+test('structured checklist blocks render data items', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Checklist Block',
+        'slug' => 'checklist-block',
+        'markdown' => 'Legacy text.',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'checklist',
+        'sort_order' => 0,
+        'data' => [
+            'title' => 'Before moving funds',
+            'items' => ['Verify the address', 'Send a small test transaction', 'Confirm backup access'],
+        ],
+    ]);
+
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'checklist-block']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<aside class="rounded-box border border-primary/40 bg-base-100 p-5 shadow-sm">', false)
+        ->assertSee('<h3 class="m-0 text-base font-semibold">Before moving funds</h3>', false)
+        ->assertSee('<ol class="m-0 grid list-none gap-2 p-0">', false)
+        ->assertSee('<li class="rounded-box border border-base-300 bg-base-200 p-3 text-base-content shadow-sm">', false)
+        ->assertSee('<span class="badge badge-primary h-7 w-7 shrink-0 rounded-full p-0 font-semibold">1</span><span class="pt-0.5 font-medium">Verify the address</span>', false)
+        ->assertSee('<span class="badge badge-primary h-7 w-7 shrink-0 rounded-full p-0 font-semibold">2</span><span class="pt-0.5 font-medium">Send a small test transaction</span>', false)
+        ->assertSee('<span class="badge badge-primary h-7 w-7 shrink-0 rounded-full p-0 font-semibold">3</span><span class="pt-0.5 font-medium">Confirm backup access</span>', false)
+        ->assertDontSee('Legacy text.');
+});
+
+test('structured insight blocks render data content', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Insight Data Block',
+        'slug' => 'insight-data-block',
+        'markdown' => 'Legacy text.',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'insight',
+        'sort_order' => 0,
+        'data' => [
+            'title' => 'Core insight',
+            'body' => 'Separate daily spending from long-term custody.',
+        ],
+    ]);
+
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'insight-data-block']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<aside class="rounded-box border border-info/25 bg-info/10 p-5">', false)
+        ->assertSee('<h3 class="m-0 text-base font-semibold">Core insight</h3>', false)
+        ->assertSee('<p class="text-base-content/80 m-0">Separate daily spending from long-term custody.</p>', false)
+        ->assertDontSee('Legacy text.');
+});
+
+test('structured sketch blocks render data labels', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Sketch Data Block',
+        'slug' => 'sketch-data-block',
+        'markdown' => 'Legacy text.',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'sketch',
+        'sort_order' => 0,
+        'data' => [
+            'title' => 'Wallet map',
+            'caption' => 'A compact model for thinking about wallet roles.',
+            'labels' => ['Income', 'Cold storage', 'Hot wallet'],
+        ],
+    ]);
+
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'sketch-data-block']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<aside class="rounded-box border border-base-300 bg-base-200/70 p-5">', false)
+        ->assertSee('<h3 class="m-0 text-base font-semibold">Wallet map</h3>', false)
+        ->assertSee('<p class="text-base-content/75 m-0">A compact model for thinking about wallet roles.</p>', false)
+        ->assertSee('<span class="badge badge-outline">Income</span>', false)
+        ->assertSee('<span class="badge badge-outline">Cold storage</span>', false)
+        ->assertSee('<span class="badge badge-outline">Hot wallet</span>', false)
+        ->assertDontSee('Legacy text.');
+});
+
 test('non section structured blocks render markdown when available', function () {
     $post = Post::factory()->published()->create();
 

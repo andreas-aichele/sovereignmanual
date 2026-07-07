@@ -167,7 +167,33 @@ test('pipeline block planning preserves article detail up to twelve blocks', fun
     expect($pipeline)->toContain('Preserve the full article detail')
         ->and($pipeline)->toContain('Do not summarize, shorten, or omit practical examples')
         ->and($pipeline)->toContain('Split the full draft into section blocks with several paragraphs each')
+        ->and($pipeline)->toContain('Place visual/support blocks immediately after the section they clarify')
+        ->and($pipeline)->toContain('do not group insight, checklist, flow_diagram, or sketch blocks at the end')
         ->and($pipeline)->toContain('->take(12)');
+});
+
+test('pipeline fallback interleaves visual blocks with sections', function () {
+    $pipeline = app(MagazineAiPipeline::class);
+    $method = new ReflectionMethod(MagazineAiPipeline::class, 'fallbackBlocks');
+
+    $blocks = $method->invoke(
+        $pipeline,
+        'Two Wallet System',
+        'en',
+        "# Two Wallet System\n\nIntro paragraph.\n\n## Vault\n\nKeep long-term funds offline.\n\n## Pocket\n\nKeep spending funds small.",
+    );
+
+    expect(array_column($blocks, 'type'))->toBe([
+        'section',
+        'section',
+        'insight',
+        'section',
+        'flow_diagram',
+        'checklist',
+    ])
+        ->and($blocks[0]['heading'])->toBe('Two Wallet System')
+        ->and($blocks[1]['heading'])->toBe('Vault')
+        ->and($blocks[3]['heading'])->toBe('Pocket');
 });
 
 test('pipeline stores markdown diagram fences as flow diagram blocks', function () {
