@@ -463,7 +463,7 @@ test('article language switcher uses localized category and slug for translated 
         ->assertSee('Seed Backup');
 });
 
-test('markdown is rendered to sanitized html for articles', function () {
+test('section block markdown is rendered to sanitized html for articles', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
@@ -471,19 +471,30 @@ test('markdown is rendered to sanitized html for articles', function () {
         'locale' => 'en',
         'title' => 'Markdown Rendering',
         'slug' => 'markdown-rendering',
-        'markdown' => "# Markdown Rendering\n\nA **strong** point.\n\n- first\n- second\n\n<script>alert('x')</script>",
+        'markdown' => 'Legacy translation markdown.',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'section',
+        'sort_order' => 0,
+        'heading' => 'Markdown Rendering',
+        'anchor' => 'markdown-rendering',
+        'markdown' => "A **strong** point.\n\n- first\n- second\n\n<script>alert('x')</script>",
     ]);
 
     $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'markdown-rendering']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
-        ->assertSee('<h1>Markdown Rendering</h1>', false)
+        ->assertSee('<h2 id="markdown-rendering">Markdown Rendering</h2>', false)
         ->assertSee('<strong>strong</strong>', false)
         ->assertSee('<li>first</li>', false)
-        ->assertDontSee('<script>', false);
+        ->assertDontSee('<script>', false)
+        ->assertDontSee('Legacy translation markdown');
 });
 
-test('arrow based diagram code blocks remain markdown code', function () {
+test('arrow based diagram code blocks in section markdown remain code', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
@@ -491,6 +502,16 @@ test('arrow based diagram code blocks remain markdown code', function () {
         'locale' => 'en',
         'title' => 'Diagram Code Rendering',
         'slug' => 'diagram-code-rendering',
+        'markdown' => 'Legacy translation markdown.',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'section',
+        'sort_order' => 0,
+        'heading' => 'Diagram Code Rendering',
+        'anchor' => 'diagram-code-rendering',
         'markdown' => "```\n[Traditional System]  --> [Intermediary / Bank]   --> [Your Money (Permissive)]\n[Bitcoin System]      --> [Your Private Keys]     --> [Your Money (Absolute)]\n```",
     ]);
 
@@ -499,10 +520,11 @@ test('arrow based diagram code blocks remain markdown code', function () {
         ->assertViewIs('magazine.show')
         ->assertSee('<pre><code>[Traditional System]', false)
         ->assertSee('[Bitcoin System]      --&gt; [Your Private Keys]', false)
-        ->assertDontSee('<pre class="mermaid">', false);
+        ->assertDontSee('<pre class="mermaid">', false)
+        ->assertDontSee('Legacy translation markdown');
 });
 
-test('branched diagram code blocks remain markdown code', function () {
+test('branched diagram code blocks in section markdown remain code', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
@@ -510,6 +532,16 @@ test('branched diagram code blocks remain markdown code', function () {
         'locale' => 'en',
         'title' => 'Branched Diagram Code Rendering',
         'slug' => 'branched-diagram-code-rendering',
+        'markdown' => 'Legacy translation markdown.',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'section',
+        'sort_order' => 0,
+        'heading' => 'Branched Diagram Code Rendering',
+        'anchor' => 'branched-diagram-code-rendering',
         'markdown' => "```\n[ Einkommen / Börse ]\n       │\n       ├───> [ Cold Storage (Tresor) ] ───> ~90-95% des Vermögens (Offline, Hardware-Wallet)\n       │\n       └───> [ Hot Wallet (Tasche) ]   ───> ~5-10% des Vermögens (Online, Mobil/Lightning)\n```",
     ]);
 
@@ -518,10 +550,11 @@ test('branched diagram code blocks remain markdown code', function () {
         ->assertViewIs('magazine.show')
         ->assertSee('<pre><code>[ Einkommen / Börse ]', false)
         ->assertSee('├───&gt; [ Cold Storage (Tresor) ] ───&gt;', false)
-        ->assertDontSee('<pre class="mermaid">', false);
+        ->assertDontSee('<pre class="mermaid">', false)
+        ->assertDontSee('Legacy translation markdown');
 });
 
-test('native mermaid code blocks remain markdown code', function () {
+test('native mermaid code blocks in section markdown remain code', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
@@ -529,6 +562,16 @@ test('native mermaid code blocks remain markdown code', function () {
         'locale' => 'en',
         'title' => 'Native Mermaid',
         'slug' => 'native-mermaid',
+        'markdown' => 'Legacy translation markdown.',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'section',
+        'sort_order' => 0,
+        'heading' => 'Native Mermaid',
+        'anchor' => 'native-mermaid',
         'markdown' => "```mermaid\nflowchart TB\n    A[Bitcoin] --> B[Self custody]\n```",
     ]);
 
@@ -538,7 +581,8 @@ test('native mermaid code blocks remain markdown code', function () {
         ->assertSee('<pre><code class="language-mermaid">', false)
         ->assertSee('flowchart TB')
         ->assertSee('A[Bitcoin] --&gt; B[Self custody]', false)
-        ->assertDontSee('<pre class="mermaid">', false);
+        ->assertDontSee('<pre class="mermaid">', false)
+        ->assertDontSee('Legacy translation markdown');
 });
 
 test('regular code blocks remain code when they are not diagrams', function () {
@@ -549,6 +593,16 @@ test('regular code blocks remain code when they are not diagrams', function () {
         'locale' => 'en',
         'title' => 'Code Rendering',
         'slug' => 'code-rendering',
+        'markdown' => 'Legacy translation markdown.',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'section',
+        'sort_order' => 0,
+        'heading' => 'Code Rendering',
+        'anchor' => 'code-rendering',
         'markdown' => "```php\n\$wallet = 'cold storage';\nreturn \$wallet;\n```",
     ]);
 
@@ -556,7 +610,8 @@ test('regular code blocks remain code when they are not diagrams', function () {
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertSee('<pre><code class="language-php">', false)
-        ->assertDontSee('class="mermaid"', false);
+        ->assertDontSee('class="mermaid"', false)
+        ->assertDontSee('Legacy translation markdown');
 });
 
 test('article images render responsive picture markup', function () {
@@ -619,7 +674,14 @@ test('article images render responsive picture markup', function () {
         'post_id' => $post->id,
         'post_asset_id' => $blockAsset->id,
         'locale' => 'en',
-        'markdown' => 'Block body.',
+        'type' => 'image',
+        'heading' => null,
+        'anchor' => null,
+        'markdown' => null,
+        'data' => [
+            'caption' => 'Block image caption',
+            'credit' => 'Stored asset',
+        ],
     ]);
 
     $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'responsive-images']))
@@ -637,6 +699,9 @@ test('article images render responsive picture markup', function () {
         ->assertSee('fetchpriority="high"', false)
         ->assertSee('src="/storage/post-assets/block.png"', false)
         ->assertSee('alt="Block image alt text"', false)
+        ->assertSee('<figcaption class="mt-3 flex flex-col gap-1">', false)
+        ->assertSee('Block image caption')
+        ->assertSee('Stored asset')
         ->assertSee('loading="lazy"', false);
 });
 
@@ -987,7 +1052,7 @@ test('numbered sitemap pages no longer exist', function () {
         ->assertNotFound();
 });
 
-test('article h2 headings render table of contents anchor links', function () {
+test('translation markdown does not render as article fallback without blocks', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
@@ -1001,22 +1066,18 @@ test('article h2 headings render table of contents anchor links', function () {
     $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'linked-contents']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
-        ->assertSee('Contents')
-        ->assertSee('<h2 id="risk-model">Risk Model</h2>', false)
-        ->assertSee('<h3>Cold Storage</h3>', false)
-        ->assertSee('<h4>Key Rotation</h4>', false)
-        ->assertSee('<h2 id="risk-model-2">Risk Model</h2>', false)
-        ->assertSee('data-toc-link', false)
-        ->assertSee('aria-[current=location]:font-semibold', false)
-        ->assertSee('href="#risk-model"', false)
-        ->assertSee('href="#risk-model-2"', false)
+        ->assertDontSee('<h2 id="risk-model">Risk Model</h2>', false)
+        ->assertDontSee('<h3>Cold Storage</h3>', false)
+        ->assertDontSee('<h4>Key Rotation</h4>', false)
+        ->assertDontSee('data-toc-link', false)
+        ->assertDontSee('href="#risk-model"', false)
         ->assertDontSee('href="#cold-storage"', false)
         ->assertDontSee('href="#key-rotation"', false)
         ->assertDontSee('id="cold-storage"', false)
         ->assertDontSee('id="key-rotation"', false);
 });
 
-test('structured post blocks provide table of contents anchors before markdown fallback parsing', function () {
+test('structured section blocks provide table of contents anchors', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
@@ -1045,7 +1106,7 @@ test('structured post blocks provide table of contents anchors before markdown f
         ->assertDontSee('Legacy Heading');
 });
 
-test('structured post block markdown headings are included in the table of contents', function () {
+test('structured post block markdown headings are not added to the table of contents', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
@@ -1070,11 +1131,13 @@ test('structured post block markdown headings are included in the table of conte
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
         ->assertSee('<h2 id="custody-basics">Custody Basics</h2>', false)
-        ->assertSee('<h2 id="wallet-setup">Wallet Setup</h2>', false)
-        ->assertSee('<h2 id="recovery-plan">Recovery Plan</h2>', false)
+        ->assertSee('<h2>Wallet Setup</h2>', false)
+        ->assertSee('<h2>Recovery Plan</h2>', false)
         ->assertSee('href="#custody-basics"', false)
-        ->assertSee('href="#wallet-setup"', false)
-        ->assertSee('href="#recovery-plan"', false);
+        ->assertDontSee('href="#wallet-setup"', false)
+        ->assertDontSee('href="#recovery-plan"', false)
+        ->assertDontSee('id="wallet-setup"', false)
+        ->assertDontSee('id="recovery-plan"', false);
 });
 
 test('structured flow diagram blocks render as article diagrams', function () {
@@ -1248,7 +1311,7 @@ test('structured sketch blocks render data labels', function () {
         ->assertDontSee('Legacy text.');
 });
 
-test('non section structured blocks render markdown when available', function () {
+test('non section blocks ignore markdown fallback content', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
@@ -1271,6 +1334,7 @@ test('non section structured blocks render markdown when available', function ()
     $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'insight-block']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
-        ->assertSee('<strong>Key insight:</strong> hold your own keys.', false)
+        ->assertDontSee('<strong>Key insight:</strong> hold your own keys.', false)
+        ->assertDontSee('Ignored heading')
         ->assertDontSee('Legacy text.');
 });

@@ -82,10 +82,6 @@ class MagazineController extends Controller
         $localizedBlocks = $post->blocks
             ->where('locale', $locale)
             ->values();
-        $article = $localizedBlocks->isEmpty()
-            ? $this->renderMarkdownWithTableOfContents($translation->markdown, $usedHeadingIds)
-            : ['html' => '', 'toc' => []];
-        $tableOfContents = $article['toc'];
         $blocks = $localizedBlocks
             ->map(function (PostBlock $block) use ($locale, &$usedHeadingIds, &$tableOfContents): array {
                 $renderedBlock = $this->renderBlock($block, $usedHeadingIds);
@@ -115,7 +111,7 @@ class MagazineController extends Controller
             'post' => [
                 ...$this->serializePostSummary($post, $locale),
                 'markdown' => $translation->markdown,
-                'html' => $article['html'],
+                'html' => '',
                 'blocks' => $blocks,
                 'toc' => $tableOfContents,
             ],
@@ -560,27 +556,36 @@ class MagazineController extends Controller
             ];
         }
 
-        $structuredHtml = match ($block->type) {
+        if ($block->type === 'image') {
+            return [
+                'html' => $this->renderImageData($block->data),
+                'toc' => [],
+            ];
+        }
+
+        if ($block->type === 'section') {
+            return $this->renderSectionBlock($block, $usedHeadingIds);
+        }
+
+        $html = match ($block->type) {
             'insight' => $this->renderInsightData($block->data),
             'checklist' => $this->renderChecklistData($block->data),
             'sketch' => $this->renderSketchData($block->data),
             default => '',
         };
 
-        if ($structuredHtml !== '') {
-            return [
-                'html' => $structuredHtml,
-                'toc' => [],
-            ];
-        }
+        return [
+            'html' => $html,
+            'toc' => [],
+        ];
+    }
 
-        if (! in_array($block->type, ['section', 'markdown'], true) && trim((string) $block->markdown) === '') {
-            return [
-                'html' => '',
-                'toc' => [],
-            ];
-        }
-
+    /**
+     * @param  array<string, int>  $usedHeadingIds
+     * @return array{html: string, toc: array<int, array{id: string, title: string, level: int}>}
+     */
+    private function renderSectionBlock(PostBlock $block, array &$usedHeadingIds): array
+    {
         $toc = [];
         $heading = $this->cleanHeading($block->heading);
         $headingHtml = '';
@@ -595,55 +600,10 @@ class MagazineController extends Controller
             $headingHtml = '<h2 id="'.$id.'">'.e($heading).'</h2>';
         }
 
-        $renderedMarkdown = $this->renderMarkdownWithTableOfContents($block->markdown, $usedHeadingIds);
+        $renderedMarkdown = $this->renderMarkdown($block->markdown);
 
         return [
-            'html' => $headingHtml.$renderedMarkdown['html'],
-            'toc' => [
-                ...$toc,
-                ...$renderedMarkdown['toc'],
-            ],
-        ];
-    }
-
-    /**
-     * @param  array<string, int>  $usedHeadingIds
-     * @return array{html: string, toc: array<int, array{id: string, title: string, level: int}>}
-     */
-    private function renderMarkdownWithTableOfContents(?string $markdown, array &$usedHeadingIds): array
-    {
-        $toc = [];
-        $html = Str::of($markdown ?? '')
-            ->markdown([
-                'html_input' => 'strip',
-                'allow_unsafe_links' => false,
-            ])
-            ->toString();
-
-        $html = preg_replace_callback(
-            '/<h2>(.*?)<\/h2>/s',
-            function (array $matches) use (&$toc, &$usedHeadingIds): string {
-                $htmlTitle = $matches[1];
-                $title = trim(html_entity_decode(strip_tags($htmlTitle), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
-
-                if ($title === '') {
-                    return $matches[0];
-                }
-
-                $id = $this->uniqueHeadingId($title, $usedHeadingIds);
-                $toc[] = [
-                    'id' => $id,
-                    'title' => $title,
-                    'level' => 2,
-                ];
-
-                return "<h2 id=\"{$id}\">{$htmlTitle}</h2>";
-            },
-            $html
-        );
-
-        return [
-            'html' => $html ?? '',
+            'html' => $headingHtml.$renderedMarkdown,
             'toc' => $toc,
         ];
     }
@@ -658,6 +618,24 @@ class MagazineController extends Controller
             ->toString();
 
         return $html;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $data
+     */
+    private function renderImageData(?array $data): string
+    {
+        $caption = is_scalar($data['caption'] ?? null) ? trim((string) $data['caption']) : '';
+        $credit = is_scalar($data['credit'] ?? null) ? trim((string) $data['credit']) : '';
+
+        if ($caption === '' && $credit === '') {
+            return '';
+        }
+
+        $captionHtml = $caption === '' ? '' : '<p class="m-0 text-sm font-medium">'.e($caption).'</p>';
+        $creditHtml = $credit === '' ? '' : '<p class="m-0 text-xs text-base-content/60">'.e($credit).'</p>';
+
+        return '<figcaption class="mt-3 flex flex-col gap-1">'.$captionHtml.$creditHtml.'</figcaption>';
     }
 
     /**

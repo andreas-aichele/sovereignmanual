@@ -108,9 +108,29 @@ class MagazineAiPipeline
                     'excerpt' => $sourceExcerpt,
                     'blocks' => $sourceBlocks,
                 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            ) ?? $this->fallbackTranslatedArticle($title, $locale);
+            );
+
+            if ($translatedArticle === null && $this->hasAiProviderKey()) {
+                $this->failRun($translationRun, 'AI translation did not return valid article JSON.', [
+                    'locale' => $locale,
+                ]);
+
+                throw new RuntimeException('AI translation did not return valid article JSON.');
+            }
+
+            $translatedArticle ??= $this->fallbackTranslatedArticle($title, $locale);
             $translatedTitle = $this->cleanText((string) ($translatedArticle['title'] ?? $title), $title);
-            $blocks = $this->sanitizeBlocks($translatedArticle['blocks'] ?? null, $locale, $translatedTitle, $this->fallbackMarkdown($title, $locale));
+            $blocks = $this->sanitizeBlocks($translatedArticle['blocks'] ?? null, $locale);
+
+            if ($sourceBlocks !== [] && $this->hasAiProviderKey() && $blocks === []) {
+                $this->failRun($translationRun, 'AI translation did not return usable article blocks.', [
+                    'locale' => $locale,
+                    'source_block_count' => count($sourceBlocks),
+                ]);
+
+                throw new RuntimeException('AI translation did not return usable article blocks.');
+            }
+
             $localizedInternalLinks = $this->internalLinkCandidates($locale, $post->id);
             $localizedDraft = $this->markdownFromBlocks($blocks, $this->fallbackMarkdown($title, $locale));
             $this->finishRun($translationRun, $localizedDraft, ['title' => $translatedTitle, 'locale' => $locale]);
@@ -544,109 +564,166 @@ class MagazineAiPipeline
      */
     private function articleBlocks(ContentTopic $topic, string $locale, string $title, string $markdown, array $keywords = [], array $internalLinks = []): array
     {
-        $fallback = [
-            'blocks' => $this->fallbackBlocks($title, $locale, $markdown),
-        ];
+        if (! $this->hasAiProviderKey()) {
+            return [];
+        }
 
-        $response = $this->promptJson(
-            instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Keep every section heading compact, ideally 3 to 7 words. Naturally use the provided SEO keywords in headings and body text where they fit. Add relevant internal Markdown links from the provided candidates. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for article sections with a heading, anchor, and markdown body that does not repeat the heading. Place visual/support blocks immediately after the section they clarify; do not group insight, checklist, flow_diagram, or sketch blocks at the end of the article. Visual blocks may supplement the article, but must not replace section text. Store every process, tree, branch, wallet-allocation, comparison, sequence, timeline, or relationship diagram as a flow_diagram block with a structured data.diagram object, never as a Markdown code fence. Use data.diagram.kind to describe the diagram family. Do not include raw HTML, raw SVG, or Mermaid syntax.',
-            prompt: json_encode([
-                'locale' => $locale,
-                'topic' => $topic->title,
-                'audience_level' => $topic->audience_level,
-                'brief' => $topic->brief,
-                'seo_keywords' => $keywords,
-                'internal_link_candidates' => $internalLinks,
-                'markdown' => $markdown,
-                'schema' => [
-                    'blocks' => [
-                        [
-                            'type' => 'section',
-                            'heading' => 'Section heading',
-                            'anchor' => 'section-heading',
-                            'markdown' => 'Markdown section body without the heading',
-                            'data' => [],
-                        ],
-                        [
-                            'type' => 'insight',
-                            'markdown' => null,
-                            'data' => ['title' => 'Short label', 'body' => 'One focused insight'],
-                        ],
-                        [
-                            'type' => 'checklist',
-                            'markdown' => null,
-                            'data' => ['title' => 'Checklist title', 'items' => ['Action one', 'Action two']],
-                        ],
-                        [
-                            'type' => 'flow_diagram',
-                            'markdown' => null,
-                            'data' => [
-                                'title' => 'Flow title',
-                                'diagram' => [
-                                    'kind' => 'flowchart',
-                                    'direction' => 'LR',
-                                    'rows' => [
-                                        ['Shared start', 'Path one', 'Outcome one'],
-                                        ['Shared start', 'Path two', 'Outcome two'],
+        $run = $this->startRun(AiRunType::Outline, $topic);
+        $feedback = null;
+
+        for ($attempt = 1; $attempt <= 3; $attempt++) {
+            $response = $this->promptJson(
+                instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Keep every section heading compact, ideally 3 to 7 words. Naturally use the provided SEO keywords in headings and body text where they fit. Add relevant internal Markdown links from the provided candidates. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for all prose sections with an explicit heading column, anchor column, and markdown body that does not repeat the heading and does not contain nested H2 headings. Place visual/support blocks immediately after the section they clarify; do not group insight, checklist, flow_diagram, or sketch blocks at the end of the article. Visual blocks may supplement the article, but must not replace section text. Store every process, tree, branch, wallet-allocation, comparison, sequence, timeline, or relationship diagram as a flow_diagram block with a structured data.diagram object, never as a Markdown code fence. Use data.diagram.kind to describe the diagram family. Do not include raw HTML, raw SVG, or Mermaid syntax.',
+                prompt: json_encode([
+                    'locale' => $locale,
+                    'topic' => $topic->title,
+                    'audience_level' => $topic->audience_level,
+                    'brief' => $topic->brief,
+                    'seo_keywords' => $keywords,
+                    'internal_link_candidates' => $internalLinks,
+                    'markdown' => $markdown,
+                    'previous_attempt_feedback' => $feedback,
+                    'schema' => [
+                        'blocks' => [
+                            [
+                                'type' => 'section',
+                                'heading' => 'Section heading',
+                                'anchor' => 'section-heading',
+                                'markdown' => 'Markdown section body without the heading',
+                                'data' => [],
+                            ],
+                            [
+                                'type' => 'insight',
+                                'markdown' => null,
+                                'data' => ['title' => 'Short label', 'body' => 'One focused insight'],
+                            ],
+                            [
+                                'type' => 'checklist',
+                                'markdown' => null,
+                                'data' => ['title' => 'Checklist title', 'items' => ['Action one', 'Action two']],
+                            ],
+                            [
+                                'type' => 'flow_diagram',
+                                'markdown' => null,
+                                'data' => [
+                                    'title' => 'Flow title',
+                                    'diagram' => [
+                                        'kind' => 'flowchart',
+                                        'direction' => 'LR',
+                                        'rows' => [
+                                            ['Shared start', 'Path one', 'Outcome one'],
+                                            ['Shared start', 'Path two', 'Outcome two'],
+                                        ],
                                     ],
                                 ],
                             ],
-                        ],
-                        [
-                            'type' => 'sketch',
-                            'markdown' => null,
-                            'data' => ['title' => 'Sketch title', 'caption' => 'Short caption', 'labels' => ['Label one', 'Label two']],
+                            [
+                                'type' => 'sketch',
+                                'markdown' => null,
+                                'data' => ['title' => 'Sketch title', 'caption' => 'Short caption', 'labels' => ['Label one', 'Label two']],
+                            ],
                         ],
                     ],
-                ],
-            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-        ) ?? $fallback;
+                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            );
 
-        return $this->sanitizeBlocks($response['blocks'] ?? null, $locale, $title, $markdown);
+            $blocks = $this->sanitizeBlocks($this->extractBlockPlanBlocks($response), $locale);
+            $sectionCount = collect($blocks)->where('type', 'section')->count();
+            $feedback = 'Return at least three usable section blocks in the requested block schema.';
+
+            if ($sectionCount >= 3) {
+                $this->finishRun($run, $this->markdownFromBlocks($blocks, ''), [
+                    'attempts' => $attempt,
+                    'block_count' => count($blocks),
+                    'section_count' => $sectionCount,
+                    'block_types' => collect($blocks)->pluck('type')->values()->all(),
+                ]);
+
+                return $blocks;
+            }
+        }
+
+        $this->failRun($run, 'AI block planning did not return usable article blocks.', [
+            'feedback' => $feedback,
+        ]);
+
+        throw new RuntimeException('AI block planning did not return usable article blocks.');
+    }
+
+    /**
+     * @return array<int, mixed>|null
+     */
+    private function extractBlockPlanBlocks(?array $response): ?array
+    {
+        if ($response === null) {
+            return null;
+        }
+
+        if (is_array($response['blocks'] ?? null)) {
+            return $response['blocks'];
+        }
+
+        return array_is_list($response) ? $response : null;
     }
 
     /**
      * @return array<int, array<string, mixed>>
      */
-    private function sanitizeBlocks(mixed $blocks, string $locale, string $title, string $markdown): array
+    private function sanitizeBlocks(mixed $blocks, string $locale): array
     {
         if (! is_array($blocks)) {
-            return $this->fallbackBlocks($title, $locale, $markdown);
+            return [];
         }
 
-        $allowedTypes = ['section', 'markdown', 'insight', 'checklist', 'flow_diagram', 'sketch'];
-        $sanitized = collect($blocks)
+        return collect($blocks)
             ->filter(fn (mixed $block): bool => is_array($block))
-            ->flatMap(function (array $block) use ($allowedTypes): array {
-                $type = in_array($block['type'] ?? null, $allowedTypes, true) ? $block['type'] : 'markdown';
-                $data = is_array($block['data'] ?? null) ? $this->sanitizeBlockData($type, $block['data']) : [];
-                $heading = $type === 'section'
-                    ? $this->seoText((string) ($block['heading'] ?? ''), 'Practice', 72)
-                    : null;
-                $anchor = filled($heading) ? Str::slug((string) ($block['anchor'] ?? $heading)) : null;
+            ->map(function (array $block) use ($locale): ?array {
+                $type = $block['type'] ?? null;
 
-                return $this->expandMarkdownDiagramBlocks([
+                if ($type === 'section') {
+                    $heading = $this->seoText((string) ($block['heading'] ?? ''), 'Practice', 72);
+                    $anchor = filled($heading) ? Str::slug((string) ($block['anchor'] ?? $heading), '-', $locale) : null;
+                    $markdown = $this->cleanMarkdown($block['markdown'] ?? null);
+
+                    if (! filled($heading) || ! filled($anchor) || ! filled($markdown)) {
+                        return null;
+                    }
+
+                    return [
+                        'type' => 'section',
+                        'post_asset_id' => null,
+                        'heading' => $heading,
+                        'anchor' => $anchor,
+                        'markdown' => $markdown,
+                        'data' => [],
+                    ];
+                }
+
+                if (! in_array($type, ['insight', 'checklist', 'flow_diagram', 'sketch', 'image'], true)) {
+                    return null;
+                }
+
+                $data = is_array($block['data'] ?? null) ? $this->sanitizeBlockData($type, $block['data']) : [];
+
+                return [
                     'type' => $type,
-                    'heading' => filled($heading) ? $heading : null,
-                    'anchor' => filled($anchor) ? $anchor : null,
-                    'markdown' => in_array($type, ['section', 'markdown'], true) ? $this->cleanMarkdown($block['markdown'] ?? null) : null,
+                    'post_asset_id' => $type === 'image' ? $this->sanitizePostAssetId($block['post_asset_id'] ?? null) : null,
+                    'heading' => null,
+                    'anchor' => null,
+                    'markdown' => null,
                     'data' => $data,
-                ]);
+                ];
             })
-            ->filter(fn (array $block): bool => ! in_array($block['type'], ['section', 'markdown'], true) || filled($block['markdown']))
+            ->filter(function (array $block): bool {
+                if ($block['type'] === 'image') {
+                    return ($block['post_asset_id'] ?? null) !== null;
+                }
+
+                return true;
+            })
             ->take(12)
             ->values()
             ->all();
-
-        if ($sanitized === []) {
-            return $this->fallbackBlocks($title, $locale, $markdown);
-        }
-
-        if (! collect($sanitized)->contains(fn (array $block): bool => in_array($block['type'], ['insight', 'checklist', 'flow_diagram', 'sketch'], true))) {
-            $sanitized[] = $this->fallbackVisualBlock($locale);
-        }
-
-        return $sanitized;
     }
 
     /**
@@ -684,6 +761,19 @@ class MagazineAiPipeline
             })
             ->filter(fn (mixed $value): bool => $value !== null && $value !== '' && $value !== [])
             ->all();
+    }
+
+    private function sanitizePostAssetId(mixed $value): ?int
+    {
+        if (is_int($value) && $value > 0) {
+            return $value;
+        }
+
+        if (is_string($value) && ctype_digit($value) && (int) $value > 0) {
+            return (int) $value;
+        }
+
+        return null;
     }
 
     /**
@@ -740,161 +830,6 @@ class MagazineAiPipeline
     }
 
     /**
-     * @param  array<string, mixed>  $block
-     * @return array<int, array<string, mixed>>
-     */
-    private function expandMarkdownDiagramBlocks(array $block): array
-    {
-        if (! in_array($block['type'] ?? null, ['section', 'markdown'], true) || ! filled($block['markdown'] ?? null)) {
-            return [$block];
-        }
-
-        $diagrams = [];
-        $markdown = preg_replace_callback(
-            '/```(?P<language>[^\r\n`]*)\R(?P<code>.*?)\R?```/su',
-            function (array $matches) use (&$diagrams): string {
-                if (trim($matches['language']) !== '') {
-                    return $matches[0];
-                }
-
-                $rows = $this->parseAsciiDiagramRows($matches['code']);
-
-                if ($rows === []) {
-                    return $matches[0];
-                }
-
-                $diagrams[] = [
-                    'type' => 'flow_diagram',
-                    'heading' => null,
-                    'anchor' => null,
-                    'markdown' => null,
-                    'data' => [
-                        'diagram' => [
-                            'kind' => 'flowchart',
-                            'direction' => 'LR',
-                            'rows' => $rows,
-                        ],
-                    ],
-                ];
-
-                return '';
-            },
-            (string) $block['markdown']
-        ) ?? (string) $block['markdown'];
-
-        if ($diagrams === []) {
-            return [$block];
-        }
-
-        $block['markdown'] = Str::of($markdown)
-            ->replaceMatches("/\n{3,}/", "\n\n")
-            ->trim()
-            ->toString();
-
-        return [
-            $block,
-            ...$diagrams,
-        ];
-    }
-
-    /**
-     * @return array<int, array<int, string>>
-     */
-    private function parseAsciiDiagramRows(string $code): array
-    {
-        $lines = Str::of($code)
-            ->replace(["\r\n", "\r"], "\n")
-            ->explode("\n")
-            ->map(fn (string $line): string => trim($line))
-            ->filter()
-            ->values();
-
-        if ($lines->isEmpty()) {
-            return [];
-        }
-
-        $rootLabel = $this->diagramRootLabel($lines->first());
-        $rows = [];
-
-        foreach ($lines as $index => $line) {
-            if ($index === 0 && $rootLabel !== null) {
-                continue;
-            }
-
-            if ($this->isDiagramConnectorLine($line)) {
-                continue;
-            }
-
-            $row = $this->parseAsciiDiagramRow($line);
-
-            if ($row === []) {
-                return [];
-            }
-
-            if ($rootLabel !== null && $this->isBranchedDiagramRow($line)) {
-                array_unshift($row, $rootLabel);
-            }
-
-            if (count($row) < 2) {
-                return [];
-            }
-
-            $rows[] = $row;
-        }
-
-        return $rows;
-    }
-
-    private function diagramRootLabel(?string $line): ?string
-    {
-        if ($line === null || ! preg_match('/^\[[^\]]+\]$/u', $line)) {
-            return null;
-        }
-
-        return $this->cleanDiagramLabel($line);
-    }
-
-    private function isDiagramConnectorLine(string $line): bool
-    {
-        return preg_match('/^[\s│]+$/u', $line) === 1;
-    }
-
-    private function isBranchedDiagramRow(string $line): bool
-    {
-        return preg_match('/^[\s│]*(?:├|└|┬|┼|┤|┌|┐|┘|┴|─)/u', $line) === 1;
-    }
-
-    /**
-     * @return array<int, string>
-     */
-    private function parseAsciiDiagramRow(string $line): array
-    {
-        $line = preg_replace('/^[\s│├└┬┼┤┌┐┘┴─-]*(?:-{1,}|─{1,}|={1,})>\s*/u', '', $line) ?? $line;
-
-        if (! preg_match('/(?:-{1,}|─{1,}|={1,})>/u', $line)) {
-            return [];
-        }
-
-        $parts = preg_split('/\s*(?:-{1,}|─{1,}|={1,})>\s*/u', $line) ?: [];
-
-        return collect($parts)
-            ->map(fn (string $part): string => $this->cleanDiagramLabel($part))
-            ->filter()
-            ->values()
-            ->all();
-    }
-
-    private function cleanDiagramLabel(string $label): string
-    {
-        return Str::of($label)
-            ->trim()
-            ->replaceMatches('/^\[(.*)\]$/', '$1')
-            ->replaceMatches('/\s+/', ' ')
-            ->trim()
-            ->toString();
-    }
-
-    /**
      * @param  array<int, array<string, mixed>>  $blocks
      */
     private function markdownFromBlocks(array $blocks, string $fallback): string
@@ -924,6 +859,7 @@ class MagazineAiPipeline
     {
         foreach ($blocks as $index => $block) {
             $post->blocks()->create([
+                'post_asset_id' => $block['post_asset_id'] ?? null,
                 'locale' => $locale,
                 'type' => $block['type'],
                 'sort_order' => $index,
@@ -1762,148 +1698,8 @@ class MagazineAiPipeline
         return [
             'title' => $title,
             'excerpt' => 'A practical guide to Bitcoin, self custody, and financial sovereignty.',
-            'blocks' => $this->fallbackBlocks($title, $locale, $this->fallbackMarkdown($title, $locale)),
+            'blocks' => [],
         ];
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function fallbackBlocks(string $title, string $locale, string $markdown): array
-    {
-        $sections = $this->fallbackSectionBlocks($title, $locale, $markdown);
-        $lastSectionIndex = array_key_last($sections);
-        $insightAfterIndex = min(1, $lastSectionIndex ?? 0);
-        $blocks = [];
-
-        foreach ($sections as $index => $section) {
-            $blocks[] = $section;
-
-            if ($index === $insightAfterIndex) {
-                $blocks[] = $this->fallbackInsightBlock();
-            }
-
-            if ($index === $lastSectionIndex) {
-                $blocks[] = $this->fallbackFlowDiagramBlock();
-                $blocks[] = $this->fallbackChecklistBlock();
-            }
-        }
-
-        return $blocks;
-    }
-
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    private function fallbackSectionBlocks(string $title, string $locale, string $markdown): array
-    {
-        $body = $this->markdownWithoutLeadingHeading($markdown);
-        $parts = preg_split('/^##\s+(.+)$/m', $body, -1, PREG_SPLIT_DELIM_CAPTURE);
-
-        if (! is_array($parts) || count($parts) < 3) {
-            return [[
-                'type' => 'section',
-                'heading' => $title,
-                'anchor' => Str::slug($title, '-', $locale),
-                'markdown' => $body,
-                'data' => [],
-            ]];
-        }
-
-        $sections = [];
-        $intro = trim((string) array_shift($parts));
-
-        if ($intro !== '') {
-            $sections[] = [
-                'type' => 'section',
-                'heading' => $title,
-                'anchor' => Str::slug($title, '-', $locale),
-                'markdown' => $intro,
-                'data' => [],
-            ];
-        }
-
-        foreach (array_chunk($parts, 2) as $section) {
-            $heading = trim((string) ($section[0] ?? ''));
-            $sectionMarkdown = trim((string) ($section[1] ?? ''));
-
-            if ($heading === '' || $sectionMarkdown === '') {
-                continue;
-            }
-
-            $sections[] = [
-                'type' => 'section',
-                'heading' => $this->seoText($heading, 'Practice', 72),
-                'anchor' => Str::slug($heading, '-', $locale),
-                'markdown' => $sectionMarkdown,
-                'data' => [],
-            ];
-        }
-
-        return $sections !== [] ? $sections : [[
-            'type' => 'section',
-            'heading' => $title,
-            'anchor' => Str::slug($title, '-', $locale),
-            'markdown' => $body,
-            'data' => [],
-        ]];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function fallbackInsightBlock(): array
-    {
-        return [
-            'type' => 'insight',
-            'markdown' => null,
-            'data' => [
-                'title' => 'Core insight',
-                'body' => 'Sovereignty improves when decisions are explicit, tested at small scale, and reviewed on a schedule.',
-            ],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function fallbackFlowDiagramBlock(): array
-    {
-        return [
-            'type' => 'flow_diagram',
-            'markdown' => null,
-            'data' => [
-                'title' => 'Decision path',
-                'diagram' => [
-                    'kind' => 'flowchart',
-                    'direction' => 'LR',
-                    'steps' => ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly'],
-                ],
-            ],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function fallbackChecklistBlock(): array
-    {
-        return [
-            'type' => 'checklist',
-            'markdown' => null,
-            'data' => [
-                'title' => 'Field checklist',
-                'items' => ['Write the time horizon', 'Plan seed storage', 'Send a small test transaction', 'Update the policy note'],
-            ],
-        ];
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
-    private function fallbackVisualBlock(string $locale): array
-    {
-        return $this->fallbackFlowDiagramBlock();
     }
 
     private function cleanMarkdown(mixed $markdown): string
@@ -1916,14 +1712,6 @@ class MagazineAiPipeline
             ->replaceMatches('/<[^>]+>/', '')
             ->trim()
             ->limit(6000, '')
-            ->toString();
-    }
-
-    private function markdownWithoutLeadingHeading(string $markdown): string
-    {
-        return Str::of($markdown)
-            ->replaceMatches('/\A#{1,3}\s+.+\R{2,}/u', '')
-            ->trim()
             ->toString();
     }
 

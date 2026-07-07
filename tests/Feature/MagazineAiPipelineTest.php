@@ -35,8 +35,6 @@ test('pipeline creates a published post with english and german translations', f
     $englishTranslation = $post->translations()->where('locale', 'en')->firstOrFail();
     $germanTranslation = $post->translations()->where('locale', 'de')->firstOrFail();
     $asset = $post->assets()->firstOrFail();
-    $englishBlockTypes = $post->blocks()->where('locale', 'en')->pluck('type')->all();
-    $englishSection = $post->blocks()->where('locale', 'en')->where('type', 'section')->firstOrFail();
 
     expect($post->status)->toBe(PostStatus::Published)
         ->and($createdStatus)->toBe(PostStatus::Draft)
@@ -53,12 +51,7 @@ test('pipeline creates a published post with english and german translations', f
         ->and(mb_strlen($germanTranslation->meta_description))->toBeLessThanOrEqual(160)
         ->and($germanTranslation->seo['keywords'])->toContain('bitcoin')
         ->and($post->category?->key)->toBe('self-custody')
-        ->and($post->blocks()->where('locale', 'en')->count())->toBeGreaterThan(1)
-        ->and($post->blocks()->where('locale', 'de')->count())->toBeGreaterThan(1)
-        ->and($englishBlockTypes)->toContain('section')
-        ->and($englishSection->heading)->toBe('Why Bitcoin custody matters')
-        ->and($englishSection->anchor)->toBe('why-bitcoin-custody-matters')
-        ->and($englishBlockTypes)->toContain('flow_diagram')
+        ->and($post->blocks()->count())->toBe(0)
         ->and($asset->url)->toBeNull()
         ->and($asset->metadata['role'])->toBe('header')
         ->and($asset->metadata['reason'])->toBe('image_generation_not_configured')
@@ -89,7 +82,7 @@ test('pipeline creates translations for languages defined in the language enum',
     $post = app(MagazineAiPipeline::class)->generatePost($topic);
 
     expect($post->translations()->pluck('locale')->sort()->values()->all())->toBe(['de', 'en'])
-        ->and($post->blocks()->pluck('locale')->unique()->sort()->values()->all())->toBe(['de', 'en'])
+        ->and($post->blocks()->count())->toBe(0)
         ->and($post->aiRuns()->where('type', AiRunType::Translation)->exists())->toBeTrue();
 });
 
@@ -130,7 +123,7 @@ test('pipeline keeps h1 title fallback within limits without cutting words', fun
     $englishTranslation = $post->translations()->where('locale', 'en')->firstOrFail();
 
     expect(mb_strlen($englishTranslation->title))->toBeLessThanOrEqual(70)
-        ->and($englishTranslation->markdown)->toContain('## Bitcoin self custody threat models')
+        ->and($englishTranslation->markdown)->toContain('# Bitcoin self custody threat models for beginners who want practical security without relying on custodians')
         ->and($englishTranslation->title)->toEndWith('practical')
         ->and($englishTranslation->title)->not->toEndWith('practic');
 });
@@ -154,10 +147,9 @@ test('pipeline fallback translations are created for supported locales without l
 
     $post = app(MagazineAiPipeline::class)->generatePost($topic);
     $germanTranslation = $post->translations()->where('locale', 'de')->firstOrFail();
-    $germanInsight = $post->blocks()->where('locale', 'de')->where('type', 'insight')->firstOrFail();
 
     expect($germanTranslation->title)->toBe('Bitcoin self custody threat models for beginners')
-        ->and($germanInsight->data['title'])->toBe('Core insight')
+        ->and($post->blocks()->count())->toBe(0)
         ->and($germanTranslation->markdown)->toContain('Bitcoin self custody threat models for beginners');
 });
 
@@ -167,62 +159,62 @@ test('pipeline block planning preserves article detail up to twelve blocks', fun
     expect($pipeline)->toContain('Preserve the full article detail')
         ->and($pipeline)->toContain('Do not summarize, shorten, or omit practical examples')
         ->and($pipeline)->toContain('Split the full draft into section blocks with several paragraphs each')
+        ->and($pipeline)->toContain('does not contain nested H2 headings')
         ->and($pipeline)->toContain('Place visual/support blocks immediately after the section they clarify')
         ->and($pipeline)->toContain('do not group insight, checklist, flow_diagram, or sketch blocks at the end')
         ->and($pipeline)->toContain('->take(12)');
 });
 
-test('pipeline fallback interleaves visual blocks with sections', function () {
-    $pipeline = app(MagazineAiPipeline::class);
-    $method = new ReflectionMethod(MagazineAiPipeline::class, 'fallbackBlocks');
-
-    $blocks = $method->invoke(
-        $pipeline,
-        'Two Wallet System',
-        'en',
-        "# Two Wallet System\n\nIntro paragraph.\n\n## Vault\n\nKeep long-term funds offline.\n\n## Pocket\n\nKeep spending funds small.",
-    );
-
-    expect(array_column($blocks, 'type'))->toBe([
-        'section',
-        'section',
-        'insight',
-        'section',
-        'flow_diagram',
-        'checklist',
-    ])
-        ->and($blocks[0]['heading'])->toBe('Two Wallet System')
-        ->and($blocks[1]['heading'])->toBe('Vault')
-        ->and($blocks[3]['heading'])->toBe('Pocket');
-});
-
-test('pipeline stores markdown diagram fences as flow diagram blocks', function () {
+test('pipeline accepts a real generated block plan without inventing fallback blocks', function () {
     $pipeline = app(MagazineAiPipeline::class);
     $method = new ReflectionMethod(MagazineAiPipeline::class, 'sanitizeBlocks');
 
     $blocks = $method->invoke($pipeline, [
         [
             'type' => 'section',
-            'heading' => 'Wallet Split',
-            'anchor' => 'wallet-split',
-            'markdown' => "The split keeps daily spending separate.\n\n```\n[ Income / Exchange ]\n       │\n       ├───> [ Cold Storage (Vault) ] ───> ~90-95% of wealth\n       │\n       └───> [ Hot Wallet (Pocket) ] ───> ~5-10% of wealth\n```\n\nKeep the hot wallet small.",
+            'heading' => 'Why UTXO Labeling Matters',
+            'anchor' => 'why-utxo-labeling-matters',
+            'markdown' => "Every time you receive Bitcoin, you receive a UTXO.\n\n```\n[KYC UTXO] --> [Combined Transaction]\n```\n\nThe diagram must arrive as its own flow_diagram block.",
             'data' => [],
         ],
-    ], 'en', 'Wallet Split', 'Fallback markdown.');
+        [
+            'type' => 'insight',
+            'markdown' => null,
+            'data' => [
+                'title' => 'Core insight',
+                'body' => 'Labels are privacy boundaries, not decoration.',
+            ],
+        ],
+        [
+            'type' => 'flow_diagram',
+            'markdown' => null,
+            'data' => [
+                'title' => 'Decision path',
+                'diagram' => [
+                    'kind' => 'flowchart',
+                    'direction' => 'LR',
+                    'steps' => ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly'],
+                ],
+            ],
+        ],
+        [
+            'type' => 'checklist',
+            'markdown' => null,
+            'data' => [
+                'title' => 'Field checklist',
+                'items' => ['Label each UTXO', 'Freeze KYC coins', 'Use coin control'],
+            ],
+        ],
+    ], 'en');
 
-    expect($blocks)->toHaveCount(2)
-        ->and($blocks[0]['type'])->toBe('section')
-        ->and($blocks[0]['markdown'])->toContain('The split keeps daily spending separate.')
-        ->and($blocks[0]['markdown'])->toContain('Keep the hot wallet small.')
-        ->and($blocks[0]['markdown'])->not->toContain('```')
-        ->and($blocks[1]['type'])->toBe('flow_diagram')
-        ->and($blocks[1]['markdown'])->toBeNull()
-        ->and($blocks[1]['data']['diagram']['kind'])->toBe('flowchart')
-        ->and($blocks[1]['data']['diagram']['direction'])->toBe('LR')
-        ->and($blocks[1]['data']['diagram']['rows'])->toBe([
-            ['Income / Exchange', 'Cold Storage (Vault)', '~90-95% of wealth'],
-            ['Income / Exchange', 'Hot Wallet (Pocket)', '~5-10% of wealth'],
-        ]);
+    expect($blocks)->toHaveCount(4)
+        ->and(array_column($blocks, 'type'))->toBe(['section', 'insight', 'flow_diagram', 'checklist'])
+        ->and($blocks[0]['heading'])->toBe('Why UTXO Labeling Matters')
+        ->and($blocks[0]['anchor'])->toBe('why-utxo-labeling-matters')
+        ->and($blocks[0]['markdown'])->toContain('[KYC UTXO] --> [Combined Transaction]')
+        ->and($blocks[1]['data']['body'])->toBe('Labels are privacy boundaries, not decoration.')
+        ->and($blocks[2]['data']['diagram']['steps'])->toBe(['Clarify goal', 'Map risk', 'Test custody', 'Review regularly'])
+        ->and($blocks[3]['data']['items'])->toBe(['Label each UTXO', 'Freeze KYC coins', 'Use coin control']);
 });
 
 test('topic ideation creates scheduled topics', function () {

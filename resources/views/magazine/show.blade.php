@@ -73,15 +73,19 @@
                             'mt-10' => in_array($block['type'], ['section', 'markdown'], true),
                             'mt-6' => ! in_array($block['type'], ['section', 'markdown'], true),
                         ])>
-                            @if ($block['asset'])
-                                <x-img
-                                    class="rounded-box border-base-300 border"
-                                    :src="$block['asset']['url']" :alt="$block['asset']['alt'] ?? ''"
-                                    :responsive="$block['asset']['responsive']"
-                                    sizes="(min-width: 64rem) 48rem, 100vw" />
-                            @endif
+                            @if ($block['type'] === 'image' && $block['asset'])
+                                <figure class="m-0">
+                                    <x-img
+                                        class="rounded-box border-base-300 border"
+                                        :src="$block['asset']['url']" :alt="$block['asset']['alt'] ?? ''"
+                                        :responsive="$block['asset']['responsive']"
+                                        sizes="(min-width: 64rem) 48rem, 100vw" />
 
-                            {!! $block['html'] !!}
+                                    {!! $block['html'] !!}
+                                </figure>
+                            @else
+                                {!! $block['html'] !!}
+                            @endif
                         </section>
                     @endforeach
                 </div>

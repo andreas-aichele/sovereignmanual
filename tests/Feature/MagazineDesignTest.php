@@ -191,8 +191,8 @@ test('magazine article renders linked table of contents for mobile and desktop',
         ->and($show)->toContain('{{ $copy[\'toc\'] }}')
         ->and($show)->toContain('@foreach ($post[\'toc\'] as $item)')
         ->and($show)->toContain('href="#{{ $item[\'id\'] }}"')
-        ->and($controller)->toContain('renderMarkdownWithTableOfContents')
         ->and($controller)->toContain('uniqueHeadingId')
+        ->and($controller)->not->toContain('renderMarkdownWithTableOfContents')
         ->and($css)->toContain('.content-body h2[id]')
         ->and($css)->toContain('scroll-mt-24');
 });
