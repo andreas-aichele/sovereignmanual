@@ -484,28 +484,45 @@ test('markdown is rendered to sanitized html for articles', function () {
         ->assertDontSee('<script>', false);
 });
 
-test('arrow based diagram code blocks render as article diagrams', function () {
+test('arrow based diagram code blocks remain markdown code', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
         'post_id' => $post->id,
         'locale' => 'en',
-        'title' => 'Diagram Rendering',
-        'slug' => 'diagram-rendering',
+        'title' => 'Diagram Code Rendering',
+        'slug' => 'diagram-code-rendering',
         'markdown' => "```\n[Traditional System]  --> [Intermediary / Bank]   --> [Your Money (Permissive)]\n[Bitcoin System]      --> [Your Private Keys]     --> [Your Money (Absolute)]\n```",
     ]);
 
-    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'diagram-rendering']))
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'diagram-code-rendering']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
-        ->assertSee('<pre class="mermaid">', false)
-        ->assertSee('flowchart LR')
-        ->assertSee('node_0_0[&quot;Traditional System&quot;] --&gt; node_0_1[&quot;Intermediary / Bank&quot;]', false)
-        ->assertSee('node_1_1[&quot;Your Private Keys&quot;] --&gt; node_1_2[&quot;Your Money (Absolute)&quot;]', false)
-        ->assertDontSee('<pre><code>[Traditional System]', false);
+        ->assertSee('<pre><code>[Traditional System]', false)
+        ->assertSee('[Bitcoin System]      --&gt; [Your Private Keys]', false)
+        ->assertDontSee('<pre class="mermaid">', false);
 });
 
-test('native mermaid code blocks render as mermaid diagrams', function () {
+test('branched diagram code blocks remain markdown code', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Branched Diagram Code Rendering',
+        'slug' => 'branched-diagram-code-rendering',
+        'markdown' => "```\n[ Einkommen / Börse ]\n       │\n       ├───> [ Cold Storage (Tresor) ] ───> ~90-95% des Vermögens (Offline, Hardware-Wallet)\n       │\n       └───> [ Hot Wallet (Tasche) ]   ───> ~5-10% des Vermögens (Online, Mobil/Lightning)\n```",
+    ]);
+
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'branched-diagram-code-rendering']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<pre><code>[ Einkommen / Börse ]', false)
+        ->assertSee('├───&gt; [ Cold Storage (Tresor) ] ───&gt;', false)
+        ->assertDontSee('<pre class="mermaid">', false);
+});
+
+test('native mermaid code blocks remain markdown code', function () {
     $post = Post::factory()->published()->create();
 
     PostTranslation::factory()->create([
@@ -519,10 +536,10 @@ test('native mermaid code blocks render as mermaid diagrams', function () {
     $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'native-mermaid']))
         ->assertSuccessful()
         ->assertViewIs('magazine.show')
-        ->assertSee('<pre class="mermaid">', false)
+        ->assertSee('<pre><code class="language-mermaid">', false)
         ->assertSee('flowchart TB')
         ->assertSee('A[Bitcoin] --&gt; B[Self custody]', false)
-        ->assertDontSee('language-mermaid');
+        ->assertDontSee('<pre class="mermaid">', false);
 });
 
 test('regular code blocks remain code when they are not diagrams', function () {
@@ -1090,6 +1107,45 @@ test('structured flow diagram blocks render as article diagrams', function () {
         ->assertSee('%% Decision path')
         ->assertSee('node_0_0[&quot;Goal&quot;] --&gt; node_0_1[&quot;Risk&quot;]', false)
         ->assertSee('node_0_1[&quot;Risk&quot;] --&gt; node_0_2[&quot;Test&quot;]', false);
+});
+
+test('structured flow diagram rows render shared branch nodes once', function () {
+    $post = Post::factory()->published()->create();
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Structured Branched Diagram',
+        'slug' => 'structured-branched-diagram',
+        'markdown' => 'Legacy text.',
+    ]);
+
+    PostBlock::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'type' => 'flow_diagram',
+        'sort_order' => 0,
+        'data' => [
+            'title' => 'Wallet split',
+            'diagram' => [
+                'kind' => 'flowchart',
+                'direction' => 'TB',
+                'rows' => [
+                    ['Income / Exchange', 'Cold Storage (Vault)', '~90-95% of wealth'],
+                    ['Income / Exchange', 'Hot Wallet (Pocket)', '~5-10% of wealth'],
+                ],
+            ],
+        ],
+    ]);
+
+    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'structured-branched-diagram']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.show')
+        ->assertSee('<pre class="mermaid">', false)
+        ->assertSee('flowchart TB')
+        ->assertSee('node_0_0[&quot;Income / Exchange&quot;] --&gt; node_0_1[&quot;Cold Storage (Vault)&quot;]', false)
+        ->assertSee('node_0_0[&quot;Income / Exchange&quot;] --&gt; node_1_1[&quot;Hot Wallet (Pocket)&quot;]', false)
+        ->assertDontSee('node_1_0[&quot;Income / Exchange&quot;]', false);
 });
 
 test('non section structured blocks render markdown when available', function () {

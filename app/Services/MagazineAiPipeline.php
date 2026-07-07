@@ -551,7 +551,7 @@ class MagazineAiPipeline
         ];
 
         $response = $this->promptJson(
-            instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Keep every section heading compact, ideally 3 to 7 words. Naturally use the provided SEO keywords in headings and body text where they fit. Add relevant internal Markdown links from the provided candidates. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for article sections with a heading, anchor, and markdown body that does not repeat the heading. Visual blocks may supplement the article, but must not replace section text. Do not include raw HTML or raw SVG.',
+            instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Keep every section heading compact, ideally 3 to 7 words. Naturally use the provided SEO keywords in headings and body text where they fit. Add relevant internal Markdown links from the provided candidates. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for article sections with a heading, anchor, and markdown body that does not repeat the heading. Visual blocks may supplement the article, but must not replace section text. Store every process, tree, branch, wallet-allocation, comparison, sequence, timeline, or relationship diagram as a flow_diagram block with a structured data.diagram object, never as a Markdown code fence. Use data.diagram.kind to describe the diagram family. Do not include raw HTML, raw SVG, or Mermaid syntax.',
             prompt: json_encode([
                 'locale' => $locale,
                 'topic' => $topic->title,
@@ -582,7 +582,17 @@ class MagazineAiPipeline
                         [
                             'type' => 'flow_diagram',
                             'markdown' => null,
-                            'data' => ['title' => 'Flow title', 'steps' => ['Step one', 'Step two', 'Step three']],
+                            'data' => [
+                                'title' => 'Flow title',
+                                'diagram' => [
+                                    'kind' => 'flowchart',
+                                    'direction' => 'LR',
+                                    'rows' => [
+                                        ['Shared start', 'Path one', 'Outcome one'],
+                                        ['Shared start', 'Path two', 'Outcome two'],
+                                    ],
+                                ],
+                            ],
                         ],
                         [
                             'type' => 'sketch',
@@ -609,21 +619,21 @@ class MagazineAiPipeline
         $allowedTypes = ['section', 'markdown', 'insight', 'checklist', 'flow_diagram', 'sketch'];
         $sanitized = collect($blocks)
             ->filter(fn (mixed $block): bool => is_array($block))
-            ->map(function (array $block) use ($allowedTypes): array {
+            ->flatMap(function (array $block) use ($allowedTypes): array {
                 $type = in_array($block['type'] ?? null, $allowedTypes, true) ? $block['type'] : 'markdown';
-                $data = is_array($block['data'] ?? null) ? $this->sanitizeBlockData($block['data']) : [];
+                $data = is_array($block['data'] ?? null) ? $this->sanitizeBlockData($type, $block['data']) : [];
                 $heading = $type === 'section'
                     ? $this->seoText((string) ($block['heading'] ?? ''), 'Practice', 72)
                     : null;
                 $anchor = filled($heading) ? Str::slug((string) ($block['anchor'] ?? $heading)) : null;
 
-                return [
+                return $this->expandMarkdownDiagramBlocks([
                     'type' => $type,
                     'heading' => filled($heading) ? $heading : null,
                     'anchor' => filled($anchor) ? $anchor : null,
                     'markdown' => in_array($type, ['section', 'markdown'], true) ? $this->cleanMarkdown($block['markdown'] ?? null) : null,
                     'data' => $data,
-                ];
+                ]);
             })
             ->filter(fn (array $block): bool => ! in_array($block['type'], ['section', 'markdown'], true) || filled($block['markdown']))
             ->take(12)
@@ -645,7 +655,20 @@ class MagazineAiPipeline
      * @param  array<string, mixed>  $data
      * @return array<string, mixed>
      */
-    private function sanitizeBlockData(array $data): array
+    private function sanitizeBlockData(string $type, array $data): array
+    {
+        if ($type === 'flow_diagram') {
+            return $this->sanitizeFlowDiagramData($data);
+        }
+
+        return $this->sanitizeScalarBlockData($data);
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function sanitizeScalarBlockData(array $data): array
     {
         return collect($data)
             ->map(function (mixed $value): mixed {
@@ -663,6 +686,214 @@ class MagazineAiPipeline
             })
             ->filter(fn (mixed $value): bool => $value !== null && $value !== '' && $value !== [])
             ->all();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
+    private function sanitizeFlowDiagramData(array $data): array
+    {
+        $sanitized = [];
+        $title = is_scalar($data['title'] ?? null) ? $this->cleanText((string) $data['title'], '') : '';
+        $diagram = is_array($data['diagram'] ?? null) ? $data['diagram'] : $data;
+        $kind = is_scalar($diagram['kind'] ?? null) ? Str::of((string) $diagram['kind'])->lower()->replaceMatches('/[^a-z0-9_-]+/', '_')->trim('_')->toString() : 'flowchart';
+        $direction = is_scalar($diagram['direction'] ?? null) ? strtoupper(trim((string) $diagram['direction'])) : 'LR';
+        $rows = collect($diagram['rows'] ?? [])
+            ->filter(fn (mixed $row): bool => is_array($row))
+            ->map(fn (array $row): array => collect($row)
+                ->filter(fn (mixed $step): bool => is_scalar($step))
+                ->map(fn (mixed $step): string => $this->cleanText((string) $step, ''))
+                ->filter()
+                ->take(6)
+                ->values()
+                ->all())
+            ->filter(fn (array $row): bool => count($row) >= 2)
+            ->take(6)
+            ->values()
+            ->all();
+        $steps = collect($diagram['steps'] ?? [])
+            ->filter(fn (mixed $step): bool => is_scalar($step))
+            ->map(fn (mixed $step): string => $this->cleanText((string) $step, ''))
+            ->filter()
+            ->take(6)
+            ->values()
+            ->all();
+
+        if (filled($title)) {
+            $sanitized['title'] = $title;
+        }
+
+        $sanitized['diagram'] = [
+            'kind' => filled($kind) ? $kind : 'flowchart',
+        ];
+
+        if (in_array($direction, ['LR', 'RL', 'TB', 'TD', 'BT'], true)) {
+            $sanitized['diagram']['direction'] = $direction;
+        }
+
+        if ($rows !== []) {
+            $sanitized['diagram']['rows'] = $rows;
+        } elseif (count($steps) >= 2) {
+            $sanitized['diagram']['steps'] = $steps;
+        }
+
+        return $sanitized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $block
+     * @return array<int, array<string, mixed>>
+     */
+    private function expandMarkdownDiagramBlocks(array $block): array
+    {
+        if (! in_array($block['type'] ?? null, ['section', 'markdown'], true) || ! filled($block['markdown'] ?? null)) {
+            return [$block];
+        }
+
+        $diagrams = [];
+        $markdown = preg_replace_callback(
+            '/```(?P<language>[^\r\n`]*)\R(?P<code>.*?)\R?```/su',
+            function (array $matches) use (&$diagrams): string {
+                if (trim($matches['language']) !== '') {
+                    return $matches[0];
+                }
+
+                $rows = $this->parseAsciiDiagramRows($matches['code']);
+
+                if ($rows === []) {
+                    return $matches[0];
+                }
+
+                $diagrams[] = [
+                    'type' => 'flow_diagram',
+                    'heading' => null,
+                    'anchor' => null,
+                    'markdown' => null,
+                    'data' => [
+                        'diagram' => [
+                            'kind' => 'flowchart',
+                            'direction' => 'LR',
+                            'rows' => $rows,
+                        ],
+                    ],
+                ];
+
+                return '';
+            },
+            (string) $block['markdown']
+        ) ?? (string) $block['markdown'];
+
+        if ($diagrams === []) {
+            return [$block];
+        }
+
+        $block['markdown'] = Str::of($markdown)
+            ->replaceMatches("/\n{3,}/", "\n\n")
+            ->trim()
+            ->toString();
+
+        return [
+            $block,
+            ...$diagrams,
+        ];
+    }
+
+    /**
+     * @return array<int, array<int, string>>
+     */
+    private function parseAsciiDiagramRows(string $code): array
+    {
+        $lines = Str::of($code)
+            ->replace(["\r\n", "\r"], "\n")
+            ->explode("\n")
+            ->map(fn (string $line): string => trim($line))
+            ->filter()
+            ->values();
+
+        if ($lines->isEmpty()) {
+            return [];
+        }
+
+        $rootLabel = $this->diagramRootLabel($lines->first());
+        $rows = [];
+
+        foreach ($lines as $index => $line) {
+            if ($index === 0 && $rootLabel !== null) {
+                continue;
+            }
+
+            if ($this->isDiagramConnectorLine($line)) {
+                continue;
+            }
+
+            $row = $this->parseAsciiDiagramRow($line);
+
+            if ($row === []) {
+                return [];
+            }
+
+            if ($rootLabel !== null && $this->isBranchedDiagramRow($line)) {
+                array_unshift($row, $rootLabel);
+            }
+
+            if (count($row) < 2) {
+                return [];
+            }
+
+            $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    private function diagramRootLabel(?string $line): ?string
+    {
+        if ($line === null || ! preg_match('/^\[[^\]]+\]$/u', $line)) {
+            return null;
+        }
+
+        return $this->cleanDiagramLabel($line);
+    }
+
+    private function isDiagramConnectorLine(string $line): bool
+    {
+        return preg_match('/^[\s│]+$/u', $line) === 1;
+    }
+
+    private function isBranchedDiagramRow(string $line): bool
+    {
+        return preg_match('/^[\s│]*(?:├|└|┬|┼|┤|┌|┐|┘|┴|─)/u', $line) === 1;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function parseAsciiDiagramRow(string $line): array
+    {
+        $line = preg_replace('/^[\s│├└┬┼┤┌┐┘┴─-]*(?:-{1,}|─{1,}|={1,})>\s*/u', '', $line) ?? $line;
+
+        if (! preg_match('/(?:-{1,}|─{1,}|={1,})>/u', $line)) {
+            return [];
+        }
+
+        $parts = preg_split('/\s*(?:-{1,}|─{1,}|={1,})>\s*/u', $line) ?: [];
+
+        return collect($parts)
+            ->map(fn (string $part): string => $this->cleanDiagramLabel($part))
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function cleanDiagramLabel(string $label): string
+    {
+        return Str::of($label)
+            ->trim()
+            ->replaceMatches('/^\[(.*)\]$/', '$1')
+            ->replaceMatches('/\s+/', ' ')
+            ->trim()
+            ->toString();
     }
 
     /**
@@ -1561,7 +1792,11 @@ class MagazineAiPipeline
                 'markdown' => null,
                 'data' => [
                     'title' => 'Decision path',
-                    'steps' => ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly'],
+                    'diagram' => [
+                        'kind' => 'flowchart',
+                        'direction' => 'LR',
+                        'steps' => ['Clarify goal', 'Map risk', 'Test custody', 'Review regularly'],
+                    ],
                 ],
             ],
             [
@@ -1583,7 +1818,14 @@ class MagazineAiPipeline
         return [
             'type' => 'flow_diagram',
             'markdown' => null,
-            'data' => ['title' => 'Decision path', 'steps' => ['Goal', 'Risk', 'Test', 'Review']],
+            'data' => [
+                'title' => 'Decision path',
+                'diagram' => [
+                    'kind' => 'flowchart',
+                    'direction' => 'LR',
+                    'steps' => ['Goal', 'Risk', 'Test', 'Review'],
+                ],
+            ],
         ];
     }
 

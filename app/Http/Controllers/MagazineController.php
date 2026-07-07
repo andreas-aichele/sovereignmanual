@@ -606,8 +606,6 @@ class MagazineController extends Controller
             ])
             ->toString();
 
-        $html = $this->renderAsciiDiagramCodeBlocks($html);
-
         $html = preg_replace_callback(
             '/<h2>(.*?)<\/h2>/s',
             function (array $matches) use (&$toc, &$usedHeadingIds): string {
@@ -645,30 +643,7 @@ class MagazineController extends Controller
             ])
             ->toString();
 
-        return $this->renderAsciiDiagramCodeBlocks($html);
-    }
-
-    private function renderAsciiDiagramCodeBlocks(string $html): string
-    {
-        return preg_replace_callback(
-            '/<pre><code\b([^>]*)>(.*?)<\/code><\/pre>/s',
-            function (array $matches): string {
-                $code = html_entity_decode($matches[2], ENT_QUOTES | ENT_HTML5, 'UTF-8');
-
-                if (str_contains($matches[1], 'language-mermaid')) {
-                    return $this->renderMermaidBlock(trim($code));
-                }
-
-                $rows = $this->parseDiagramRows($code);
-
-                if ($rows === []) {
-                    return $matches[0];
-                }
-
-                return $this->renderMermaidBlock($this->mermaidFlowchart($rows));
-            },
-            $html
-        ) ?? $html;
+        return $html;
     }
 
     /**
@@ -676,64 +651,68 @@ class MagazineController extends Controller
      */
     private function renderFlowDiagramData(?array $data): string
     {
-        $steps = collect($data['steps'] ?? [])
-            ->filter(fn (mixed $step): bool => is_scalar($step) && trim((string) $step) !== '')
-            ->map(fn (mixed $step): string => trim((string) $step))
-            ->values()
-            ->all();
+        $rows = $this->flowDiagramRows($data);
 
-        if ($steps === []) {
+        if ($rows === []) {
             return '';
         }
 
         $title = is_scalar($data['title'] ?? null) ? trim((string) $data['title']) : '';
+        $direction = $this->flowDiagramDirection($data);
 
-        return $this->renderMermaidBlock($this->mermaidFlowchart([$steps], $title));
+        return $this->renderMermaidBlock($this->mermaidFlowchart($rows, $title, $direction));
     }
 
     /**
      * @return array<int, array<int, string>>
      */
-    private function parseDiagramRows(string $code): array
+    private function flowDiagramRows(?array $data): array
     {
-        $lines = Str::of($code)
-            ->replace(["\r\n", "\r"], "\n")
-            ->explode("\n")
-            ->map(fn (string $line): string => trim($line))
-            ->filter()
-            ->values();
-
-        if ($lines->isEmpty()) {
+        if (! is_array($data)) {
             return [];
         }
 
-        $rows = $lines
-            ->map(function (string $line): array {
-                if (! preg_match('/(?:-{1,2}>|={1,2}>)/', $line)) {
-                    return [];
-                }
+        $diagram = is_array($data['diagram'] ?? null) ? $data['diagram'] : $data;
 
-                return collect(preg_split('/\s*(?:-{1,2}>|={1,2}>)\s*/', $line) ?: [])
-                    ->map(fn (string $part): string => $this->cleanDiagramLabel($part))
-                    ->filter()
-                    ->values()
-                    ->all();
-            })
+        if (($diagram['kind'] ?? 'flowchart') !== 'flowchart') {
+            return [];
+        }
+
+        $rows = collect($diagram['rows'] ?? [])
+            ->filter(fn (mixed $row): bool => is_array($row))
+            ->map(fn (array $row): array => collect($row)
+                ->filter(fn (mixed $step): bool => is_scalar($step) && trim((string) $step) !== '')
+                ->map(fn (mixed $step): string => trim((string) $step))
+                ->values()
+                ->all())
             ->filter(fn (array $row): bool => count($row) >= 2)
             ->values()
             ->all();
 
-        return count($rows) === $lines->count() ? $rows : [];
+        if ($rows !== []) {
+            return $rows;
+        }
+
+        $steps = collect($diagram['steps'] ?? [])
+            ->filter(fn (mixed $step): bool => is_scalar($step) && trim((string) $step) !== '')
+            ->map(fn (mixed $step): string => trim((string) $step))
+            ->filter()
+            ->values()
+            ->all();
+
+        return count($steps) >= 2 ? [$steps] : [];
     }
 
-    private function cleanDiagramLabel(string $label): string
+    private function flowDiagramDirection(?array $data): string
     {
-        return Str::of($label)
-            ->trim()
-            ->replaceMatches('/^\[(.*)\]$/', '$1')
-            ->replaceMatches('/\s+/', ' ')
-            ->trim()
-            ->toString();
+        if (! is_array($data)) {
+            return 'LR';
+        }
+
+        $diagram = is_array($data['diagram'] ?? null) ? $data['diagram'] : $data;
+        $direction = is_scalar($diagram['direction'] ?? null) ? strtoupper(trim((string) $diagram['direction'])) : 'LR';
+
+        return in_array($direction, ['LR', 'RL', 'TB', 'TD', 'BT'], true) ? $direction : 'LR';
     }
 
     private function mermaidNodeId(int $rowIndex, int $columnIndex): string
@@ -749,9 +728,10 @@ class MagazineController extends Controller
     /**
      * @param  array<int, array<int, string>>  $rows
      */
-    private function mermaidFlowchart(array $rows, string $title = ''): string
+    private function mermaidFlowchart(array $rows, string $title = '', string $direction = 'LR'): string
     {
-        $lines = ['flowchart LR'];
+        $lines = ["flowchart {$direction}"];
+        $nodeIds = [];
 
         if ($title !== '') {
             $lines[] = '%% '.$title;
@@ -759,16 +739,30 @@ class MagazineController extends Controller
 
         foreach ($rows as $rowIndex => $row) {
             for ($columnIndex = 0; $columnIndex < count($row) - 1; $columnIndex++) {
-                $fromId = $this->mermaidNodeId($rowIndex, $columnIndex);
-                $toId = $this->mermaidNodeId($rowIndex, $columnIndex + 1);
                 $fromLabel = $this->mermaidLabel($row[$columnIndex]);
                 $toLabel = $this->mermaidLabel($row[$columnIndex + 1]);
+                $fromId = $this->sharedMermaidNodeId($nodeIds, $row[$columnIndex], $rowIndex, $columnIndex);
+                $toId = $this->sharedMermaidNodeId($nodeIds, $row[$columnIndex + 1], $rowIndex, $columnIndex + 1);
 
                 $lines[] = "    {$fromId}[\"{$fromLabel}\"] --> {$toId}[\"{$toLabel}\"]";
             }
         }
 
         return implode("\n", $lines);
+    }
+
+    /**
+     * @param  array<string, string>  $nodeIds
+     */
+    private function sharedMermaidNodeId(array &$nodeIds, string $label, int $rowIndex, int $columnIndex): string
+    {
+        $key = $columnIndex.':'.$label;
+
+        if (! isset($nodeIds[$key])) {
+            $nodeIds[$key] = $this->mermaidNodeId($rowIndex, $columnIndex);
+        }
+
+        return $nodeIds[$key];
     }
 
     private function renderMermaidBlock(string $diagram): string

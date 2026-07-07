@@ -227,8 +227,8 @@ test('magazine article diagrams have responsive readable styling', function () {
     expect($css)->toContain('.content-body .mermaid')
         ->and($css)->toContain('overflow-x-auto')
         ->and($css)->toContain('.content-body .mermaid svg')
-        ->and($controller)->toContain('renderAsciiDiagramCodeBlocks')
         ->and($controller)->toContain('renderFlowDiagramData')
+        ->and($controller)->toContain('flowDiagramRows')
         ->and($controller)->toContain('mermaidFlowchart');
 });
 

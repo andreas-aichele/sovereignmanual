@@ -170,6 +170,35 @@ test('pipeline block planning preserves article detail up to twelve blocks', fun
         ->and($pipeline)->toContain('->take(12)');
 });
 
+test('pipeline stores markdown diagram fences as flow diagram blocks', function () {
+    $pipeline = app(MagazineAiPipeline::class);
+    $method = new ReflectionMethod(MagazineAiPipeline::class, 'sanitizeBlocks');
+
+    $blocks = $method->invoke($pipeline, [
+        [
+            'type' => 'section',
+            'heading' => 'Wallet Split',
+            'anchor' => 'wallet-split',
+            'markdown' => "The split keeps daily spending separate.\n\n```\n[ Income / Exchange ]\n       │\n       ├───> [ Cold Storage (Vault) ] ───> ~90-95% of wealth\n       │\n       └───> [ Hot Wallet (Pocket) ] ───> ~5-10% of wealth\n```\n\nKeep the hot wallet small.",
+            'data' => [],
+        ],
+    ], 'en', 'Wallet Split', 'Fallback markdown.');
+
+    expect($blocks)->toHaveCount(2)
+        ->and($blocks[0]['type'])->toBe('section')
+        ->and($blocks[0]['markdown'])->toContain('The split keeps daily spending separate.')
+        ->and($blocks[0]['markdown'])->toContain('Keep the hot wallet small.')
+        ->and($blocks[0]['markdown'])->not->toContain('```')
+        ->and($blocks[1]['type'])->toBe('flow_diagram')
+        ->and($blocks[1]['markdown'])->toBeNull()
+        ->and($blocks[1]['data']['diagram']['kind'])->toBe('flowchart')
+        ->and($blocks[1]['data']['diagram']['direction'])->toBe('LR')
+        ->and($blocks[1]['data']['diagram']['rows'])->toBe([
+            ['Income / Exchange', 'Cold Storage (Vault)', '~90-95% of wealth'],
+            ['Income / Exchange', 'Hot Wallet (Pocket)', '~5-10% of wealth'],
+        ]);
+});
+
 test('topic ideation creates scheduled topics', function () {
     config(['ai.providers.gemini.key' => null]);
 
