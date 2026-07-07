@@ -481,7 +481,7 @@ test('section block markdown is rendered to sanitized html for articles', functi
         'sort_order' => 0,
         'heading' => 'Markdown Rendering',
         'anchor' => 'markdown-rendering',
-        'markdown' => "A **strong** point.\n\n- first\n- second\n\n<script>alert('x')</script>",
+        'markdown' => "A **strong** point.\n\n**Keep it offline**\nNever type recovery words into a browser.\n\n- first\n- second\n\n<script>alert('x')</script>",
     ]);
 
     $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'markdown-rendering']))
@@ -489,6 +489,7 @@ test('section block markdown is rendered to sanitized html for articles', functi
         ->assertViewIs('magazine.show')
         ->assertSee('<h2 id="markdown-rendering">Markdown Rendering</h2>', false)
         ->assertSee('<strong>strong</strong>', false)
+        ->assertSee("<p><strong>Keep it offline</strong><br />\nNever type recovery words into a browser.</p>", false)
         ->assertSee('<li>first</li>', false)
         ->assertDontSee('<script>', false)
         ->assertDontSee('Legacy translation markdown');

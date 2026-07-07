@@ -610,7 +610,7 @@ class MagazineController extends Controller
 
     private function renderMarkdown(?string $markdown): string
     {
-        $html = Str::of($markdown ?? '')
+        $html = Str::of($this->normalizeMarkdownLineBreaks($markdown ?? ''))
             ->markdown([
                 'html_input' => 'strip',
                 'allow_unsafe_links' => false,
@@ -618,6 +618,13 @@ class MagazineController extends Controller
             ->toString();
 
         return $html;
+    }
+
+    private function normalizeMarkdownLineBreaks(string $markdown): string
+    {
+        return Str::of($markdown)
+            ->replaceMatches('/^(\*\*[^*\r\n][^*\r\n]*\*\*)\R(?=\S)/m', "$1  \n")
+            ->toString();
     }
 
     /**
