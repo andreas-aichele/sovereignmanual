@@ -21,6 +21,13 @@ class Category extends Model
     /** @use HasFactory<CategoryFactory> */
     use HasFactory;
 
+    public const NAVIGATION_ORDER = [
+        'news',
+        'financial-sovereignty',
+        'mindset',
+        'self-custody',
+    ];
+
     /**
      * @return array<string, string>
      */

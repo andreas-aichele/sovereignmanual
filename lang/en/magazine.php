@@ -4,6 +4,7 @@ return [
     'language_switcher' => 'Language',
     'nav' => [
         'about' => 'About the project',
+        'categories' => 'Categories',
     ],
     'meta' => [
         'title' => 'Sovereign Manual Magazine',

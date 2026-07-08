@@ -139,6 +139,54 @@ test('about page language switcher stays on about pages', function () {
     ]);
 });
 
+test('public navigation links localized category pages', function () {
+    selfCustodyCategory();
+
+    Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+    Category::factory()->create([
+        'key' => 'financial-sovereignty',
+        'lang' => Language::English,
+        'slug' => 'financial-sovereignty',
+        'name' => 'Financial Sovereignty',
+    ]);
+    Category::factory()->create([
+        'key' => 'mindset',
+        'lang' => Language::English,
+        'slug' => 'mindset',
+        'name' => 'Mindset',
+    ]);
+    Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::German,
+        'slug' => 'nachrichten',
+        'name' => 'Nachrichten',
+    ]);
+
+    $this->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertSee('relative z-50 border-b', false)
+        ->assertDontSee('lg:flex', false)
+        ->assertDontSee('lg:hidden', false)
+        ->assertSee('Categories')
+        ->assertSeeInOrder([
+            route('magazine.category', ['category' => 'news']),
+            route('magazine.category', ['category' => 'financial-sovereignty']),
+            route('magazine.category', ['category' => 'mindset']),
+            route('magazine.category', ['category' => 'self-custody']),
+        ], false);
+
+    $this->get(route('magazine.localized.about', ['locale' => 'de']))
+        ->assertSuccessful()
+        ->assertSee('Kategorien')
+        ->assertSee('href="'.route('magazine.localized.category', ['locale' => 'de', 'category' => 'nachrichten']).'"', false)
+        ->assertSee('href="'.route('magazine.localized.category', ['locale' => 'de', 'category' => 'selbstverwahrung']).'"', false);
+});
+
 test('newest published post leads the magazine index', function () {
     $olderPost = Post::factory()->published()->create([
         'published_at' => now()->subDays(2),

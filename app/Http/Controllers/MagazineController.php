@@ -18,13 +18,6 @@ use Illuminate\Support\Str;
 
 class MagazineController extends Controller
 {
-    private const HOME_CATEGORY_ORDER = [
-        'news',
-        'financial-sovereignty',
-        'mindset',
-        'self-custody',
-    ];
-
     public function index(): View
     {
         $locale = App::currentLocale();
@@ -76,7 +69,7 @@ class MagazineController extends Controller
      */
     private function categorySections(string $locale, array $excludedPostIds): array
     {
-        $categoryOrder = array_flip(self::HOME_CATEGORY_ORDER);
+        $categoryOrder = array_flip(Category::NAVIGATION_ORDER);
 
         return Category::query()
             ->where('lang', Locales::language($locale))
