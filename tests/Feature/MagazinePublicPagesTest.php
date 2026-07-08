@@ -35,6 +35,23 @@ function selbstverwahrungCategory(): Category
     );
 }
 
+function publishedMagazinePost(Category $category, string $title, string $slug, int $daysAgo): Post
+{
+    $post = Post::factory()->published()->create([
+        'category_id' => $category->id,
+        'published_at' => now()->subDays($daysAgo),
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => $title,
+        'slug' => $slug,
+    ]);
+
+    return $post;
+}
+
 test('published posts appear on the magazine index', function () {
     $category = selfCustodyCategory();
 
@@ -86,6 +103,115 @@ test('newest published post leads the magazine index', function () {
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
         ->assertSeeInOrder(['Newest article', 'Older article']);
+});
+
+test('magazine index groups category articles below the hero and latest posts', function () {
+    $selfCustody = selfCustodyCategory();
+    $news = Category::factory()->create([
+        'key' => 'news',
+        'slug' => 'news',
+        'name' => 'News',
+        'description' => '**Stay informed without the noise.**<br><br>News context.',
+    ]);
+    $financialSovereignty = Category::factory()->create([
+        'key' => 'financial-sovereignty',
+        'slug' => 'financial-sovereignty',
+        'name' => 'Financial Sovereignty',
+        'description' => '**Own your money.**<br><br>Financial resilience.',
+    ]);
+    $mindset = Category::factory()->create([
+        'key' => 'mindset',
+        'slug' => 'mindset',
+        'name' => 'Mindset',
+        'description' => '**Bitcoin is as much a personal journey as a technological one.**<br><br>Long-term thinking.',
+    ]);
+
+    publishedMagazinePost($selfCustody, 'Hero article', 'hero-article', 0);
+    publishedMagazinePost($selfCustody, 'Latest self custody', 'latest-self-custody', 1);
+    publishedMagazinePost($news, 'Latest news', 'latest-news', 2);
+    publishedMagazinePost($financialSovereignty, 'Latest financial sovereignty', 'latest-financial-sovereignty', 3);
+    publishedMagazinePost($news, 'Protocol update context', 'protocol-update-context', 4);
+    publishedMagazinePost($news, 'Policy update explained', 'policy-update-explained', 5);
+    publishedMagazinePost($news, 'Mining news analysis', 'mining-news-analysis', 6);
+    publishedMagazinePost($financialSovereignty, 'Long-term savings', 'long-term-savings', 7);
+    publishedMagazinePost($financialSovereignty, 'Spending with intention', 'spending-with-intention', 8);
+    publishedMagazinePost($financialSovereignty, 'Building resilience', 'building-resilience', 9);
+    publishedMagazinePost($mindset, 'Low time preference', 'low-time-preference', 10);
+    publishedMagazinePost($mindset, 'Conviction without hype', 'conviction-without-hype', 11);
+    publishedMagazinePost($mindset, 'Patience and responsibility', 'patience-and-responsibility', 12);
+    publishedMagazinePost($selfCustody, 'Seed backup plans', 'seed-backup-plans', 13);
+    publishedMagazinePost($selfCustody, 'Hardware wallet checks', 'hardware-wallet-checks', 14);
+    publishedMagazinePost($selfCustody, 'Recovery drill basics', 'recovery-drill-basics', 15);
+
+    $response = $this->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.index')
+        ->assertSee('<strong>Stay informed without the noise.</strong>', false)
+        ->assertDontSee('**Stay informed without the noise.**')
+        ->assertDontSee('Latest articles')
+        ->assertSeeInOrder([
+            'Hero article',
+            'Latest self custody',
+            'Latest news',
+            'Latest financial sovereignty',
+            'News',
+            'Protocol update context',
+            'Policy update explained',
+            'Mining news analysis',
+            'Financial Sovereignty',
+            'Long-term savings',
+            'Spending with intention',
+            'Building resilience',
+            'Mindset',
+            'Low time preference',
+            'Conviction without hype',
+            'Patience and responsibility',
+            'Self Custody',
+            'Seed backup plans',
+            'Hardware wallet checks',
+            'Recovery drill basics',
+        ]);
+
+    $categorySections = collect($response->viewData('categorySections'));
+    $categoryArticleTitles = $categorySections->pluck('posts')->flatten(1)->pluck('title');
+
+    expect($response->viewData('featuredPost')['title'])->toBe('Hero article');
+    expect($response->viewData('latestPosts')->pluck('title')->all())->toBe([
+        'Latest self custody',
+        'Latest news',
+        'Latest financial sovereignty',
+    ]);
+    expect($categorySections->pluck('key')->all())->toBe([
+        'news',
+        'financial-sovereignty',
+        'mindset',
+        'self-custody',
+    ]);
+    expect($categoryArticleTitles)
+        ->not->toContain('Hero article')
+        ->not->toContain('Latest self custody')
+        ->not->toContain('Latest news')
+        ->not->toContain('Latest financial sovereignty');
+    expect(collect($categorySections->firstWhere('key', 'news')['posts'])->pluck('title')->all())->toBe([
+        'Protocol update context',
+        'Policy update explained',
+        'Mining news analysis',
+    ]);
+    expect(collect($categorySections->firstWhere('key', 'financial-sovereignty')['posts'])->pluck('title')->all())->toBe([
+        'Long-term savings',
+        'Spending with intention',
+        'Building resilience',
+    ]);
+    expect(collect($categorySections->firstWhere('key', 'mindset')['posts'])->pluck('title')->all())->toBe([
+        'Low time preference',
+        'Conviction without hype',
+        'Patience and responsibility',
+    ]);
+    expect(collect($categorySections->firstWhere('key', 'self-custody')['posts'])->pluck('title')->all())->toBe([
+        'Seed backup plans',
+        'Hardware wallet checks',
+        'Recovery drill basics',
+    ]);
 });
 
 test('unpublished posts are hidden from the public magazine', function () {

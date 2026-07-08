@@ -18,23 +18,31 @@ use Illuminate\Support\Str;
 
 class MagazineController extends Controller
 {
+    private const HOME_CATEGORY_ORDER = [
+        'news',
+        'financial-sovereignty',
+        'mindset',
+        'self-custody',
+    ];
+
     public function index(): View
     {
         $locale = App::currentLocale();
 
-        $posts = Post::query()
-            ->with(['category', 'translations', 'assets'])
-            ->where('status', PostStatus::Published)
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
-            ->latest('published_at')
-            ->paginate(12)
-            ->through(fn (Post $post): array => $this->serializePostSummary($post, $locale));
+        $topPosts = $this->publishedPostsQuery()
+            ->limit(4)
+            ->get();
+        $topPostIds = $topPosts->pluck('id');
+        $topPostSummaries = $topPosts
+            ->map(fn (Post $post): array => $this->serializePostSummary($post, $locale))
+            ->values();
 
         return view('magazine.index', [
             'locale' => $locale,
             'languageOptions' => $this->languageOptions($locale),
-            'posts' => $posts,
+            'featuredPost' => $topPostSummaries->first(),
+            'latestPosts' => $topPostSummaries->skip(1),
+            'categorySections' => $this->categorySections($locale, $topPostIds->all()),
             'copy' => $this->translationArray('index', $locale),
             'meta' => [
                 ...$this->translationArray('meta', $locale),
@@ -47,6 +55,77 @@ class MagazineController extends Controller
                 'structuredData' => $this->websiteStructuredData($locale),
             ],
         ]);
+    }
+
+    /**
+     * @return Builder<Post>
+     */
+    private function publishedPostsQuery(): Builder
+    {
+        return Post::query()
+            ->with(['category', 'translations', 'assets'])
+            ->where('status', PostStatus::Published)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->latest('published_at');
+    }
+
+    /**
+     * @param  array<int, int>  $excludedPostIds
+     * @return array<int, array{key: string, title: string, description_html: string, url: string, posts: array<int, array<string, mixed>>}>
+     */
+    private function categorySections(string $locale, array $excludedPostIds): array
+    {
+        $categoryOrder = array_flip(self::HOME_CATEGORY_ORDER);
+
+        return Category::query()
+            ->where('lang', Locales::language($locale))
+            ->get()
+            ->sortBy(fn (Category $category): array => [
+                $categoryOrder[$category->key] ?? PHP_INT_MAX,
+                $category->name,
+            ])
+            ->map(function (Category $category) use ($excludedPostIds, $locale) {
+                $posts = $this->publishedPostsQuery()
+                    ->whereNotIn('id', $excludedPostIds)
+                    ->where(function (Builder $query) use ($category): void {
+                        $query->whereHas('category', fn (Builder $query) => $query->where('key', $category->key));
+
+                        if ($category->key === 'self-custody') {
+                            $query->orWhereNull('category_id');
+                        }
+                    })
+                    ->limit(3)
+                    ->get()
+                    ->map(fn (Post $post): array => $this->serializePostSummary($post, $locale))
+                    ->values()
+                    ->all();
+
+                if ($posts === []) {
+                    return null;
+                }
+
+                return [
+                    'key' => $category->key,
+                    'title' => $category->label($locale),
+                    'description_html' => $this->renderCategoryDescription($category->localizedDescription($locale)),
+                    'url' => $this->localizedRoute($locale, 'category', [
+                        'category' => $category->localizedSlug($locale),
+                    ]),
+                    'posts' => $posts,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function renderCategoryDescription(string $description): string
+    {
+        return $this->renderMarkdown(Str::of($description)
+            ->replaceMatches('/<br\s*\/?>\s*<br\s*\/?>/i', "\n\n")
+            ->replaceMatches('/<br\s*\/?>/i', "  \n")
+            ->toString());
     }
 
     public function show(string $localeOrCategory, string $categoryOrSlug, ?string $slug = null): View
@@ -147,11 +226,7 @@ class MagazineController extends Controller
         $category ??= $localeOrCategory;
         $resolvedCategory = $this->findCategory($category, $locale);
 
-        $posts = Post::query()
-            ->with(['category', 'translations', 'assets'])
-            ->where('status', PostStatus::Published)
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
+        $posts = $this->publishedPostsQuery()
             ->where(function (Builder $query) use ($resolvedCategory): void {
                 $query->whereHas('category', fn (Builder $query) => $query->where('key', $resolvedCategory->key));
 
@@ -159,7 +234,6 @@ class MagazineController extends Controller
                     $query->orWhereNull('category_id');
                 }
             })
-            ->latest('published_at')
             ->paginate(12)
             ->through(fn (Post $post): array => $this->serializePostSummary($post, $locale));
 

@@ -76,8 +76,8 @@ test('magazine localization strings live in language files', function () {
         ->and($germanTranslations)->not->toHaveKeys(['alternate_locale', 'locales'])
         ->and($englishTranslations)->not->toHaveKey('categories')
         ->and($germanTranslations)->not->toHaveKey('categories')
-        ->and($englishTranslations['index'])->toHaveKeys(['about_body', 'about_heading'])
-        ->and($germanTranslations['index'])->toHaveKeys(['about_body', 'about_heading'])
+        ->and($englishTranslations['index'])->toHaveKeys(['about_body', 'about_heading', 'view_category'])
+        ->and($germanTranslations['index'])->toHaveKeys(['about_body', 'about_heading', 'view_category'])
         ->and($englishTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'details', 'language', 'magazine', 'toc'])
         ->and($germanTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'details', 'language', 'magazine', 'toc'])
         ->and($controller)->not->toContain("locale === 'de'")
@@ -92,6 +92,12 @@ test('magazine start page keeps visible intro copy and lower about section', fun
 
     expect($index)->toContain('<section class="mb-10 max-w-3xl">')
         ->and($index)->toContain('<h1')
+        ->and($index)->toContain('$section[\'description_html\']')
+        ->and($index)->toContain('{!! $section[\'description_html\'] !!}')
+        ->and($index)->toContain("@include('magazine.partials.article-card'")
+        ->and($index)->toContain('flex items-start justify-between gap-4')
+        ->and($index)->toContain('mt-2 max-w-2xl text-sm')
+        ->and($index)->toContain('btn btn-primary btn-sm')
         ->and($index)->toContain('$copy[\'about_heading\']')
         ->and($index)->toContain('$copy[\'about_body\']')
         ->and($index)->toContain('mt-14')
@@ -103,6 +109,7 @@ test('magazine start page keeps visible intro copy and lower about section', fun
 
 test('magazine listing uses compact mobile article cards', function () {
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
+    $card = file_get_contents(resource_path('views/magazine/partials/article-card.blade.php'));
     $image = file_get_contents(resource_path('views/components/img.blade.php'));
 
     expect($index)->toContain('relative aspect-4/3')
@@ -110,12 +117,12 @@ test('magazine listing uses compact mobile article cards', function () {
         ->and($index)->toContain('bg-linear-to-t')
         ->and($index)->toContain('lg:hidden')
         ->and($index)->toContain('card-body hidden justify-center lg:flex')
-        ->and($index)->toContain('card-side')
-        ->and($index)->toContain('sm:flex-col')
-        ->and($index)->toContain('aspect-square w-2/5')
-        ->and($index)->toContain('card-body w-3/5')
-        ->and($index)->toContain('max-sm:hidden')
-        ->and($index)->toContain('(min-width: 40rem) 50vw, 40vw')
+        ->and($card)->toContain('card-side')
+        ->and($card)->toContain('md:flex-col')
+        ->and($card)->toContain('aspect-square w-2/5')
+        ->and($card)->toContain('card-body w-3/5')
+        ->and($card)->toContain('max-md:hidden')
+        ->and($card)->toContain('(min-width: 48rem) 33vw, 40vw')
         ->and($image)->toContain('<picture class="block h-full w-full">');
 });
 
