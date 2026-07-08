@@ -3,12 +3,14 @@
 @php
     $locale ??= \App\Support\Locales::fallback();
     $categoryNavItems ??= [];
-    $homeUrl = $locale === \App\Support\Locales::fallback()
-        ? route('magazine.index')
-        : route('magazine.localized.index', ['locale' => $locale]);
-    $aboutUrl = $locale === \App\Support\Locales::fallback()
-        ? route('magazine.about')
-        : route('magazine.localized.about', ['locale' => $locale]);
+    $homeUrl =
+        $locale === \App\Support\Locales::fallback()
+            ? route('magazine.index')
+            : route('magazine.localized.index', ['locale' => $locale]);
+    $aboutUrl =
+        $locale === \App\Support\Locales::fallback()
+            ? route('magazine.about')
+            : route('magazine.localized.about', ['locale' => $locale]);
 @endphp
 
 <header

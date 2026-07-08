@@ -24,15 +24,16 @@
                 <a class="card card-border bg-base-200 lg:card-side mb-10 overflow-hidden shadow-xl transition-shadow hover:shadow-2xl"
                     href="{{ $featuredPost['url'] }}">
                     <figure
-                        class="bg-base-300 relative aspect-4/3 min-h-0 w-full lg:aspect-auto lg:min-h-80 lg:w-3/5">
+                        class="bg-base-300 aspect-4/3 relative min-h-0 w-full lg:aspect-auto lg:min-h-80 lg:w-3/5">
                         <x-img class="h-full w-full object-cover"
                             :src="$featuredPost['image']" :alt="$featuredPost['image_alt'] ??
                                 $featuredPost['title']"
                             :responsive="$featuredPost['image_responsive']"
-                            sizes="(min-width: 72rem) 40rem, (min-width: 64rem) 60vw, 100vw" hero />
+                            sizes="(min-width: 72rem) 40rem, (min-width: 64rem) 60vw, 100vw"
+                            hero />
 
                         <div
-                            class="from-base-100 via-base-100/80 absolute inset-x-0 bottom-0 bg-linear-to-t to-transparent p-5 pt-20 text-left lg:hidden">
+                            class="from-base-100 via-base-100/80 bg-linear-to-t absolute inset-x-0 bottom-0 to-transparent p-5 pt-20 text-left lg:hidden">
                             <div class="badge badge-primary mb-3">
                                 {{ $featuredPost['category_label'] }}</div>
                             <h2
@@ -41,7 +42,8 @@
                         </div>
                     </figure>
 
-                    <div class="card-body hidden justify-center lg:flex lg:w-2/5">
+                    <div
+                        class="card-body hidden justify-center lg:flex lg:w-2/5">
                         <div class="badge badge-primary badge-outline">
                             {{ $featuredPost['category_label'] }}</div>
                         <h2
@@ -66,10 +68,13 @@
                 <section class="mb-14">
                     <div class="grid gap-6 md:grid-cols-3">
                         @foreach ($latestPosts as $post)
-                            @include('magazine.partials.article-card', [
-                                'headingLevel' => 2,
-                                'post' => $post,
-                            ])
+                            @include(
+                                'magazine.partials.article-card',
+                                [
+                                    'headingLevel' => 2,
+                                    'post' => $post,
+                                ]
+                            )
                         @endforeach
                     </div>
                 </section>
@@ -77,8 +82,7 @@
 
             @foreach ($categorySections as $section)
                 <section class="border-base-300 mt-12 border-t pt-10">
-                    <div
-                        class="mb-5 flex flex-col gap-3">
+                    <div class="mb-5 flex flex-col gap-3">
                         <div>
                             <div class="flex items-start justify-between gap-4">
                                 <h2
@@ -91,7 +95,7 @@
                             </div>
                             @if ($section['description_html'])
                                 <div
-                                    class="content-body text-base-content/70 mt-2 max-w-2xl text-sm leading-6 [&>p]:my-0 [&>p+p]:mt-2">
+                                    class="content-body text-base-content/70 mt-2 max-w-2xl text-sm leading-6 [&>p+p]:mt-2 [&>p]:my-0">
                                     {!! $section['description_html'] !!}
                                 </div>
                             @endif
@@ -100,10 +104,13 @@
 
                     <div class="grid gap-6 md:grid-cols-3">
                         @foreach ($section['posts'] as $post)
-                            @include('magazine.partials.article-card', [
-                                'headingLevel' => 3,
-                                'post' => $post,
-                            ])
+                            @include(
+                                'magazine.partials.article-card',
+                                [
+                                    'headingLevel' => 3,
+                                    'post' => $post,
+                                ]
+                            )
                         @endforeach
                     </div>
                 </section>
