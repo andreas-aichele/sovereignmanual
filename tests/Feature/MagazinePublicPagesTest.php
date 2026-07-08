@@ -77,6 +77,68 @@ test('published posts appear on the magazine index', function () {
         ->assertSee('fallback.jpg');
 });
 
+test('magazine index links to about page without rendering the old about section', function () {
+    $category = selfCustodyCategory();
+
+    $post = Post::factory()->published()->create([
+        'category_id' => $category->id,
+    ]);
+
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Bitcoin self custody basics',
+        'slug' => 'bitcoin-self-custody-basics',
+    ]);
+
+    $this->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertSee('href="'.route('magazine.about').'"', false)
+        ->assertSee('About the project')
+        ->assertDontSee('About Sovereign Manual')
+        ->assertDontSee('Sovereign Manual is a practical Bitcoin magazine');
+});
+
+test('about page renders project description and localized seo tags', function () {
+    $this->get(route('magazine.about'))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.about')
+        ->assertViewHas('locale', 'en')
+        ->assertCookie('locale', 'en')
+        ->assertSee('<main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">', false)
+        ->assertSee('<link href="'.route('magazine.about').'" rel="canonical">', false)
+        ->assertSee('href="'.route('magazine.localized.about', ['locale' => 'en']).'"', false)
+        ->assertSee('href="'.route('magazine.localized.about', ['locale' => 'de']).'"', false)
+        ->assertSee('hreflang="x-default"', false)
+        ->assertSee('"@type":"AboutPage"', false)
+        ->assertSee('AI-generated content, clearly disclosed')
+        ->assertSee('Bitcoin only, no trading narrative')
+        ->assertSee('https://github.com/andreas-aichele/sovereignmanual');
+
+    $this->get(route('magazine.localized.about', ['locale' => 'de']))
+        ->assertSuccessful()
+        ->assertViewIs('magazine.about')
+        ->assertViewHas('locale', 'de')
+        ->assertCookie('locale', 'de')
+        ->assertSee('<link href="'.route('magazine.localized.about', ['locale' => 'de']).'" rel="canonical">', false)
+        ->assertSee('Über das Projekt')
+        ->assertSee('KI-generierte Inhalte, klar offengelegt')
+        ->assertSee('Repository ansehen');
+});
+
+test('about page language switcher stays on about pages', function () {
+    $response = $this->get(route('magazine.about'))
+        ->assertSuccessful()
+        ->assertViewHas('locale', 'en');
+
+    expect($response->viewData('languageOptions'))->toContain([
+        'locale' => 'de',
+        'label' => 'Deutsch',
+        'url' => route('magazine.localized.about', ['locale' => 'de']),
+        'current' => false,
+    ]);
+});
+
 test('newest published post leads the magazine index', function () {
     $olderPost = Post::factory()->published()->create([
         'published_at' => now()->subDays(2),

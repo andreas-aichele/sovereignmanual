@@ -62,6 +62,6 @@ class SetLocale
         $routeName = $request->route()?->getName();
 
         return is_string($routeName)
-            && in_array($routeName, ['magazine.index', 'magazine.category', 'magazine.show'], true);
+            && in_array($routeName, ['magazine.index', 'magazine.about', 'magazine.category', 'magazine.show'], true);
     }
 }

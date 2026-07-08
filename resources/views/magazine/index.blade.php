@@ -109,17 +109,6 @@
                 </section>
             @endforeach
 
-            <section class="border-base-300 mt-14 border-t pt-10">
-                <p
-                    class="text-primary text-sm font-semibold uppercase tracking-[0.25em]">
-                    {{ $copy['eyebrow'] }}</p>
-                <h2
-                    class="wrap-anywhere text-base-content mt-4 text-2xl font-semibold leading-tight sm:text-3xl">
-                    {{ $copy['about_heading'] }}</h2>
-                <p
-                    class="text-base-content/75 mt-4 max-w-3xl text-base leading-7">
-                    {{ $copy['about_body'] }}</p>
-            </section>
         @endif
     </main>
 </x-layouts.app>
