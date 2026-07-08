@@ -256,73 +256,33 @@ class MagazineAiPipeline
         $run = $this->startRun(AiRunType::Topic);
 
         if (! $this->hasAiProviderKey()) {
-            $message = 'News topic ideation skipped because the configured AI provider has no key for live web research.';
+            $message = 'News topic ideation failed because the configured AI provider has no key for live web research.';
             Log::channel('queue')->warning($message, [
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
             ]);
-            $this->finishRun($run, $message, ['created_topics' => [], 'reason' => 'missing_ai_provider_key']);
+            $this->failRun($run, $message, ['created_topics' => [], 'reason' => 'missing_ai_provider_key']);
 
-            return collect();
+            throw new RuntimeException($message);
         }
 
         $newsCategory = $this->newsCategory();
         $avoidTopics = $this->recentTopicTitles($newsCategory);
-        $research = null;
-        $topics = collect();
-
-        for ($attempt = 1; $attempt <= 3; $attempt++) {
-            $research = $this->promptStructuredJson(
-                instructions: 'Research current Bitcoin-only news using live Google Search grounding. Exclude altcoins, trading, price predictions, and hype. Prefer primary sources, official publications, reputable mainstream financial/technology reporting, respected Bitcoin technical sources, and government or court records. Treat social posts, anonymous blogs, exchanges, and aggregators as supporting context only. Use exact HTTPS source URLs from search results or citations. Do not invent URLs, dates, publishers, or article titles. Omit any source whose exact canonical URL is uncertain. At least one credible source per topic must be primary, technical, or official.',
-                prompt: json_encode([
-                    'task' => 'Find current Bitcoin news topic candidates suitable for Sovereign Manual.',
-                    'current_date' => now()->toDateString(),
-                    'attempt' => $attempt,
-                    'candidate_count' => max(3, $count * 3),
-                    'credibility_standard' => 'Each topic must have at least two independent credible sources. Prefer primary sources. Include publication dates, direct source urls, source types, credibility notes, and unresolved uncertainties.',
-                    'important' => 'Return candidate topics discovered through search even when some sources are weak; classify weak sources as supporting. Do not return an empty topics array unless no Bitcoin-only candidate can be found at all. The application will reject candidates that do not meet the final credibility threshold.',
-                    'avoid_similar_topics' => $avoidTopics,
-                    'schema' => [
-                        'topics' => [
-                            [
-                                'title' => 'Specific Bitcoin news topic',
-                                'summary' => 'Short factual brief with context and why it matters',
-                                'sources' => [
-                                    [
-                                        'title' => 'Source title',
-                                        'url' => 'https://example.com/source',
-                                        'published_at' => 'YYYY-MM-DD',
-                                        'publisher' => 'Publisher',
-                                        'type' => 'primary|reputable_reporting|technical|official|supporting',
-                                        'credibility_note' => 'Why this source is credible',
-                                    ],
-                                ],
-                                'credibility_notes' => ['Independent confirmation details'],
-                                'open_questions' => ['Known uncertainty'],
-                            ],
-                        ],
-                    ],
-                ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-                tools: [
-                    new WebSearch(maxSearches: 8),
-                ],
-            );
-
-            if ($research === null) {
-                continue;
-            }
-
-            $topics = $this->createNewsTopicsFromResearch($research, $newsCategory, $count, $avoidTopics);
-
-            if ($topics->isNotEmpty()) {
-                break;
-            }
-
-            Log::channel('queue')->warning('News topic ideation attempt did not meet credibility threshold.', [
-                'attempt' => $attempt,
-                ...$this->newsResearchDiagnostics($research),
-            ]);
-        }
+        $research = $this->promptStructuredJson(
+            instructions: 'Research current Bitcoin-only news using live Google Search grounding. Focus on current topics that are moving the Bitcoin space. Exclude altcoins, trading, price predictions, financial advice, and hype. Prefer primary, official, and technical sources when available, but reputable Bitcoin newspapers, magazines, and mainstream financial or technology reporting are acceptable credible sources. Treat social posts, anonymous blogs, exchanges, and aggregators as supporting context only. Use exact HTTPS source URLs from search results or citations. Do not invent URLs, dates, publishers, or article titles. Omit any source whose exact canonical URL is uncertain.',
+            prompt: json_encode([
+                'task' => 'Find current Bitcoin news topic candidates suitable for Sovereign Manual.',
+                'current_date' => now()->toDateString(),
+                'candidate_count' => max(6, $count * 6),
+                'credibility_standard' => 'Each topic must have at least two independent credible sources. Credible source types are primary, official, technical, and reputable_reporting. Primary sources are preferred but not required. Include publication dates, direct source urls, source types, credibility notes, and unresolved uncertainties.',
+                'important' => 'Return candidate topics discovered through search even when some sources are weak; classify weak sources as supporting. Do not return an empty topics array unless no Bitcoin-only candidate can be found at all. The application will reject candidates that do not meet the final credibility threshold.',
+                'avoid_similar_topics' => $avoidTopics,
+            ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
+            tools: [
+                new WebSearch(maxSearches: 8),
+            ],
+            timeout: (int) config('magazine_ai.news_research_timeout', 180),
+        );
 
         if ($research === null) {
             $this->failRun($run, 'News topic ideation failed because the AI provider did not return valid structured research.', [
@@ -331,6 +291,8 @@ class MagazineAiPipeline
 
             throw new RuntimeException('News topic ideation failed because the AI provider did not return valid structured research.');
         }
+
+        $topics = $this->createNewsTopicsFromResearch($research, $newsCategory, $count, $avoidTopics);
 
         if ($topics->isEmpty()) {
             $this->failRun($run, 'News topic ideation found no topics with at least two credible independent sources.', [
@@ -423,7 +385,7 @@ class MagazineAiPipeline
     /**
      * @return array<string, mixed>|null
      */
-    private function promptStructuredJson(string $instructions, string $prompt, array $tools = []): ?array
+    private function promptStructuredJson(string $instructions, string $prompt, array $tools = [], ?int $timeout = null): ?array
     {
         if (! $this->hasAiProviderKey()) {
             return null;
@@ -454,7 +416,12 @@ class MagazineAiPipeline
                         ])->withoutAdditionalProperties())
                         ->required(),
                 ],
-            )->prompt($prompt, provider: config('magazine_ai.provider', 'gemini'), model: config('magazine_ai.text_model', 'gemini-2.5-flash'));
+            )->prompt(
+                $prompt,
+                provider: config('magazine_ai.provider', 'gemini'),
+                model: config('magazine_ai.text_model', 'gemini-2.5-flash'),
+                timeout: $timeout,
+            );
 
             $structured = $response->toArray();
             $citations = $response->meta->citations
@@ -1349,7 +1316,7 @@ class MagazineAiPipeline
 
                 return $topic;
             })
-            ->filter(fn (array $topic): bool => $this->credibleSourceSetPasses(collect($topic['credible_sources'])))
+            ->filter(fn (array $topic): bool => count($topic['credible_sources']) >= 2)
             ->take($count)
             ->values()
             ->map(function (array $topic, int $index) use ($category, $avoidTopics, $groundingCitations): ContentTopic {
@@ -1430,16 +1397,7 @@ class MagazineAiPipeline
 
     private function hasCredibleSourceSet(mixed $sources): bool
     {
-        return $this->credibleSourceSetPasses($this->credibleSources($sources));
-    }
-
-    /**
-     * @param  Collection<int, array<string, string>>  $credibleSources
-     */
-    private function credibleSourceSetPasses(Collection $credibleSources): bool
-    {
-        return $credibleSources->count() >= 2
-            && $credibleSources->contains(fn (array $source): bool => in_array($source['type'], ['primary', 'technical', 'official'], true));
+        return $this->credibleSources($sources)->count() >= 2;
     }
 
     /**

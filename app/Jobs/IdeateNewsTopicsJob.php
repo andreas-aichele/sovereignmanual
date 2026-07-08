@@ -17,7 +17,7 @@ class IdeateNewsTopicsJob implements ShouldQueue
 
     public int $tries = 2;
 
-    public int $timeout = 300;
+    public int $timeout = 600;
 
     /**
      * @var array<int, int>
@@ -31,7 +31,7 @@ class IdeateNewsTopicsJob implements ShouldQueue
      */
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('news-topic-ideation'))->expireAfter(600)];
+        return [(new WithoutOverlapping('news-topic-ideation'))->expireAfter(900)];
     }
 
     public function handle(MagazineAiPipeline $pipeline): void

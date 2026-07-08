@@ -1,21 +1,43 @@
 <?php
 
+use App\Enums\AiRunStatus;
 use App\Enums\AiRunType;
 use App\Enums\ContentTopicStatus;
 use App\Enums\Language;
 use App\Enums\PostStatus;
 use App\Jobs\GeneratePostFromTopic;
 use App\Jobs\IdeateNewsTopicsJob;
+use App\Models\AiRun;
 use App\Models\Category;
 use App\Models\ContentTopic;
 use App\Models\Post;
 use App\Models\PostTranslation;
 use App\Services\MagazineAiPipeline;
 use Illuminate\Queue\Attributes\DeleteWhenMissingModels;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Psr\Log\LoggerInterface;
+
+function newsCategory(): Category
+{
+    return Category::factory()->create([
+        'key' => 'news',
+        'lang' => Language::English,
+        'slug' => 'news',
+        'name' => 'News',
+    ]);
+}
+
+/**
+ * @return Collection<int, ContentTopic>
+ */
+function newsTopicsFromResearch(array $research, int $count = 1): Collection
+{
+    return (new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch'))
+        ->invoke(app(MagazineAiPipeline::class), $research, newsCategory(), $count, []);
+}
 
 test('pipeline creates a published post with english and german translations', function () {
     config(['ai.providers.gemini.key' => null]);
@@ -286,12 +308,13 @@ test('topic ideation stores existing category topics as similarity exclusions', 
     expect($topic->constraints['avoid_similar_topics'])->toContain('Bitcoin privacy threat models everyone keeps repeating');
 });
 
-test('news ideation without provider web research creates no topics', function () {
+test('news ideation without provider web research fails visibly', function () {
     config(['ai.providers.gemini.key' => null]);
 
     $this->artisan('app:ideate-news-topics --count=1 --sync')->assertFailed();
 
-    expect(ContentTopic::query()->count())->toBe(0);
+    expect(ContentTopic::query()->count())->toBe(0)
+        ->and(AiRun::query()->latest('id')->firstOrFail()->status)->toBe(AiRunStatus::Failed);
 });
 
 test('news ideation command queues by default', function () {
@@ -309,16 +332,7 @@ test('news research must include at least two credible independent sources', fun
         'example.com/*' => Http::response('', 200),
     ]);
 
-    $category = Category::factory()->create([
-        'key' => 'news',
-        'lang' => Language::English,
-        'slug' => 'news',
-        'name' => 'News',
-    ]);
-    $pipeline = app(MagazineAiPipeline::class);
-    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
-
-    $topics = $method->invoke($pipeline, [
+    $topics = newsTopicsFromResearch([
         'grounding_citations' => [
             [
                 'title' => 'Bitcoin Core release notes',
@@ -366,7 +380,7 @@ test('news research must include at least two credible independent sources', fun
                 ],
             ],
         ],
-    ], $category, 2, []);
+    ], 2);
 
     expect($topics)->toHaveCount(1);
 
@@ -382,14 +396,8 @@ test('news topics without verified sources are not generated into posts', functi
     config(['ai.providers.gemini.key' => null]);
     Http::fake();
 
-    $category = Category::factory()->create([
-        'key' => 'news',
-        'lang' => Language::English,
-        'slug' => 'news',
-        'name' => 'News',
-    ]);
     $topic = ContentTopic::factory()->due()->create([
-        'category_id' => $category->id,
+        'category_id' => newsCategory()->id,
         'title' => 'Unverified Bitcoin news item',
         'constraints' => ['tone' => 'clear, sourced, non-hype'],
     ]);
@@ -404,14 +412,8 @@ test('news topics without verified sources are not generated into posts', functi
 test('generation job skips invalid news topics after archiving them', function () {
     Http::fake();
 
-    $category = Category::factory()->create([
-        'key' => 'news',
-        'lang' => Language::English,
-        'slug' => 'news',
-        'name' => 'News',
-    ]);
     $topic = ContentTopic::factory()->due()->create([
-        'category_id' => $category->id,
+        'category_id' => newsCategory()->id,
         'title' => 'Old news topic with dead sources',
         'constraints' => ['news_research' => ['sources' => []]],
     ]);
@@ -428,16 +430,7 @@ test('news research rejects unreachable source urls', function () {
         'github.com/*' => Http::response('', 404),
     ]);
 
-    $category = Category::factory()->create([
-        'key' => 'news',
-        'lang' => Language::English,
-        'slug' => 'news',
-        'name' => 'News',
-    ]);
-    $pipeline = app(MagazineAiPipeline::class);
-    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
-
-    $topics = $method->invoke($pipeline, [
+    $topics = newsTopicsFromResearch([
         'grounding_citations' => [
             [
                 'title' => 'Bitcoin Core release notes',
@@ -474,7 +467,7 @@ test('news research rejects unreachable source urls', function () {
                 'open_questions' => [],
             ],
         ],
-    ], $category, 1, []);
+    ]);
 
     expect($topics)->toHaveCount(0);
 });
@@ -485,16 +478,7 @@ test('news research accepts verified direct source urls even without google grou
         'github.com/*' => Http::response('', 200),
     ]);
 
-    $category = Category::factory()->create([
-        'key' => 'news',
-        'lang' => Language::English,
-        'slug' => 'news',
-        'name' => 'News',
-    ]);
-    $pipeline = app(MagazineAiPipeline::class);
-    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
-
-    $topics = $method->invoke($pipeline, [
+    $topics = newsTopicsFromResearch([
         'grounding_citations' => [],
         'topics' => [
             [
@@ -522,7 +506,7 @@ test('news research accepts verified direct source urls even without google grou
                 'open_questions' => [],
             ],
         ],
-    ], $category, 1, []);
+    ]);
 
     expect($topics)->toHaveCount(1)
         ->and($topics->first()->constraints['news_research']['grounding_citations'])->toBe([]);
@@ -534,16 +518,7 @@ test('news research accepts source urls blocked by publishers', function () {
         'reputable-news.com/*' => Http::response('', 403),
     ]);
 
-    $category = Category::factory()->create([
-        'key' => 'news',
-        'lang' => Language::English,
-        'slug' => 'news',
-        'name' => 'News',
-    ]);
-    $pipeline = app(MagazineAiPipeline::class);
-    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
-
-    $topics = $method->invoke($pipeline, [
+    $topics = newsTopicsFromResearch([
         'grounding_citations' => [],
         'topics' => [
             [
@@ -571,27 +546,18 @@ test('news research accepts source urls blocked by publishers', function () {
                 'open_questions' => [],
             ],
         ],
-    ], $category, 1, []);
+    ]);
 
     expect($topics)->toHaveCount(1);
 });
 
-test('news research requires at least one strong primary technical or official source', function () {
+test('news research accepts independent reputable reporting without primary source', function () {
     Http::fake([
         'example-news.com/*' => Http::response('', 200),
         'another-news.com/*' => Http::response('', 200),
     ]);
 
-    $category = Category::factory()->create([
-        'key' => 'news',
-        'lang' => Language::English,
-        'slug' => 'news',
-        'name' => 'News',
-    ]);
-    $pipeline = app(MagazineAiPipeline::class);
-    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
-
-    $topics = $method->invoke($pipeline, [
+    $topics = newsTopicsFromResearch([
         'grounding_citations' => [],
         'topics' => [
             [
@@ -615,11 +581,89 @@ test('news research requires at least one strong primary technical or official s
                         'credibility_note' => 'Independent publication.',
                     ],
                 ],
-                'credibility_notes' => ['No primary, technical, or official source is available.'],
+                'credibility_notes' => ['Two independent publications confirm the story.'],
                 'open_questions' => [],
             ],
         ],
-    ], $category, 1, []);
+    ]);
+
+    expect($topics)->toHaveCount(1)
+        ->and($topics->first()->constraints['news_research']['sources'])->toHaveCount(2);
+});
+
+test('news research rejects sources from the same publisher domain', function () {
+    Http::fake([
+        'example-news.com/*' => Http::response('', 200),
+    ]);
+
+    $topics = newsTopicsFromResearch([
+        'grounding_citations' => [],
+        'topics' => [
+            [
+                'title' => 'Bitcoin story repeated by one publisher',
+                'summary' => 'A story with two URLs from one publisher.',
+                'sources' => [
+                    [
+                        'title' => 'First report',
+                        'url' => 'https://example-news.com/bitcoin-policy',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Example News',
+                        'type' => 'reputable_reporting',
+                        'credibility_note' => 'Known publication.',
+                    ],
+                    [
+                        'title' => 'Second report',
+                        'url' => 'https://example-news.com/bitcoin-policy-followup',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Example News',
+                        'type' => 'reputable_reporting',
+                        'credibility_note' => 'Same publisher follow-up.',
+                    ],
+                ],
+                'credibility_notes' => ['Only one publisher domain is represented.'],
+                'open_questions' => [],
+            ],
+        ],
+    ]);
+
+    expect($topics)->toHaveCount(0);
+});
+
+test('news research does not count supporting sources as credible', function () {
+    Http::fake([
+        'example-news.com/*' => Http::response('', 200),
+        'social.example.com/*' => Http::response('', 200),
+    ]);
+
+    $topics = newsTopicsFromResearch([
+        'grounding_citations' => [],
+        'topics' => [
+            [
+                'title' => 'Bitcoin story with weak supporting context',
+                'summary' => 'A story with one credible report and one supporting source.',
+                'sources' => [
+                    [
+                        'title' => 'Independent report',
+                        'url' => 'https://example-news.com/bitcoin-policy',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Example News',
+                        'type' => 'reputable_reporting',
+                        'credibility_note' => 'Known publication.',
+                    ],
+                    [
+                        'title' => 'Social discussion',
+                        'url' => 'https://social.example.com/bitcoin-policy',
+                        'published_at' => now()->toDateString(),
+                        'publisher' => 'Social Example',
+                        'type' => 'supporting',
+                        'credibility_note' => 'Useful context but not a credible source.',
+                    ],
+                ],
+                'credibility_notes' => ['Only one credible source is present.'],
+                'open_questions' => [],
+            ],
+        ],
+    ]);
 
     expect($topics)->toHaveCount(0);
 });
@@ -630,16 +674,7 @@ test('news research stores google redirect citations as diagnostics', function (
         'github.com/*' => Http::response('', 200),
     ]);
 
-    $category = Category::factory()->create([
-        'key' => 'news',
-        'lang' => Language::English,
-        'slug' => 'news',
-        'name' => 'News',
-    ]);
-    $pipeline = app(MagazineAiPipeline::class);
-    $method = new ReflectionMethod(MagazineAiPipeline::class, 'createNewsTopicsFromResearch');
-
-    $topics = $method->invoke($pipeline, [
+    $topics = newsTopicsFromResearch([
         'grounding_citations' => [
             [
                 'title' => 'bitcoincore.org',
@@ -676,7 +711,7 @@ test('news research stores google redirect citations as diagnostics', function (
                 'open_questions' => [],
             ],
         ],
-    ], $category, 1, []);
+    ]);
 
     expect($topics)->toHaveCount(1)
         ->and($topics->first()->constraints['news_research']['sources'])->toHaveCount(2);
