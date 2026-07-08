@@ -56,7 +56,7 @@ class MagazineAiPipeline
         $sourceSeo = $this->seoPlan($topic, $sourceLocale, $title, $draft, $internalLinks);
         $sourceTitle = $sourceSeo['article_title'];
         $sourceSlug = $this->uniqueTranslationSlug($sourceSeo['slug'], $sourceLocale);
-        $sourceExcerpt = $this->excerpt($draft, 180);
+        $sourceExcerpt = $sourceSeo['meta_description'];
         $sourceBlocks = $this->articleBlocks($topic, $sourceLocale, $sourceTitle, $draft, $sourceSeo['keywords'], $internalLinks);
         $sourceMarkdown = $this->markdownFromBlocks($sourceBlocks, $draft);
 
@@ -141,7 +141,7 @@ class MagazineAiPipeline
                 'locale' => $locale,
                 'title' => $translatedTitle,
                 'slug' => $localizedSlug,
-                'excerpt' => $this->cleanText((string) ($translatedArticle['excerpt'] ?? $this->excerpt($localizedDraft, 180)), $this->excerpt($localizedDraft, 180)),
+                'excerpt' => $localizedSeo['meta_description'],
                 'markdown' => $localizedDraft,
                 'meta_title' => $localizedSeo['meta_title'],
                 'meta_description' => $localizedSeo['meta_description'],
@@ -1014,7 +1014,7 @@ class MagazineAiPipeline
 
         for ($attempt = 1; $attempt <= 3; $attempt++) {
             $response = $this->promptJson(
-                instructions: 'Create SEO metadata for an educational Bitcoin magazine article. Return only valid JSON. Generate the visible H1 article_title and the browser/search meta_title directly at the correct length. They may differ slightly. Do not return an overlong title for PHP to shorten later. Keep article_title readable and specific, up to 70 characters. Keep meta_title compelling and specific, up to 60 characters. Keep meta_description up to 160 characters. Avoid hype. Identify relevant keywords that should appear naturally in headings, body copy, and meta tags.',
+                instructions: 'Create SEO metadata for an educational Bitcoin magazine article. Return only valid JSON. Generate the visible H1 article_title, browser/search meta_title, and meta_description directly at the correct length. They may differ slightly. Do not return overlong text for PHP to shorten later. Keep article_title readable and specific, up to 70 characters. Keep meta_title compelling and specific, up to 60 characters. Keep meta_description as a complete description up to 160 characters. Never end meta_description with an ellipsis. Avoid hype. Identify relevant keywords that should appear naturally in headings, body copy, and meta tags.',
                 prompt: json_encode([
                     'locale' => $locale,
                     'topic' => $topic->title,
@@ -1075,6 +1075,10 @@ class MagazineAiPipeline
 
             if ($plan['meta_description'] === '' || mb_strlen($plan['meta_description']) > 160) {
                 $problems[] = 'meta_description must be present and at most 160 characters';
+            }
+
+            if (str_ends_with($plan['meta_description'], '...')) {
+                $problems[] = 'meta_description must be complete and must not end with an ellipsis';
             }
 
             $feedback = implode('; ', $problems);
@@ -1691,7 +1695,8 @@ class MagazineAiPipeline
             ->replaceMatches('/[#*_`>\[\]\(\)]/', '')
             ->replaceMatches('/\s+/', ' ')
             ->trim()
-            ->limit($limit)
+            ->limit($limit, '', true)
+            ->rtrim(' ,.;:-')
             ->toString();
     }
 }

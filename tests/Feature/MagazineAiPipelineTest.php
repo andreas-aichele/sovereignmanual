@@ -65,12 +65,16 @@ test('pipeline creates a published post with english and german translations', f
         ->and($post->translations()->where('locale', 'de')->exists())->toBeTrue()
         ->and(mb_strlen($englishTranslation->meta_title))->toBeLessThanOrEqual(60)
         ->and(mb_strlen($englishTranslation->meta_description))->toBeLessThanOrEqual(160)
+        ->and($englishTranslation->excerpt)->toBe($englishTranslation->meta_description)
+        ->and($englishTranslation->excerpt)->not->toEndWith('...')
         ->and($englishTranslation->seo['keywords'])->toContain('bitcoin')
         ->and($englishTranslation->slug)->toBe('why-bitcoin-custody-matters')
         ->and($germanTranslation->title)->toBe('Why Bitcoin custody matters')
         ->and($germanTranslation->slug)->toBe('why-bitcoin-custody-matters')
         ->and(mb_strlen($germanTranslation->meta_title))->toBeLessThanOrEqual(60)
         ->and(mb_strlen($germanTranslation->meta_description))->toBeLessThanOrEqual(160)
+        ->and($germanTranslation->excerpt)->toBe($germanTranslation->meta_description)
+        ->and($germanTranslation->excerpt)->not->toEndWith('...')
         ->and($germanTranslation->seo['keywords'])->toContain('bitcoin')
         ->and($post->category?->key)->toBe('self-custody')
         ->and($post->blocks()->count())->toBe(0)
@@ -153,8 +157,10 @@ test('pipeline keeps h1 title fallback within limits without cutting words', fun
 test('pipeline retries seo title generation until length requirements pass', function () {
     $pipeline = file_get_contents(app_path('Services/MagazineAiPipeline.php'));
 
-    expect($pipeline)->toContain('Generate the visible H1 article_title and the browser/search meta_title directly at the correct length')
-        ->and($pipeline)->toContain('Do not return an overlong title for PHP to shorten later')
+    expect($pipeline)->toContain('Generate the visible H1 article_title, browser/search meta_title, and meta_description directly at the correct length')
+        ->and($pipeline)->toContain('Do not return overlong text for PHP to shorten later')
+        ->and($pipeline)->toContain('Never end meta_description with an ellipsis')
+        ->and($pipeline)->toContain('meta_description must be complete and must not end with an ellipsis')
         ->and($pipeline)->toContain('previous_attempt_feedback')
         ->and($pipeline)->toContain('$problems = []')
         ->and($pipeline)->toContain('for ($attempt = 1; $attempt <= 3; $attempt++)');
