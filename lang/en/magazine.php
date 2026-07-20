@@ -35,13 +35,13 @@ return [
         'read' => 'Read article',
         'view_pillar' => 'Explore the topic',
         'view_category' => 'View category',
-        'waitlist' => [
-            'heading' => 'Stay close to the next practical guide',
-            'intro' => 'Join the waitlist for the future Sovereign Manual briefing. We will only start sending it after the format is ready.',
+        'newsletter' => [
+            'heading' => 'The Sovereign Manual newsletter',
+            'intro' => 'A weekly summary of new practical guides and context for greater digital, financial, and personal independence. No daily noise.',
             'email' => 'Email address',
             'email_placeholder' => 'you@example.com',
-            'consent' => 'I agree that Sovereign Manual may store my email address and language for this waitlist.',
-            'submit' => 'Join waitlist',
+            'consent' => 'I want to receive the Sovereign Manual newsletter. Sovereign Manual may store my email address and language for this purpose. Unsubscribe anytime.',
+            'submit' => 'Subscribe to newsletter',
         ],
         'empty' => 'No published articles yet.',
     ],

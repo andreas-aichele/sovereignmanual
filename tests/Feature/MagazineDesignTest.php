@@ -77,8 +77,8 @@ test('magazine localization strings live in language files', function () {
         ->and($germanTranslations)->not->toHaveKeys(['alternate_locale', 'locales'])
         ->and($englishTranslations)->not->toHaveKey('categories')
         ->and($germanTranslations)->not->toHaveKey('categories')
-        ->and($englishTranslations['index'])->toHaveKeys(['heading', 'paths_heading', 'featured_heading', 'briefing_heading', 'view_pillar', 'waitlist'])
-        ->and($germanTranslations['index'])->toHaveKeys(['heading', 'paths_heading', 'featured_heading', 'briefing_heading', 'view_pillar', 'waitlist'])
+        ->and($englishTranslations['index'])->toHaveKeys(['heading', 'paths_heading', 'featured_heading', 'briefing_heading', 'view_pillar', 'newsletter'])
+        ->and($germanTranslations['index'])->toHaveKeys(['heading', 'paths_heading', 'featured_heading', 'briefing_heading', 'view_pillar', 'newsletter'])
         ->and($englishTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'content_type', 'corrections', 'created', 'details', 'language', 'magazine', 'method', 'sources', 'toc', 'updated'])
         ->and($germanTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'content_type', 'corrections', 'created', 'details', 'language', 'magazine', 'method', 'sources', 'toc', 'updated'])
         ->and($controller)->not->toContain("locale === 'de'")
@@ -88,7 +88,7 @@ test('magazine localization strings live in language files', function () {
         ->and($controller)->not->toContain('Latest article');
 });
 
-test('magazine start page presents three paths, selected briefings, and the waitlist', function () {
+test('magazine start page presents three paths, selected briefings, and the newsletter', function () {
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
 
     expect($index)->toContain('aria-labelledby="paths-heading"')
@@ -99,8 +99,8 @@ test('magazine start page presents three paths, selected briefings, and the wait
         ->and($index)->toContain('$briefings')
         ->and($index)->toContain('$copy[\'paths_heading\']')
         ->and($index)->toContain('$copy[\'briefing_heading\']')
-        ->and($index)->toContain('$copy[\'waitlist\']')
-        ->and($index)->toContain("route('waitlist.store')")
+        ->and($index)->toContain('$copy[\'newsletter\']')
+        ->and($index)->toContain("route('newsletter.store')")
         ->and($index)->toContain('name="consent"')
         ->and($index)->toContain('bitcoin-pillar-accent')
         ->and($index)->toContain('btn btn-primary btn-sm')

@@ -436,7 +436,7 @@ test('german category page also resolves the stable category key as a legacy ali
         ->assertSee('Selbstverwahrung');
 });
 
-test('self custody route supports legacy published posts without a category', function () {
+test('public routes exclude published posts without a category instead of assigning a default url', function () {
     $post = Post::factory()->published()->create([
         'category_id' => null,
     ]);
@@ -444,17 +444,29 @@ test('self custody route supports legacy published posts without a category', fu
     PostTranslation::factory()->create([
         'post_id' => $post->id,
         'locale' => 'en',
-        'title' => 'Legacy Self Custody',
-        'slug' => 'legacy-self-custody',
+        'title' => 'Uncategorized Legacy Post',
+        'slug' => 'uncategorized-legacy-post',
     ]);
 
-    $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'legacy-self-custody']))
-        ->assertSuccessful()
-        ->assertSee('Legacy Self Custody')
-        ->assertSee('Self Custody');
+    $legacyUrl = route('magazine.show', [
+        'category' => 'self-custody',
+        'slug' => 'uncategorized-legacy-post',
+    ]);
 
-    $this->get(route('magazine.show', ['category' => 'privacy-security', 'slug' => 'legacy-self-custody']))
+    $this->get($legacyUrl)
         ->assertNotFound();
+
+    $this->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertDontSee('Uncategorized Legacy Post');
+
+    $this->get(route('magazine.category', ['category' => 'self-custody']))
+        ->assertSuccessful()
+        ->assertDontSee('Uncategorized Legacy Post');
+
+    $this->get(route('sitemap.posts'))
+        ->assertSuccessful()
+        ->assertDontSee($legacyUrl, false);
 });
 
 test('german category labels use correct umlauts', function () {

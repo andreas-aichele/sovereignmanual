@@ -91,6 +91,7 @@ class SitemapController extends Controller
             ->where('status', PostStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())
+            ->whereNotNull('category_id')
             ->latest('published_at')
             ->first(['updated_at', 'published_at']);
 
@@ -135,6 +136,7 @@ class SitemapController extends Controller
             ->where('posts.status', PostStatus::Published)
             ->whereNotNull('posts.published_at')
             ->where('posts.published_at', '<=', now())
+            ->whereNotNull('posts.category_id')
             ->orderByDesc('posts.published_at')
             ->orderBy('post_translations.locale');
     }
@@ -146,7 +148,7 @@ class SitemapController extends Controller
     {
         return [
             'loc' => $this->localizedRoute($translation->locale, 'show', [
-                'category' => $translation->post->category?->localizedSlug($translation->locale) ?? 'self-custody',
+                'category' => $translation->post->category->localizedSlug($translation->locale),
                 'slug' => $translation->slug,
             ]),
             'lastmod' => ($translation->post->updated_at ?? $translation->post->published_at)?->toDateString(),

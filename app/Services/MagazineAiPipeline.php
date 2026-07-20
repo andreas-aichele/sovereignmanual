@@ -1664,6 +1664,7 @@ class MagazineAiPipeline
             ->where('status', PostStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())
+            ->whereHas('category')
             ->whereHas('translations', fn (Builder $query) => $query->where('locale', $locale))
             ->when($excludePostId !== null, fn ($query) => $query->whereKeyNot($excludePostId))
             ->when(
@@ -1686,7 +1687,7 @@ class MagazineAiPipeline
                 return [
                     'title' => $translation->title,
                     'url' => $this->localizedRoute($locale, 'show', [
-                        'category' => $post->category?->localizedSlug($locale) ?? 'self-custody',
+                        'category' => $post->category->localizedSlug($locale),
                         'slug' => $translation->slug,
                     ]),
                     'slug' => $translation->slug,
@@ -1811,10 +1812,6 @@ class MagazineAiPipeline
             'family-legacy' => [
                 'Wichtige Informationen für Angehörige verständlich dokumentieren',
                 'Eine vorsichtige Checkliste für persönliche Notfallunterlagen',
-            ],
-            'tools-practice' => [
-                'Digitale Werkzeuge vor dem Alltagseinsatz sicher testen',
-                'Eine praktische Checkliste für wiederholbare Abläufe',
             ],
             'economics' => [
                 'Was Geldgeschichte für langfristige Entscheidungen lehrt',

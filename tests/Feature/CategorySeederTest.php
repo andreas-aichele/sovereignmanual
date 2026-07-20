@@ -15,7 +15,6 @@ test('category seeder creates the editorial taxonomy without a generic bitcoin c
         'news',
         'privacy-security',
         'self-custody',
-        'tools-practice',
     ])
         ->and(Category::query()->where('key', 'mindset')->where('lang', Language::English)->first()?->name)->toBe('Mindset')
         ->and(Category::query()->where('key', 'mindset')->where('lang', Language::German)->first()?->name)->toBe('Denkweise')
@@ -23,4 +22,19 @@ test('category seeder creates the editorial taxonomy without a generic bitcoin c
         ->and(Category::query()->where('key', 'mindset')->where('lang', Language::German)->first()?->slug)->toBe('denkweise')
         ->and(Category::query()->where('key', 'mindset')->count())->toBe(2)
         ->and(Category::query()->where('key', 'bitcoin')->exists())->toBeFalse();
+});
+
+test('category seeding preserves historical tools practice categories for stable urls', function () {
+    $this->seed(CategorySeeder::class);
+
+    $historicalCategory = Category::factory()->create([
+        'key' => 'tools-practice',
+        'lang' => Language::English,
+        'slug' => 'tools-practice',
+        'name' => 'Tools & Practice',
+    ]);
+
+    $this->seed(CategorySeeder::class);
+
+    expect(Category::query()->find($historicalCategory->id))->not->toBeNull();
 });

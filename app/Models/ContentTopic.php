@@ -57,11 +57,6 @@ class ContentTopic extends Model implements Auditable
         return $this->belongsTo(Category::class);
     }
 
-    public function categorySlug(): string
-    {
-        return $this->category?->key ?? 'self-custody';
-    }
-
     /**
      * @return HasMany<AiRun, $this>
      */

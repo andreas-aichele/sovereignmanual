@@ -7,7 +7,7 @@ use App\Models\Post;
 use App\Models\PostTranslation;
 use Database\Seeders\CategorySeeder;
 
-test('the start page introduces all three paths and the double opt-in waitlist', function () {
+test('the start page introduces all three paths and the double opt-in newsletter', function () {
     $this->seed(CategorySeeder::class);
 
     $category = Category::query()
@@ -32,8 +32,8 @@ test('the start page introduces all three paths and the double opt-in waitlist',
         ->assertSee('Digital Sovereignty')
         ->assertSee('Decisions &amp; Preparedness', false)
         ->assertSee('A practical first step')
-        ->assertSee('Join the waitlist')
-        ->assertSee('action="'.route('waitlist.store').'"', false)
+        ->assertSee('The Sovereign Manual newsletter')
+        ->assertSee('action="'.route('newsletter.store').'"', false)
         ->assertSee('name="consent"', false);
 });
 

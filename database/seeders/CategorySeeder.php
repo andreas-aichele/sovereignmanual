@@ -21,7 +21,6 @@ class CategorySeeder extends Seeder
             'financial-sovereignty' => 'bitcoin-money',
             'economics' => 'bitcoin-money',
             'news' => 'bitcoin-money',
-            'tools-practice' => 'bitcoin-money',
             'privacy-security' => 'digital-sovereignty',
             'mindset' => 'decisions-preparedness',
             'family-legacy' => 'decisions-preparedness',
@@ -85,21 +84,6 @@ class CategorySeeder extends Seeder
                         'slug' => 'familie-nachlass',
                         'name' => 'Familie & Nachlass',
                         'description' => '**Wichtige Informationen sollten nicht nur im eigenen Kopf liegen.**<br><br>Langfristige Verantwortung umfasst verständliche Dokumentation, gute Gespräche mit Angehörigen und praktische Pläne für Menschen, die auf dich zählen.<br><br>Diese Artikel bieten Orientierung und Vorsorge-Modelle, keine Rechts- oder Nachlassberatung.',
-                    ],
-                ],
-            ],
-            [
-                'key' => 'tools-practice',
-                'translations' => [
-                    Language::English->value => [
-                        'slug' => 'tools-practice',
-                        'name' => 'Tools & Practice',
-                        'description' => '**Knowledge becomes valuable when applied.**<br><br>Discover practical guides, software, hardware, workflows, and checklists that help you use Bitcoin confidently in everyday life.<br><br>From wallet setup and node operation to backups and payment tools, this category turns theory into repeatable practice.',
-                    ],
-                    Language::German->value => [
-                        'slug' => 'werkzeuge-praxis',
-                        'name' => 'Werkzeuge & Praxis',
-                        'description' => '**Wissen entfaltet seinen Wert erst in der Anwendung.**<br><br>Hier findest du praktische Anleitungen, Werkzeuge, Hardware-Empfehlungen, Checklisten und erprobte Abläufe für den Alltag mit Bitcoin.<br><br>Von Wallet-Einrichtungen über eigene Nodes bis hin zu Backup-Strategien wird Theorie in konkrete Praxis übersetzt.',
                     ],
                 ],
             ],

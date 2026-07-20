@@ -22,7 +22,6 @@ test('category seeding maps every localized category to one of three localized p
         'financial-sovereignty' => 'bitcoin-money',
         'economics' => 'bitcoin-money',
         'news' => 'bitcoin-money',
-        'tools-practice' => 'bitcoin-money',
         'privacy-security' => 'digital-sovereignty',
         'mindset' => 'decisions-preparedness',
         'family-legacy' => 'decisions-preparedness',
@@ -54,7 +53,7 @@ test('category seeding maps every localized category to one of three localized p
     expect($bitcoinMoney->localizedSlug('de'))->toBe('bitcoin-geld')
         ->and($bitcoinMoney->localizedDescription('de'))->toContain('Bitcoin')
         ->and($bitcoinMoney->matchesSlug('bitcoin-geld', 'de'))->toBeTrue()
-        ->and($bitcoinMoney->categories()->count())->toBe(5);
+        ->and($bitcoinMoney->categories()->count())->toBe(4);
 });
 
 test('pillar backfill creates localized pillars and maps existing categories without seeding', function () {

@@ -14,7 +14,7 @@ Route::get('sitemap-posts.xml', [SitemapController::class, 'posts'])->name('site
 Route::get('sitemap-categories.xml', [SitemapController::class, 'categories'])->name('sitemap.categories');
 Route::get('sitemap-pillars.xml', [SitemapController::class, 'pillars'])->name('sitemap.pillars');
 
-require __DIR__.'/waitlist.php';
+require __DIR__.'/newsletter.php';
 
 Route::get('{locale}', [MagazineController::class, 'switchLocale'])
     ->whereIn('locale', Locales::supported())

@@ -35,13 +35,13 @@ return [
         'read' => 'Artikel lesen',
         'view_pillar' => 'Thema entdecken',
         'view_category' => 'Kategorie ansehen',
-        'waitlist' => [
-            'heading' => 'Bleib nah am nächsten praktischen Leitfaden',
-            'intro' => 'Trag dich für das künftige Sovereign-Manual-Briefing auf die Warteliste ein. Versendet wird erst, wenn das Format bereit ist.',
+        'newsletter' => [
+            'heading' => 'Der Sovereign Manual Newsletter',
+            'intro' => 'Ein wöchentlicher Überblick über neue praktische Anleitungen und Einordnungen für mehr digitale, finanzielle und persönliche Eigenständigkeit. Kein tägliches Grundrauschen.',
             'email' => 'E-Mail-Adresse',
             'email_placeholder' => 'du@beispiel.de',
-            'consent' => 'Ich bin einverstanden, dass Sovereign Manual meine E-Mail-Adresse und Sprache für diese Warteliste speichert.',
-            'submit' => 'Zur Warteliste anmelden',
+            'consent' => 'Ich möchte den Sovereign Manual Newsletter erhalten. Sovereign Manual darf meine E-Mail-Adresse und Sprache dafür speichern. Abmeldung jederzeit möglich.',
+            'submit' => 'Newsletter abonnieren',
         ],
         'empty' => 'Noch keine veröffentlichten Artikel.',
     ],

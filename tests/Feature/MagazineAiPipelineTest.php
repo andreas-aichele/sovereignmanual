@@ -760,7 +760,16 @@ test('evergreen topic ideation chooses a non news category before creating topic
         'slug' => 'news',
         'name' => 'News',
     ]);
-    Category::query()->whereNotIn('id', [$privacy->id])->where('key', '!=', 'news')->delete();
+    $historicalToolsPractice = Category::factory()->create([
+        'key' => 'tools-practice',
+        'lang' => Language::German,
+        'slug' => 'werkzeuge-praxis',
+        'name' => 'Werkzeuge & Praxis',
+    ]);
+    Category::query()
+        ->whereNotIn('id', [$privacy->id, $historicalToolsPractice->id])
+        ->where('key', '!=', 'news')
+        ->delete();
 
     $this->artisan('app:ideate-magazine-topics --count=1')->assertSuccessful();
 
@@ -771,7 +780,8 @@ test('evergreen topic ideation chooses a non news category before creating topic
 
     expect($topic->category_id)->toBe($privacy->id)
         ->and($topic->category?->key)->toBe('privacy-security')
-        ->and($topic->category?->key)->not->toBe('news');
+        ->and($topic->category?->key)->not->toBe('news')
+        ->and($topic->category?->key)->not->toBe('tools-practice');
 });
 
 test('topic ideation stores existing category topics as similarity exclusions', function () {

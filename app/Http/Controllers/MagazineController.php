@@ -63,6 +63,7 @@ class MagazineController extends Controller
             ->where('status', PostStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())
+            ->whereHas('category')
             ->when(
                 $locale !== null,
                 fn (Builder $query) => $query->whereHas(
@@ -128,13 +129,7 @@ class MagazineController extends Controller
             ->where('status', PostStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())
-            ->where(function (Builder $query) use ($resolvedCategory): void {
-                $query->whereHas('category', fn (Builder $query) => $query->where('key', $resolvedCategory->key));
-
-                if ($resolvedCategory->key === 'self-custody') {
-                    $query->orWhereNull('category_id');
-                }
-            })
+            ->whereHas('category', fn (Builder $query) => $query->where('key', $resolvedCategory->key))
             ->whereHas('translations', fn ($query) => $query
                 ->where('locale', $locale)
                 ->where('slug', $slug))
@@ -215,13 +210,7 @@ class MagazineController extends Controller
         $resolvedCategory = $this->findCategory($category, $locale);
 
         $posts = $this->publishedPostsQuery($locale)
-            ->where(function (Builder $query) use ($resolvedCategory): void {
-                $query->whereHas('category', fn (Builder $query) => $query->where('key', $resolvedCategory->key));
-
-                if ($resolvedCategory->key === 'self-custody') {
-                    $query->orWhereNull('category_id');
-                }
-            })
+            ->whereHas('category', fn (Builder $query) => $query->where('key', $resolvedCategory->key))
             ->paginate(12)
             ->through(fn (Post $post): array => $this->serializePostSummary($post, $locale));
 
@@ -281,7 +270,7 @@ class MagazineController extends Controller
             'status' => $post->status->value,
             'audience_level' => $post->audience_level,
             'category' => $category,
-            'category_label' => $post->category?->label($locale) ?? $this->categoryLabel($category),
+            'category_label' => $post->category->label($locale),
             'category_url' => $this->localizedRoute($locale, 'category', [
                 'category' => $category,
             ]),
@@ -325,16 +314,6 @@ class MagazineController extends Controller
         }
 
         return $asset->url;
-    }
-
-    private function categoryLabel(?string $category): string
-    {
-        $category ??= 'self-custody';
-
-        return Str::of($category)
-            ->replace('-', ' ')
-            ->title()
-            ->toString();
     }
 
     private function coverImage(Post $post): ?PostAsset
@@ -648,9 +627,9 @@ class MagazineController extends Controller
             ->firstOrFail();
     }
 
-    private function categorySlug(?Category $category, string $locale): string
+    private function categorySlug(Category $category, string $locale): string
     {
-        return $category?->localizedSlug($locale) ?? 'self-custody';
+        return $category->localizedSlug($locale);
     }
 
     /**

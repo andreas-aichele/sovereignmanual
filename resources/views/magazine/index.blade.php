@@ -120,24 +120,24 @@
             <div class="alert mt-14">{{ $copy['empty'] }}</div>
         @endif
 
-        <section id="waitlist" class="card card-border bg-base-200 mt-16 shadow-sm" aria-labelledby="waitlist-heading">
+        <section id="newsletter" class="card card-border bg-base-200 mt-16 shadow-sm" aria-labelledby="newsletter-heading">
             <div class="card-body max-w-3xl">
-                <h2 id="waitlist-heading" class="card-title wrap-anywhere text-2xl leading-tight sm:text-3xl">
-                    {{ $copy['waitlist']['heading'] }}</h2>
-                <p class="text-base-content/70 leading-7">{{ $copy['waitlist']['intro'] }}</p>
+                <h2 id="newsletter-heading" class="card-title wrap-anywhere text-2xl leading-tight sm:text-3xl">
+                    {{ $copy['newsletter']['heading'] }}</h2>
+                <p class="text-base-content/70 leading-7">{{ $copy['newsletter']['intro'] }}</p>
 
-                @if (session('waitlist_status'))
-                    <div class="alert alert-success alert-soft mt-3">{{ session('waitlist_status') }}</div>
+                @if (session('newsletter_status'))
+                    <div class="alert alert-success alert-soft mt-3">{{ session('newsletter_status') }}</div>
                 @endif
 
-                <form class="mt-3 grid gap-4" action="{{ route('waitlist.store') }}" method="POST">
+                <form class="mt-3 grid gap-4" action="{{ route('newsletter.store') }}" method="POST">
                     @csrf
                     <input name="locale" type="hidden" value="{{ $locale }}">
 
                     <label class="form-control w-full">
-                        <span class="label"><span class="label-text">{{ $copy['waitlist']['email'] }}</span></span>
+                        <span class="label"><span class="label-text">{{ $copy['newsletter']['email'] }}</span></span>
                         <input class="input w-full" name="email" type="email" value="{{ old('email') }}"
-                            placeholder="{{ $copy['waitlist']['email_placeholder'] }}" autocomplete="email" required>
+                            placeholder="{{ $copy['newsletter']['email_placeholder'] }}" autocomplete="email" required>
                         @error('email')
                             <span class="label"><span class="label-text-alt text-error">{{ $message }}</span></span>
                         @enderror
@@ -146,13 +146,13 @@
                     <label class="label cursor-pointer items-start justify-start gap-3">
                         <input class="checkbox checkbox-primary mt-0.5" name="consent" type="checkbox" value="1"
                             @checked(old('consent')) required>
-                        <span class="label-text leading-6">{{ $copy['waitlist']['consent'] }}</span>
+                        <span class="label-text leading-6">{{ $copy['newsletter']['consent'] }}</span>
                     </label>
                     @error('consent')
                         <p class="text-error text-sm">{{ $message }}</p>
                     @enderror
 
-                    <div><button class="btn btn-primary" type="submit">{{ $copy['waitlist']['submit'] }}</button></div>
+                    <div><button class="btn btn-primary" type="submit">{{ $copy['newsletter']['submit'] }}</button></div>
                 </form>
             </div>
         </section>

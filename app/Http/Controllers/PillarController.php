@@ -90,7 +90,7 @@ class PillarController extends Controller
     private function serializePostSummary(Post $post, string $locale): array
     {
         $translation = $post->translation($locale);
-        $category = $post->category?->localizedSlug($locale) ?? 'self-custody';
+        $category = $post->category->localizedSlug($locale);
         $coverImage = $post->assets
             ->where('status', 'ready')
             ->first(fn (PostAsset $asset): bool => ($asset->metadata['role'] ?? null) === 'header')
@@ -98,7 +98,7 @@ class PillarController extends Controller
         $contentType = $post->content_type?->value ?? 'guide';
 
         return [
-            'category_label' => $post->category?->label($locale) ?? Str::headline($category),
+            'category_label' => $post->category->label($locale),
             'content_type' => $contentType,
             'content_type_label' => $this->translation("content_types.{$contentType}", $locale),
             'excerpt' => $translation?->excerpt,
