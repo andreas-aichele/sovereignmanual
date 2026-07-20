@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\ContentTopicStatus;
+use App\Enums\ContentType;
 use Database\Factories\ContentTopicFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -15,6 +16,7 @@ use OwenIt\Auditing\Contracts\Auditable;
     'title',
     'slug',
     'category_id',
+    'content_type',
     'status',
     'priority',
     'audience_level',
@@ -33,6 +35,13 @@ class ContentTopic extends Model implements Auditable
     use \OwenIt\Auditing\Auditable;
 
     /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'content_type' => ContentType::Guide->value,
+    ];
+
+    /**
      * @return HasMany<Post, $this>
      */
     public function posts(): HasMany
@@ -46,11 +55,6 @@ class ContentTopic extends Model implements Auditable
     public function category(): BelongsTo
     {
         return $this->belongsTo(Category::class);
-    }
-
-    public function categorySlug(): string
-    {
-        return $this->category?->key ?? 'self-custody';
     }
 
     /**
@@ -68,6 +72,7 @@ class ContentTopic extends Model implements Auditable
     {
         return [
             'status' => ContentTopicStatus::class,
+            'content_type' => ContentType::class,
             'target_languages' => 'array',
             'constraints' => 'array',
             'scheduled_for' => 'datetime',

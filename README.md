@@ -1,10 +1,10 @@
 # Sovereign Manual
 
-[![Bitcoin](https://img.shields.io/badge/Bitcoin-Only-F7931A)](#)
-[![Laravel](https://img.shields.io/badge/Laravel-12-FF2D20)](#)
+[![Focus](https://img.shields.io/badge/Focus-Practical%20Independence-52786B)](#)
+[![Laravel](https://img.shields.io/badge/Laravel-13-FF2D20)](#)
 [![AI-Native](https://img.shields.io/badge/AI-Native-blue)](#)
 
-A Bitcoin-only educational platform focused on self-custody, sovereignty, privacy, security, mindset, and Bitcoin news.
+A practical education platform for greater independence in digital, financial, and everyday life.
 
 **Website:** <https://sovereignmanual.com>
 
@@ -12,25 +12,23 @@ A Bitcoin-only educational platform focused on self-custody, sovereignty, privac
 
 ## Why Sovereign Manual?
 
-Bitcoin is more than an investment.
+Sovereignty reaches beyond a single tool.
 
-It is a tool for self-sovereignty, long-term thinking, financial responsibility, and individual freedom.
+Bitcoin remains a core competence: it is a powerful tool for self-custody, long-term thinking, financial responsibility, and individual freedom. Sovereign Manual places it in the wider practical context of digital privacy, security, documentation, and considered everyday decisions.
 
-Sovereign Manual exists to help beginners and experienced Bitcoiners alike understand Bitcoin without the noise of trading, altcoins, hype, or price predictions.
+Sovereign Manual exists to help German-speaking readers understand dependencies and build practical room to act without trading, altcoins, hype, price predictions, or ideological self-sufficiency narratives.
 
-The platform focuses on practical knowledge that helps people take ownership of their money, data, and digital lives.
+The platform focuses on practical knowledge that helps people take more responsibility for money, data, digital tools, and long-term plans.
 
 ---
 
 ## Topics
 
-* Self Custody
-* Privacy
-* Security
-* Sovereignty
-* Mindset
-* Bitcoin News
-* Guides & Tutorials
+* Bitcoin & Money — self-custody, financial sovereignty, economics, and selective Bitcoin briefings
+* Digital Sovereignty — privacy, security, digital tools, communication, data, and media literacy
+* Decisions & Preparedness — mindset, documentation, family, long-term planning, and careful precautions
+
+Articles are published as guides, checklists, analyses, and briefings. Bitcoin news remains selective, sourced briefing content rather than a standalone strategic topic.
 
 ---
 
@@ -44,13 +42,13 @@ Both content creation and software development make extensive use of AI systems 
 
 ## Principles
 
-### Bitcoin Only
+### Practical Independence
 
-No altcoins.
+Bitcoin is a core pillar, alongside digital sovereignty and careful long-term decision-making.
 
-No token speculation.
+### Clear Boundaries
 
-No trading advice.
+No altcoins, token speculation, trading, price predictions, individual financial, medical, legal, or tax advice, or fear-driven prepper content.
 
 ### Education First
 
@@ -58,7 +56,7 @@ Content is designed to be practical, understandable, and actionable.
 
 ### Sovereignty Matters
 
-Understanding Bitcoin also means understanding self-custody, privacy, security, and personal responsibility.
+Understanding Bitcoin also means understanding self-custody, privacy, security, and personal responsibility. Digital and personal independence deserve the same practical care.
 
 ---
 

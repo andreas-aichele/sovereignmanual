@@ -9,8 +9,10 @@
         </figure>
 
         <div class="card-body w-3/5 gap-2 p-4 md:w-full md:gap-3 md:p-5 lg:p-6">
-            <div class="badge badge-primary badge-outline badge-sm">
-                {{ $post['category_label'] }}</div>
+            <div class="flex flex-wrap gap-2">
+                <span class="badge badge-outline badge-sm">{{ $post['content_type_label'] }}</span>
+                <span class="badge badge-ghost badge-sm">{{ $post['category_label'] }}</span>
+            </div>
 
             @if ($headingLevel === 2)
                 <h2

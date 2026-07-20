@@ -2,25 +2,26 @@
 
 ## Mission
 
-Sovereign Manual is a Bitcoin-only platform focused on self-custody, sovereignty, privacy, security, mindset, and Bitcoin news.
+Sovereign Manual publishes practical guides for greater independence in digital, financial, and everyday life. Bitcoin is a core competence and a visible pillar, but not the entire scope of the brand.
 
-The goal is to help people understand and use Bitcoin independently through clear, practical, and educational content.
+The goal is to help people understand dependencies and strengthen their ability to act through clear, practical, and educational content.
 
 Never promote or recommend:
 
 * Altcoins
 * Trading
 * Price predictions
-* Financial advice
+* Individual financial, health, legal, or tax advice
 * Hype-driven content
+* Ideological self-sufficiency, fear-driven preparedness, or prepper content
 
 ---
 
 ## Audience
 
-* Bitcoin beginners
-* Intermediate Bitcoin users
-* Users moving from custodial services to self-custody
+* German-speaking people who want to understand dependencies and act more independently
+* Bitcoin beginners and intermediate users moving toward self-custody
+* People improving privacy, security, documentation, and long-term decision-making
 
 Prioritize clarity first and depth second.
 
@@ -28,10 +29,12 @@ Prioritize clarity first and depth second.
 
 ## Product Principles
 
-* Bitcoin only.
+* Practical self-determination, with exactly three pillars: Bitcoin & Money, Digital Sovereignty, and Decisions & Preparedness.
+* Bitcoin-specific rules apply within the Bitcoin & Money pillar; never promote altcoins, trading, hype, or price predictions.
 * SEO is a first-class concern.
 * Prefer evergreen content over short-lived trends.
 * Design for multilingual content.
+* New content starts in German and is translated carefully into English. Existing English root URLs remain stable.
 * Current languages are English and German, but additional languages may be added.
 * Keep content, URLs, and data structures language-agnostic.
 
@@ -119,11 +122,11 @@ Prefer extending existing concepts before introducing new ones.
 
 ## AI Content Generation
 
-Content is generated through a Laravel AI pipeline.
+Content is generated through a Laravel AI pipeline. Prompts and safeguards must receive pillar, category, and content-type context.
 
 Do not generate or manage article content directly unless explicitly requested.
 
-Focus on improving the systems, workflows, prompts, SEO capabilities, data structures, and tooling that enable content generation.
+Focus on improving the systems, workflows, prompts, SEO capabilities, data structures, quality guards, and tooling that enable content generation.
 
 ---
 

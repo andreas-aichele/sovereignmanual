@@ -5,14 +5,17 @@ namespace App\Services;
 use App\Enums\AiRunStatus;
 use App\Enums\AiRunType;
 use App\Enums\ContentTopicStatus;
+use App\Enums\ContentType;
 use App\Enums\PostStatus;
 use App\Models\AiRun;
 use App\Models\Category;
 use App\Models\ContentTopic;
+use App\Models\Pillar;
 use App\Models\Post;
 use App\Models\PostTranslation;
 use App\Support\Locales;
 use App\Support\ResponsiveImage;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -27,29 +30,117 @@ use function Laravel\Ai\agent;
 
 class MagazineAiPipeline
 {
+    private const EXCLUDED_CRYPTO_TERMS = [
+        'ethereum',
+        'ether',
+        'solana',
+        'cardano',
+        'ripple',
+        'dogecoin',
+        'litecoin',
+        'monero',
+        'polkadot',
+        'avalanche',
+        'chainlink',
+        'uniswap',
+        'tron',
+        'stellar',
+        'cosmos',
+        'tezos',
+        'algorand',
+        'tether',
+        'stablecoin',
+        'stablecoins',
+        'memecoin',
+        'meme coin',
+        'meme-coin',
+        'decentralized finance',
+        'defi',
+        'non-fungible token',
+        'non-fungible tokens',
+        'nft',
+        'nfts',
+        'token sale',
+        'token sales',
+        'token launch',
+        'token launches',
+        'initial coin offering',
+        'initial coin offerings',
+        'ico',
+        'icos',
+        'airdrop',
+        'airdrops',
+        'yield farming',
+        'liquidity mining',
+        'proof of stake',
+        'proof-of-stake',
+        'staking',
+        'pump and dump',
+        'pump-and-dump',
+        'crypto speculation',
+        'crypto-speculation',
+        'cryptocurrency speculation',
+        'cryptocurrency-speculation',
+        'kryptospekulation',
+        'krypto spekulation',
+        'krypto-spekulation',
+        'crypto investment',
+        'crypto-investment',
+        'cryptocurrency investment',
+        'cryptocurrency-investment',
+        'kryptoinvestment',
+        'krypto investment',
+        'krypto-investment',
+        'eth',
+        'xrp',
+        'bnb',
+        'usdt',
+        'usdc',
+        'doge',
+        'ltc',
+        'xmr',
+        'avax',
+    ];
+
     public function generatePost(ContentTopic $topic): Post
     {
-        if ($this->isNewsTopic($topic) && ! $this->hasCredibleNewsResearch($topic)) {
+        if (! $this->hasAiProviderKey() && ! config('magazine_ai.allow_fallback_publication', false)) {
+            throw new RuntimeException('A configured AI provider is required to publish a German source article and its English translation.');
+        }
+
+        $this->ensureTopicIsAllowed($topic);
+        $sourceLocale = $this->sourceLocale($topic);
+        $this->alignTopicWithPrimaryEditorialLocale($topic, $sourceLocale);
+        $briefingSources = $this->isBriefingTopic($topic) ? $this->briefingSources($topic) : [];
+
+        if ($this->isBriefingTopic($topic) && count($briefingSources) < 2) {
             $topic->update([
                 'status' => ContentTopicStatus::Archived,
             ]);
 
-            Log::channel('queue')->warning('News topic archived because its saved sources no longer pass verification.', [
+            Log::channel('queue')->warning('Briefing topic archived because its saved sources no longer pass verification.', [
                 'content_topic_id' => $topic->id,
                 'content_topic_title' => $topic->title,
             ]);
 
-            throw new RuntimeException('News topics require at least two credible independent sources before article generation.');
+            throw new RuntimeException('Briefing topics require at least two credible independent sources before article generation.');
         }
 
         $draftRun = $this->startRun(AiRunType::Draft, $topic);
-        $sourceLocale = Locales::fallback();
         $title = $topic->title;
-        $internalLinks = $this->internalLinkCandidates($sourceLocale);
+        $internalLinks = $this->internalLinkCandidates($sourceLocale, topic: $topic);
         $draft = $this->promptWithFallback(
             instructions: $this->draftInstructions($topic),
-            prompt: $this->draftPrompt($topic, $internalLinks),
+            prompt: $this->draftPrompt($topic, $internalLinks, $briefingSources),
             fallback: $this->fallbackMarkdown($title, $sourceLocale),
+        );
+        $this->ensureGeneratedContentIsAllowed($topic, $draft, 'draft', run: $draftRun);
+        $this->ensureGeneratedBriefingSourcesArePersisted(
+            $topic,
+            $draft,
+            'draft',
+            $briefingSources,
+            run: $draftRun,
         );
         $this->finishRun($draftRun, $draft);
 
@@ -57,16 +148,26 @@ class MagazineAiPipeline
         $sourceTitle = $sourceSeo['article_title'];
         $sourceSlug = $this->uniqueTranslationSlug($sourceSeo['slug'], $sourceLocale);
         $sourceExcerpt = $sourceSeo['meta_description'];
+        $this->ensureGeneratedContentIsAllowed($topic, $sourceSeo, 'SEO metadata');
         $sourceBlocks = $this->articleBlocks($topic, $sourceLocale, $sourceTitle, $draft, $sourceSeo['keywords'], $internalLinks);
         $sourceMarkdown = $this->markdownFromBlocks($sourceBlocks, $draft);
+        $this->ensureGeneratedContentIsAllowed($topic, [$sourceMarkdown, $sourceBlocks], 'source article');
+        $this->ensureGeneratedBriefingSourcesArePersisted(
+            $topic,
+            [$sourceSeo, $sourceMarkdown, $sourceBlocks],
+            'source article',
+            $briefingSources,
+        );
 
         $post = Post::create([
             'content_topic_id' => $topic->id,
             'category_id' => $topic->category_id ?? $this->defaultCategory()->id,
+            'content_type' => $topic->content_type ?? ContentType::Guide,
             'status' => PostStatus::Draft,
             'audience_level' => $topic->audience_level,
             'primary_language' => $sourceLocale,
             'scheduled_for' => $topic->scheduled_for,
+            'sources' => $briefingSources,
             'seo' => [
                 'keywords' => $sourceSeo['keywords'],
                 'internal_links' => $internalLinks,
@@ -75,6 +176,8 @@ class MagazineAiPipeline
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
                 'auto_generated' => true,
+                'generated_at' => now()->toAtomString(),
+                'method' => 'automated_research_and_publishing_workflow',
             ],
         ]);
 
@@ -99,11 +202,16 @@ class MagazineAiPipeline
             $translationRun = $this->startRun(AiRunType::Translation, $topic, $post);
             $targetLanguage = Locales::language($locale)->englishName();
             $translatedArticle = $this->promptJson(
-                instructions: "Translate Bitcoin magazine articles into precise, natural {$targetLanguage}. Return only valid JSON. Keep article and section headings compact. Never leave source-language headings or UI-like labels untranslated unless they are proper nouns.",
+                instructions: "Translate Sovereign Manual articles into precise, natural {$targetLanguage}. Preserve the practical, calm editorial voice. Return only valid JSON. Keep article and section headings compact. Never leave source-language headings or UI-like labels untranslated unless they are proper nouns.",
                 prompt: json_encode([
                     'source_locale' => $sourceLocale,
                     'target_locale' => $locale,
                     'target_language' => $targetLanguage,
+                    'editorial_context' => $this->editorialContext(
+                        $topic->category,
+                        $topic->content_type ?? ContentType::Guide,
+                        $locale,
+                    ),
                     'title' => $sourceTitle,
                     'excerpt' => $sourceExcerpt,
                     'blocks' => $sourceBlocks,
@@ -118,7 +226,7 @@ class MagazineAiPipeline
                 throw new RuntimeException('AI translation did not return valid article JSON.');
             }
 
-            $translatedArticle ??= $this->fallbackTranslatedArticle($title, $locale);
+            $translatedArticle ??= $this->fallbackTranslatedArticle($sourceTitle, $locale);
             $translatedTitle = $this->cleanText((string) ($translatedArticle['title'] ?? $title), $title);
             $blocks = $this->sanitizeBlocks($translatedArticle['blocks'] ?? null, $locale);
 
@@ -131,11 +239,26 @@ class MagazineAiPipeline
                 throw new RuntimeException('AI translation did not return usable article blocks.');
             }
 
-            $localizedInternalLinks = $this->internalLinkCandidates($locale, $post->id);
+            $localizedInternalLinks = $this->internalLinkCandidates($locale, $post->id, $topic);
             $localizedDraft = $this->markdownFromBlocks($blocks, $this->fallbackMarkdown($title, $locale));
-            $this->finishRun($translationRun, $localizedDraft, ['title' => $translatedTitle, 'locale' => $locale]);
             $localizedSeo = $this->seoPlan($topic, $locale, $translatedTitle, $localizedDraft, $localizedInternalLinks);
             $localizedSlug = $this->uniqueTranslationSlug($localizedSeo['slug'], $locale);
+            $this->ensureGeneratedContentIsAllowed(
+                $topic,
+                [$translatedTitle, $localizedDraft, $localizedSeo, $blocks],
+                "translation for {$locale}",
+                $post,
+                $translationRun,
+            );
+            $this->ensureGeneratedBriefingSourcesArePersisted(
+                $topic,
+                [$translatedTitle, $localizedDraft, $localizedSeo, $blocks],
+                "translation for {$locale}",
+                $briefingSources,
+                $post,
+                $translationRun,
+            );
+            $this->finishRun($translationRun, $localizedDraft, ['title' => $translatedTitle, 'locale' => $locale]);
 
             $post->translations()->create([
                 'locale' => $locale,
@@ -179,43 +302,35 @@ class MagazineAiPipeline
     /**
      * @return Collection<int, ContentTopic>
      */
-    public function createTopicIdeas(int $count = 2): Collection
+    public function createTopicIdeas(int $count = 2, ContentType $contentType = ContentType::Guide): Collection
     {
         $category = $this->randomEvergreenCategory();
+        $sourceLocale = $this->primaryEditorialLocale();
         $avoidTopics = $this->recentTopicTitles($category);
         $run = $this->startRun(AiRunType::Topic);
         $response = $this->promptWithFallback(
-            instructions: 'You propose focused editorial topics for a Bitcoin-only sovereignty learning portal. Return one topic per line. Make each idea specific, practical, and clearly different from the avoided existing topics.',
+            instructions: 'You propose focused, evergreen topics for a practical self-determination publication. Return one topic per line in German only. Make each idea specific, helpful, bounded by the editorial safeguards, and clearly different from avoided existing topics.',
             prompt: json_encode([
                 'task' => "Create {$count} evergreen article ideas for this category.",
-                'category' => [
-                    'key' => $category->key,
-                    'name' => $category->name,
-                    'description' => strip_tags((string) Str::markdown($category->description)),
-                ],
-                'audience' => 'Bitcoin beginners and intermediate users moving toward independent custody.',
-                'avoid' => [
-                    'altcoins',
-                    'trading',
-                    'price predictions',
-                    'financial advice',
-                    'generic sovereignty psychology angles',
-                    ...$avoidTopics,
-                ],
+                'output_language' => 'German',
+                'editorial_context' => $this->editorialContext($category, $contentType, $sourceLocale),
+                'audience' => 'German-speaking people who want to understand dependencies and build practical room to act in everyday life.',
+                'avoid' => [...$this->editorialExclusions(), ...$avoidTopics],
                 'style' => [
                     'concrete examples',
                     'category-specific angle',
-                    'less AI-polished phrasing',
+                    'calm editorial phrasing',
                     'clear practical reader outcome',
                 ],
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
-            fallback: implode("\n", $this->fallbackTopicTitles($category)),
+            fallback: implode("\n", $this->fallbackTopicTitles($category, $contentType)),
         );
 
         $topics = Str::of($response)
             ->explode("\n")
             ->map(fn (string $line): string => trim(preg_replace('/^[\-\*\d\.\)\s]+/', '', $line) ?? ''))
             ->filter()
+            ->filter(fn (string $title): bool => $this->isAllowedTopicText($title))
             ->take($count)
             ->values()
             ->map(fn (string $title, int $index): ContentTopic => ContentTopic::firstOrCreate(
@@ -226,14 +341,16 @@ class MagazineAiPipeline
                     'status' => ContentTopicStatus::Scheduled,
                     'priority' => max(1, 10 - $index),
                     'audience_level' => 'intermediate',
-                    'primary_language' => Locales::fallback(),
-                    'target_languages' => $this->translationLocales(Locales::fallback()),
+                    'primary_language' => $sourceLocale,
+                    'target_languages' => $this->translationLocales($sourceLocale),
                     'scheduled_for' => now(),
-                    'brief' => 'AI-proposed topic for Sovereign Manual with practical, non-hype educational framing.',
+                    'brief' => "AI-proposed evergreen {$contentType->value} topic with a practical, bounded, non-hype editorial framing.",
+                    'content_type' => $contentType,
                     'constraints' => [
                         'tone' => 'clear, practical, non-hype',
-                        'brand' => 'synthwave-cypherpunk editorial',
+                        'brand' => 'calm-editorial',
                         'category_key' => $category->key,
+                        'content_type' => $contentType->value,
                         'avoid_similar_topics' => $avoidTopics,
                     ],
                 ],
@@ -256,7 +373,7 @@ class MagazineAiPipeline
         $run = $this->startRun(AiRunType::Topic);
 
         if (! $this->hasAiProviderKey()) {
-            $message = 'News topic ideation failed because the configured AI provider has no key for live web research.';
+            $message = 'Bitcoin briefing ideation failed because the configured AI provider has no key for live web research.';
             Log::channel('queue')->warning($message, [
                 'provider' => config('magazine_ai.provider', 'gemini'),
                 'model' => config('magazine_ai.text_model', 'gemini-2.5-flash'),
@@ -266,46 +383,62 @@ class MagazineAiPipeline
             throw new RuntimeException($message);
         }
 
-        $newsCategory = $this->newsCategory();
-        $avoidTopics = $this->recentTopicTitles($newsCategory);
+        $briefingCategories = $this->briefingCategories();
+        $briefingCategoryKeys = $briefingCategories->keys()->all();
+        $avoidTopics = $briefingCategories
+            ->flatMap(fn (Category $category): array => $this->recentTopicTitles($category))
+            ->unique()
+            ->take(24)
+            ->values()
+            ->all();
         $research = $this->promptStructuredJson(
-            instructions: 'Research current Bitcoin-only news using live Google Search grounding. Focus on current topics that are moving the Bitcoin space. Exclude altcoins, trading, price predictions, financial advice, and hype. Prefer primary, official, and technical sources when available, but reputable Bitcoin newspapers, magazines, and mainstream financial or technology reporting are acceptable credible sources. Treat social posts, anonymous blogs, exchanges, and aggregators as supporting context only. Use exact HTTPS source URLs from search results or citations. Do not invent URLs, dates, publishers, or article titles. Omit any source whose exact canonical URL is uncertain.',
+            instructions: 'Research current Bitcoin developments for a selective Sovereign Manual briefing using live Google Search grounding. Return titles, summaries, credibility notes, and open questions in German only. Exclude altcoins, trading, price predictions, individual financial advice, and hype. Prefer primary, official, and technical sources; reputable reporting may provide supporting context. Treat social posts, anonymous blogs, exchanges, and aggregators as supporting context only. Use exact HTTPS source URLs from search results or citations. Do not invent URLs, dates, publishers, or article titles. Omit any source whose exact canonical URL is uncertain.',
             prompt: json_encode([
-                'task' => 'Find current Bitcoin news topic candidates suitable for Sovereign Manual.',
+                'task' => 'Find a small set of current Bitcoin briefing candidates suitable for Sovereign Manual.',
+                'output_language' => 'German',
                 'current_date' => now()->toDateString(),
                 'candidate_count' => max(6, $count * 6),
-                'credibility_standard' => 'Each topic must have at least two independent credible sources. Credible source types are primary, official, technical, and reputable_reporting. Primary sources are preferred but not required. Include publication dates, direct source urls, source types, credibility notes, and unresolved uncertainties.',
-                'important' => 'Return candidate topics discovered through search even when some sources are weak; classify weak sources as supporting. Do not return an empty topics array unless no Bitcoin-only candidate can be found at all. The application will reject candidates that do not meet the final credibility threshold.',
+                'briefing_categories' => $briefingCategories
+                    ->map(fn (Category $category): array => [
+                        'key' => $category->key,
+                        'name' => $category->name,
+                        'description' => $category->description,
+                    ])
+                    ->values()
+                    ->all(),
+                'credibility_standard' => 'Each topic must have at least two independent credible sources explicitly supported by the search grounding citations. Credible source types are primary, official, technical, and reputable_reporting. Primary sources are preferred but not required. Include publication dates, direct source urls, source types, credibility notes, and unresolved uncertainties.',
+                'important' => 'Return candidates discovered through search even when some sources are weak; classify weak sources as supporting. Do not return an empty topics array unless no suitable Bitcoin candidate can be found at all. The application will reject candidates that do not meet the final credibility threshold.',
                 'avoid_similar_topics' => $avoidTopics,
             ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE),
             tools: [
                 new WebSearch(maxSearches: 8),
             ],
             timeout: (int) config('magazine_ai.news_research_timeout', 180),
+            briefingCategoryKeys: $briefingCategoryKeys,
         );
 
         if ($research === null) {
-            $this->failRun($run, 'News topic ideation failed because the AI provider did not return valid structured research.', [
-                'category_key' => $newsCategory->key,
+            $this->failRun($run, 'Bitcoin briefing ideation failed because the AI provider did not return valid structured research.', [
+                'category_keys' => $briefingCategoryKeys,
             ]);
 
-            throw new RuntimeException('News topic ideation failed because the AI provider did not return valid structured research.');
+            throw new RuntimeException('Bitcoin briefing ideation failed because the AI provider did not return valid structured research.');
         }
 
-        $topics = $this->createNewsTopicsFromResearch($research, $newsCategory, $count, $avoidTopics);
+        $topics = $this->createNewsTopicsFromResearch($research, $briefingCategories, $count, $avoidTopics);
 
         if ($topics->isEmpty()) {
-            $this->failRun($run, 'News topic ideation found no topics with at least two credible independent sources.', [
-                'category_key' => $newsCategory->key,
+            $this->failRun($run, 'Bitcoin briefing ideation found no topics with at least two credible independent sources.', [
+                'category_keys' => $briefingCategoryKeys,
                 ...$this->newsResearchDiagnostics($research),
             ]);
 
-            throw new RuntimeException('News topic ideation found no topics with at least two credible independent sources.');
+            throw new RuntimeException('Bitcoin briefing ideation found no topics with at least two credible independent sources.');
         }
 
         $this->finishRun($run, json_encode($research ?? [], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE), [
             'created_topics' => $topics->pluck('id')->all(),
-            'category_key' => $newsCategory->key,
+            'category_keys' => $briefingCategoryKeys,
             'accepted_topics' => $topics->count(),
         ]);
 
@@ -318,15 +451,16 @@ class MagazineAiPipeline
             ->where('type', 'image')
             ->get()
             ->filter(fn ($asset): bool => str_contains((string) $asset->url, 'unsplash')
-                || ($asset->metadata['style'] ?? null) !== 'synthwave-cypherpunk')
+                || ($asset->metadata['style'] ?? null) !== 'editorial-documentary')
             ->each(fn ($asset): bool => $asset->update(['status' => 'replaced']));
 
         $this->generatePostImage(
             $post,
             $post->contentTopic ?? new ContentTopic([
-                'title' => $post->translation($post->primary_language)?->title ?? 'Bitcoin article',
+                'title' => $post->translation($post->primary_language)?->title ?? 'Practical guide',
                 'audience_level' => $post->audience_level,
                 'primary_language' => $post->primary_language,
+                'content_type' => $post->content_type ?? ContentType::Guide,
             ]),
         );
     }
@@ -385,8 +519,13 @@ class MagazineAiPipeline
     /**
      * @return array<string, mixed>|null
      */
-    private function promptStructuredJson(string $instructions, string $prompt, array $tools = [], ?int $timeout = null): ?array
-    {
+    private function promptStructuredJson(
+        string $instructions,
+        string $prompt,
+        array $tools = [],
+        ?int $timeout = null,
+        array $briefingCategoryKeys = [],
+    ): ?array {
         if (! $this->hasAiProviderKey()) {
             return null;
         }
@@ -400,6 +539,7 @@ class MagazineAiPipeline
                         ->items($schema->object([
                             'title' => $schema->string()->required(),
                             'summary' => $schema->string()->required(),
+                            'category_key' => $schema->string()->enum($briefingCategoryKeys)->required(),
                             'sources' => $schema->array()
                                 ->items($schema->object([
                                     'title' => $schema->string()->required(),
@@ -492,34 +632,386 @@ class MagazineAiPipeline
             ->all();
     }
 
-    private function draftInstructions(ContentTopic $topic): string
+    private function primaryEditorialLocale(): string
     {
-        $language = Locales::fallbackLanguage()->englishName();
+        $locale = config('magazine_ai.primary_locale', 'de');
 
-        if ($this->isNewsTopic($topic)) {
-            return "You write sourced Bitcoin-only news analysis in clear {$language} Markdown. Lead with verified facts, explain why the development matters, distinguish fact from uncertainty, cite the provided sources naturally, and avoid hype, trading framing, price predictions, altcoins, and financial advice.";
+        return is_string($locale) && Locales::isSupported($locale) ? $locale : 'de';
+    }
+
+    private function sourceLocale(ContentTopic $topic): string
+    {
+        return $this->primaryEditorialLocale();
+    }
+
+    private function alignTopicWithPrimaryEditorialLocale(ContentTopic $topic, string $sourceLocale): void
+    {
+        if ($topic->primary_language === $sourceLocale
+            && $topic->target_languages === $this->translationLocales($sourceLocale)) {
+            return;
         }
 
-        return "You write educational, non-hype Bitcoin and financial independence articles in clear {$language} Markdown. Use concise article and section headings. Build a clear SEO-friendly structure with short paragraphs, H2/H3 headings, useful lists, concrete examples, category-specific reader outcomes, and naturally repeated keywords. Do not keyword-stuff. Avoid generic sovereignty psychology phrasing unless the topic specifically requires it.";
+        $topic->update([
+            'primary_language' => $sourceLocale,
+            'target_languages' => $this->translationLocales($sourceLocale),
+        ]);
+    }
+
+    private function contentTypeValue(ContentTopic $topic): string
+    {
+        return ($topic->content_type ?? ContentType::Guide)->value;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function editorialContext(?Category $category, ContentType $contentType, string $locale): array
+    {
+        $localizedCategory = $category?->localized($locale);
+        $localizedPillar = $localizedCategory?->pillar?->localized($locale);
+
+        return [
+            'brand' => 'Sovereign Manual: practical guides to greater independence in digital, financial, and everyday life.',
+            'audience' => 'German-speaking people who want to understand dependencies and build practical room to act in everyday life.',
+            'pillar' => [
+                'key' => $localizedPillar?->key,
+                'name' => $localizedPillar?->name,
+                'description' => $localizedPillar?->description,
+            ],
+            'category' => [
+                'key' => $localizedCategory?->key,
+                'name' => $localizedCategory?->name,
+                'description' => $localizedCategory?->description,
+            ],
+            'content_type' => $contentType->value,
+            'editorial_boundaries' => $this->editorialExclusions(),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function editorialExclusions(): array
+    {
+        return [
+            'altcoins',
+            'trading',
+            'price predictions',
+            'individual financial advice',
+            'health or medical advice',
+            'legal or tax advice',
+            'fear-driven preparedness',
+            'partisan politics',
+        ];
+    }
+
+    private function ensureTopicIsAllowed(ContentTopic $topic): void
+    {
+        if ($this->isAllowedTopicText("{$topic->title} {$topic->brief}")) {
+            return;
+        }
+
+        $this->archiveTopicForSafeguards($topic, 'topic', 'The topic falls outside Sovereign Manual editorial safeguards.');
+    }
+
+    private function ensureGeneratedContentIsAllowed(
+        ContentTopic $topic,
+        mixed $content,
+        string $stage,
+        ?Post $post = null,
+        ?AiRun $run = null,
+    ): void {
+        $text = is_string($content)
+            ? $content
+            : json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        if (is_string($text) && $this->isAllowedTopicText($text)) {
+            return;
+        }
+
+        $message = 'Generated content falls outside Sovereign Manual editorial safeguards.';
+
+        if ($run !== null) {
+            $this->failRun($run, $message, ['stage' => $stage]);
+        }
+
+        $post?->delete();
+
+        $this->archiveTopicForSafeguards(
+            $topic,
+            $stage,
+            $message,
+        );
+    }
+
+    /**
+     * @param  array<int, array<string, string>>  $sources
+     */
+    private function ensureGeneratedBriefingSourcesArePersisted(
+        ContentTopic $topic,
+        mixed $content,
+        string $stage,
+        array $sources,
+        ?Post $post = null,
+        ?AiRun $run = null,
+    ): void {
+        if (! $this->isBriefingTopic($topic)) {
+            return;
+        }
+
+        $allowedUrls = collect($sources)
+            ->pluck('url')
+            ->filter(fn (mixed $url): bool => is_string($url) && filled($url))
+            ->map(fn (string $url): string => $this->normalizedUrl($url))
+            ->all();
+        $unexpectedUrls = collect($this->contentUrls($content))
+            ->reject(fn (string $url): bool => $this->isFirstPartyUrl($url)
+                || in_array($this->normalizedUrl($url), $allowedUrls, true))
+            ->values()
+            ->all();
+        $unexpectedAttributions = collect($this->contentSourceAttributions($content))
+            ->reject(fn (string $attribution): bool => $this->isVerifiedBriefingSourceAttribution($attribution, $sources))
+            ->values()
+            ->all();
+
+        if ($unexpectedUrls === [] && $unexpectedAttributions === []) {
+            return;
+        }
+
+        $message = 'Generated briefing content references a source outside the verified source set.';
+
+        if ($run !== null) {
+            $this->failRun($run, $message, ['stage' => $stage]);
+        }
+
+        $post?->delete();
+        $topic->update([
+            'status' => ContentTopicStatus::Archived,
+        ]);
+
+        Log::channel('queue')->warning('Magazine briefing archived because generated content cited an unverified source.', [
+            'content_topic_id' => $topic->id,
+            'stage' => $stage,
+            'unexpected_source_hosts' => collect($unexpectedUrls)
+                ->map(fn (string $url): ?string => $this->urlHost($url))
+                ->filter()
+                ->values()
+                ->all(),
+            'unexpected_source_attribution_count' => count($unexpectedAttributions),
+        ]);
+
+        throw new RuntimeException($message);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function contentUrls(mixed $content): array
+    {
+        $text = is_string($content)
+            ? $content
+            : json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        if (! is_string($text)) {
+            return [];
+        }
+
+        preg_match_all("~(?<![@\\w.-])(?:(?:https?://|www\\.)[^\\s<>\"'`()\\[\\]{}]+|(?:[a-z0-9-]+\\.)+[a-z]{2,}(?:/[^\\s<>\"'`()\\[\\]{}]*)?)~iu", $text, $matches);
+
+        return collect($matches[0] ?? [])
+            ->map(fn (string $url): string => rtrim($url, '.,;:!?'))
+            ->map(fn (string $url): string => str_starts_with(Str::lower($url), 'http') ? $url : "https://{$url}")
+            ->filter(fn (string $url): bool => filter_var($url, FILTER_VALIDATE_URL) !== false)
+            ->unique(fn (string $url): string => $this->normalizedUrl($url))
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function contentSourceAttributions(mixed $content): array
+    {
+        $text = is_string($content)
+            ? $content
+            : json_encode($content, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        if (! is_string($text)) {
+            return [];
+        }
+
+        preg_match_all(
+            "/(?<![\\p{L}\\p{N}])(?i:according\\s+to|as\\s+reported\\s+by|reported\\s+by|as\\s+announced\\s+by|laut|gemäß|nach\\s+angaben\\s+(?:von|des|der)|nach\\s+aussage\\s+(?:von|des|der))\\s+(?:(?i:the|a|an|dem|den|der|des)\\s+)?((?:\\p{Lu}[\\p{L}\\p{M}\\d&’'-]*)(?:\\s+(?:(?:\\p{Lu}[\\p{L}\\p{M}\\d&’'-]*)|(?i:of|the|and|for|von|für|der|die|des|den|im|in|zu|zur|zum))){0,8})/u",
+            $text,
+            $matches,
+        );
+
+        return collect($matches[1] ?? [])
+            ->filter(fn (mixed $attribution): bool => is_string($attribution) && filled($attribution))
+            ->map(fn (string $attribution): string => trim($attribution))
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  array<int, array<string, string>>  $sources
+     */
+    private function isVerifiedBriefingSourceAttribution(string $attribution, array $sources): bool
+    {
+        $normalizedAttribution = $this->normalizedSourceAttribution($attribution);
+
+        return $normalizedAttribution !== ''
+            && collect($sources)
+                ->flatMap(fn (array $source): array => [
+                    $source['publisher'] ?? null,
+                    $source['title'] ?? null,
+                ])
+                ->filter(fn (mixed $source): bool => is_string($source) && filled($source))
+                ->map(fn (string $source): string => $this->normalizedSourceAttribution($source))
+                ->filter()
+                ->contains(fn (string $source): bool => Str::contains($normalizedAttribution, $source));
+    }
+
+    private function normalizedSourceAttribution(string $value): string
+    {
+        return Str::of($value)
+            ->ascii()
+            ->lower()
+            ->replaceMatches('/[^a-z0-9]+/', ' ')
+            ->squish()
+            ->toString();
+    }
+
+    private function isFirstPartyUrl(string $url): bool
+    {
+        $appUrl = config('app.url');
+
+        return is_string($appUrl)
+            && $this->urlHost($appUrl) !== null
+            && $this->urlHost($url) === $this->urlHost($appUrl);
+    }
+
+    private function archiveTopicForSafeguards(ContentTopic $topic, string $stage, string $message): never
+    {
+        $topic->update([
+            'status' => ContentTopicStatus::Archived,
+        ]);
+
+        Log::channel('queue')->warning('Magazine content archived by editorial safeguards.', [
+            'content_topic_id' => $topic->id,
+            'stage' => $stage,
+        ]);
+
+        throw new RuntimeException($message);
+    }
+
+    private function isAllowedTopicText(string $text): bool
+    {
+        $normalizedText = Str::of($text)->lower()->toString();
+
+        return ! Str::contains($normalizedText, [
+            'altcoin',
+            'trading',
+            'traden',
+            'price prediction',
+            'price forecast',
+            'price target',
+            'kursprognose',
+            'kursziel',
+            'anlageberatung',
+            'finanzberatung',
+            'individuelle finanz',
+            'anlageempfehl',
+            'financial advice',
+            'investment recommendation',
+            'investment advice',
+            'medical advice',
+            'medical diagnosis',
+            'health treatment',
+            'health advice',
+            'gesundheitsberatung',
+            'gesundheitliche beratung',
+            'medizinische diagnose',
+            'medizinischer rat',
+            'legal advice',
+            'tax advice',
+            'rechtsberatung',
+            'rechtsrat',
+            'steuerberatung',
+            'steuerlicher rat',
+            'prepper',
+            'survivalism',
+            'ideological self-sufficiency',
+            'ideologische autarkie',
+        ]) && ! $this->containsExcludedCryptoTopic($normalizedText);
+    }
+
+    private function containsExcludedCryptoTopic(string $text): bool
+    {
+        $terms = implode('|', array_map(
+            static fn (string $term): string => preg_quote($term, '/'),
+            self::EXCLUDED_CRYPTO_TERMS,
+        ));
+
+        return preg_match('/(?<![\p{L}\p{N}])(?:'.$terms.')(?![\p{L}\p{N}])/iu', $text) === 1;
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    private function briefingSources(ContentTopic $topic): array
+    {
+        $research = $topic->constraints['news_research'] ?? [];
+
+        return is_array($research)
+            ? $this->credibleSources(
+                $research['sources'] ?? [],
+                $this->groundingCitations($research['grounding_citations'] ?? []),
+            )->values()->all()
+            : [];
+    }
+
+    private function draftInstructions(ContentTopic $topic): string
+    {
+        $language = Locales::language($this->sourceLocale($topic))->englishName();
+        $contentType = $this->contentTypeValue($topic);
+        $context = json_encode(
+            $this->editorialContext($topic->category, $topic->content_type ?? ContentType::Guide, $this->sourceLocale($topic)),
+            JSON_UNESCAPED_UNICODE,
+        );
+
+        if ($this->isBriefingTopic($topic)) {
+            return "You write a sourced Sovereign Manual briefing in clear {$language} Markdown. Lead with verified facts, explain why the development matters, distinguish fact from uncertainty, cite the provided sources naturally, and do not add individual recommendations. Follow this editorial context exactly: {$context}";
+        }
+
+        return "You write a practical Sovereign Manual {$contentType} in clear {$language} Markdown. Use concise article and section headings. Build a clear SEO-friendly structure with short paragraphs, useful lists, concrete examples, category-specific reader outcomes, and naturally repeated keywords. Do not keyword-stuff or add a related-reading section. Do not give individual financial, health, legal, tax, or political advice. Follow this editorial context exactly: {$context}";
     }
 
     /**
      * @param  array<int, array{title: string, url: string, slug: string}>  $internalLinks
      */
-    private function draftPrompt(ContentTopic $topic, array $internalLinks): string
+    private function draftPrompt(ContentTopic $topic, array $internalLinks, array $briefingSources = []): string
     {
         return json_encode([
             'task' => "Write a practical article for {$topic->audience_level} readers.",
-            'category' => $topic->category?->label(Locales::fallback()) ?? $topic->categorySlug(),
+            'editorial_context' => $this->editorialContext(
+                $topic->category,
+                $topic->content_type ?? ContentType::Guide,
+                $this->sourceLocale($topic),
+            ),
             'topic' => $topic->title,
             'brief' => $topic->brief,
-            'research' => $this->isNewsTopic($topic) ? ($topic->constraints['news_research'] ?? null) : null,
+            'research' => $this->isBriefingTopic($topic) ? [
+                'verified_sources' => $briefingSources,
+                'source_policy' => 'Ground facts only in these verified sources. Do not cite, link to, or name any other source or publisher, and do not add a references section; verified sources are rendered separately.',
+            ] : null,
             'internal_link_candidates' => $internalLinks,
             'quality_bar' => [
                 'write like a careful editor, not a generic AI assistant',
                 'include concrete examples and practical implications',
                 'avoid repeated wording from recent articles',
-                'do not add a related reading section',
+                'never invent sources, legal claims, medical claims, or individual recommendations',
             ],
         ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
     }
@@ -540,7 +1032,7 @@ class MagazineAiPipeline
 
         for ($attempt = 1; $attempt <= 3; $attempt++) {
             $response = $this->promptJson(
-                instructions: 'Convert an educational Bitcoin article into a premium magazine block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Keep every section heading compact, ideally 3 to 7 words. Naturally use the provided SEO keywords in headings and body text where they fit. Add relevant internal Markdown links from the provided candidates. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for all prose sections with an explicit heading column, anchor column, and markdown body that does not repeat the heading and does not contain nested H2 headings. Place visual/support blocks immediately after the section they clarify; do not group insight, checklist, flow_diagram, or sketch blocks at the end of the article. Visual blocks may supplement the article, but must not replace section text. Store every process, tree, branch, wallet-allocation, comparison, sequence, timeline, or relationship diagram as a flow_diagram block with a structured data.diagram object, never as a Markdown code fence. Use data.diagram.kind to describe the diagram family. Do not include raw HTML, raw SVG, or Mermaid syntax.',
+                instructions: 'Convert an educational Sovereign Manual article into a structured editorial block plan. Return only valid JSON. Preserve the full article detail. Do not summarize, shorten, or omit practical examples. Split the full draft into section blocks with several paragraphs each. Keep every section heading compact, ideally 3 to 7 words. Naturally use the provided SEO keywords in headings and body text where they fit. Add relevant internal Markdown links from the provided candidates. When the first candidate is the relevant pillar hub, link to it once where it gives the reader useful orientation; do not add a generic latest-articles section. Use these block types only: section, insight, checklist, flow_diagram, sketch. Use section blocks for all prose sections with an explicit heading column, anchor column, and markdown body that does not repeat the heading and does not contain nested H2 headings. Place visual/support blocks immediately after the section they clarify; do not group insight, checklist, flow_diagram, or sketch blocks at the end of the article. Visual blocks may supplement the article, but must not replace section text. Store every process, tree, branch, comparison, sequence, timeline, or relationship diagram as a flow_diagram block with a structured data.diagram object, never as a Markdown code fence. Use data.diagram.kind to describe the diagram family. Do not include raw HTML, raw SVG, or Mermaid syntax.',
                 prompt: json_encode([
                     'locale' => $locale,
                     'topic' => $topic->title,
@@ -840,8 +1332,8 @@ class MagazineAiPipeline
 
     private function generatePostImage(Post $post, ContentTopic $topic): void
     {
-        $sourceLocale = Locales::fallback();
-        $prompt = $this->synthwaveImagePrompt($topic);
+        $sourceLocale = $post->primary_language;
+        $prompt = $this->editorialImagePrompt($topic);
         $altTexts = $this->imageAltTexts($post, $topic);
         $run = $this->startRun(AiRunType::Image, $topic, $post, config('magazine_ai.image_model', 'gemini-2.5-flash-image'));
         $imageSlug = $post->translation($sourceLocale)?->slug ?? Str::slug($topic->title);
@@ -851,9 +1343,9 @@ class MagazineAiPipeline
         }
 
         $metadata = [
-            'style' => 'synthwave-cypherpunk',
+            'style' => 'editorial-documentary',
             'role' => 'header',
-            'prompt_version' => 2,
+            'prompt_version' => 3,
             'no_unsplash' => true,
             'alt_texts' => $altTexts,
         ];
@@ -934,9 +1426,18 @@ class MagazineAiPipeline
         }
     }
 
-    private function synthwaveImagePrompt(ContentTopic $topic): string
+    private function editorialImagePrompt(ContentTopic $topic): string
     {
-        return "Full-bleed synthwave editorial website background for article topic: {$topic->title}. Audience level: {$topic->audience_level}. Bitcoin financial sovereignty context, dark readable magazine atmosphere, Bitcoin orange focal light, restrained neon cyan and magenta accents, subtle grid lines, abstract ledger details, human-scale personal scene details like warm desk light, hands, notes, or a non-identifiable silhouette, modern handcrafted editorial character, cinematic depth, natural imperfections. Edge-to-edge background art only; no border, no frame, no book, no magazine mockup, no poster, no device mockup, no page layout, no floating card, no text in image, no logos, no identifiable real people, no stock-photo look, no glossy AI-slop aesthetic.";
+        $context = json_encode(
+            $this->editorialContext(
+                $topic->category,
+                $topic->content_type ?? ContentType::Guide,
+                $this->sourceLocale($topic),
+            ),
+            JSON_UNESCAPED_UNICODE,
+        );
+
+        return "Full-bleed documentary editorial header image for article topic: {$topic->title}. Audience level: {$topic->audience_level}. Context: {$context}. Calm, human-scale visual language: natural light, hands, paper, thoughtfully used everyday tools, rooms, details, or non-identifiable silhouettes where appropriate. Warm, tactile, restrained, modern editorial character with natural imperfections and ample readable negative space. Use the Bitcoin symbol or orange only when the topic is explicitly about Bitcoin. No neon, cyberpunk, abstract crypto ledgers, futuristic grids, propaganda, survivalism, stock-photo look, glossy AI aesthetic, text, logos, identifiable people, device mockups, book covers, posters, or page layouts.";
     }
 
     /**
@@ -955,7 +1456,7 @@ class MagazineAiPipeline
         }
 
         $response = $this->promptJson(
-            instructions: 'Write concise accessible alt text for an editorial Bitcoin article header image. Return only valid JSON. Describe the image meaningfully for screen readers. Do not include prompt/style labels such as synthwave, cypherpunk, AI art, background, or illustration unless visually necessary. Do not mention Bitcoin price, trading, altcoins, or financial advice. Translate each alt text naturally for its locale.',
+            instructions: 'Write concise accessible alt text for an editorial article header image. Return only valid JSON. Describe the image meaningfully for screen readers. Do not include prompt/style labels such as AI art, background, or illustration unless visually necessary. Translate each alt text naturally for its locale.',
             prompt: json_encode([
                 'topic' => $topic->title,
                 'audience_level' => $topic->audience_level,
@@ -1014,11 +1515,16 @@ class MagazineAiPipeline
 
         for ($attempt = 1; $attempt <= 3; $attempt++) {
             $response = $this->promptJson(
-                instructions: 'Create SEO metadata for an educational Bitcoin magazine article. Return only valid JSON. Generate the visible H1 article_title, browser/search meta_title, and meta_description directly at the correct length. They may differ slightly. Do not return overlong text for PHP to shorten later. Keep article_title readable and specific, up to 70 characters. Keep meta_title compelling and specific, up to 60 characters. Keep meta_description as a complete description up to 160 characters. Never end meta_description with an ellipsis. Avoid hype. Identify relevant keywords that should appear naturally in headings, body copy, and meta tags.',
+                instructions: 'Create SEO metadata for a practical Sovereign Manual article. Return only valid JSON. Generate the visible H1 article_title, browser/search meta_title, and meta_description directly at the correct length. They may differ slightly. Do not return overlong text for PHP to shorten later. Keep article_title readable and specific, up to 70 characters. Keep meta_title compelling and specific, up to 60 characters. Keep meta_description as a complete description up to 160 characters. Never end meta_description with an ellipsis. Avoid hype and individual advice. Identify relevant keywords that should appear naturally in headings, body copy, and meta tags.',
                 prompt: json_encode([
                     'locale' => $locale,
                     'topic' => $topic->title,
                     'brief' => $topic->brief,
+                    'editorial_context' => $this->editorialContext(
+                        $topic->category,
+                        $topic->content_type ?? ContentType::Guide,
+                        $locale,
+                    ),
                     'article_title_candidate' => $title,
                     'markdown' => $this->excerpt($markdown, 1200),
                     'internal_link_candidates' => $internalLinks,
@@ -1102,13 +1608,13 @@ class MagazineAiPipeline
      */
     private function fallbackSeoPlan(ContentTopic $topic, string $locale, string $title, string $markdown): array
     {
-        $articleTitle = $this->seoText($title, 'Bitcoin strategy', 70);
+        $articleTitle = $this->seoText($title, 'Practical guide', 70);
         $keywords = $this->keywordsFor($topic, $locale);
 
         return [
             'article_title' => $articleTitle,
             'meta_title' => $this->seoText($articleTitle, $articleTitle, 60),
-            'meta_description' => $this->seoText($this->excerpt($markdown, 160), 'A practical guide to Bitcoin, self custody, and financial sovereignty.', 160),
+            'meta_description' => $this->seoText($this->excerpt($markdown, 160), 'A practical guide to greater independence in everyday life.', 160),
             'slug' => $this->shortSlug($articleTitle, $locale),
             'keywords' => $keywords,
         ];
@@ -1119,11 +1625,16 @@ class MagazineAiPipeline
      */
     private function keywordsFor(ContentTopic $topic, string $locale): array
     {
+        $context = $this->editorialContext(
+            $topic->category,
+            $topic->content_type ?? ContentType::Guide,
+            $locale,
+        );
+
         return collect([
-            'bitcoin',
-            'self custody',
-            'financial sovereignty',
-            $topic->categorySlug(),
+            $context['pillar']['name'] ?? null,
+            $context['category']['name'] ?? null,
+            $this->contentTypeValue($topic),
             ...Str::of($topic->title.' '.$topic->brief)
                 ->lower()
                 ->replaceMatches('/[^\pL\pN\s-]+/u', ' ')
@@ -1143,14 +1654,26 @@ class MagazineAiPipeline
     /**
      * @return array<int, array{title: string, url: string, slug: string}>
      */
-    private function internalLinkCandidates(string $locale, ?int $excludePostId = null): array
+    private function internalLinkCandidates(string $locale, ?int $excludePostId = null, ?ContentTopic $topic = null): array
     {
-        return Post::query()
+        $pillarKey = $topic?->category?->pillar?->key;
+        $pillarHub = $this->pillarHubCandidate($topic, $locale);
+
+        $posts = Post::query()
             ->with(['category', 'translations'])
             ->where('status', PostStatus::Published)
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())
+            ->whereHas('category')
+            ->whereHas('translations', fn (Builder $query) => $query->where('locale', $locale))
             ->when($excludePostId !== null, fn ($query) => $query->whereKeyNot($excludePostId))
+            ->when(
+                filled($pillarKey),
+                fn (Builder $query) => $query->whereHas(
+                    'category.pillar',
+                    fn (Builder $pillarQuery) => $pillarQuery->where('key', $pillarKey),
+                ),
+            )
             ->latest('published_at')
             ->limit(5)
             ->get()
@@ -1164,7 +1687,7 @@ class MagazineAiPipeline
                 return [
                     'title' => $translation->title,
                     'url' => $this->localizedRoute($locale, 'show', [
-                        'category' => $post->category?->localizedSlug($locale) ?? 'self-custody',
+                        'category' => $post->category->localizedSlug($locale),
                         'slug' => $translation->slug,
                     ]),
                     'slug' => $translation->slug,
@@ -1173,77 +1696,138 @@ class MagazineAiPipeline
             ->filter()
             ->values()
             ->all();
+
+        return $pillarHub === null ? $posts : [$pillarHub, ...$posts];
+    }
+
+    /**
+     * @return array{title: string, url: string, slug: string}|null
+     */
+    private function pillarHubCandidate(?ContentTopic $topic, string $locale): ?array
+    {
+        $pillar = $topic?->category?->pillar;
+
+        if ($pillar === null) {
+            return null;
+        }
+
+        $localizedPillar = $pillar->localized($locale);
+        $categoryKeys = Category::query()
+            ->where('pillar_id', $localizedPillar->id)
+            ->pluck('key');
+        $hasEnoughArticles = Post::query()
+            ->where('status', PostStatus::Published)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->whereHas('translations', fn (Builder $query) => $query->where('locale', $locale))
+            ->whereHas('category', fn (Builder $query) => $query->whereIn('key', $categoryKeys))
+            ->count() >= 6;
+
+        if (! $hasEnoughArticles) {
+            return null;
+        }
+
+        return [
+            'title' => $localizedPillar->name,
+            'url' => $this->localizedRoute($locale, 'pillar.show', [
+                'pillar' => $localizedPillar->slug,
+            ]),
+            'slug' => $localizedPillar->slug,
+        ];
     }
 
     private function defaultCategory(): Category
     {
-        return Category::query()->firstOrCreate(
-            ['key' => 'self-custody', 'lang' => Locales::fallbackLanguage()],
+        $locale = $this->primaryEditorialLocale();
+        $category = Category::query()->firstOrCreate(
+            ['key' => 'self-custody', 'lang' => Locales::language($this->primaryEditorialLocale())],
             [
-                'slug' => 'self-custody',
-                'name' => 'Self Custody',
-                'description' => 'Guides for holding your own keys, planning recovery, and reducing custody risk without depending on custodians.',
+                'slug' => 'selbstverwahrung',
+                'name' => 'Selbstverwahrung',
+                'description' => 'Praktische Anleitungen für eigene Schlüssel, Wiederherstellungspläne und geringere Verwahrungsrisiken.',
             ]
         );
+
+        if ($category->pillar_id === null) {
+            $category->updateQuietly([
+                'pillar_id' => Pillar::query()
+                    ->where('key', 'bitcoin-money')
+                    ->where('lang', Locales::language($locale))
+                    ->value('id'),
+            ]);
+        }
+
+        return $category;
     }
 
     private function randomEvergreenCategory(): Category
     {
         return Category::query()
-            ->where('lang', Locales::fallbackLanguage())
-            ->where('key', '!=', 'news')
+            ->where('lang', Locales::language($this->primaryEditorialLocale()))
+            ->whereNotIn('key', ['news', 'tools-practice'])
             ->inRandomOrder()
             ->first()
             ?? $this->defaultCategory();
     }
 
-    private function newsCategory(): Category
+    /**
+     * @return Collection<string, Category>
+     */
+    private function briefingCategories(): Collection
     {
-        return Category::query()->firstOrCreate(
-            ['key' => 'news', 'lang' => Locales::fallbackLanguage()],
-            [
-                'slug' => 'news',
-                'name' => 'News',
-                'description' => 'Current Bitcoin developments explained with context and credible sources.',
-            ]
-        );
+        $categories = Category::query()
+            ->where('lang', Locales::language($this->primaryEditorialLocale()))
+            ->whereIn('key', ['self-custody', 'financial-sovereignty', 'economics'])
+            ->get()
+            ->keyBy('key');
+
+        if (! $categories->has('self-custody')) {
+            $category = $this->defaultCategory();
+            $categories->put($category->key, $category);
+        }
+
+        return $categories;
     }
 
     /**
      * @return array<int, string>
      */
-    private function fallbackTopicTitles(Category $category): array
+    private function fallbackTopicTitles(Category $category, ContentType $contentType): array
     {
-        return match ($category->key) {
+        $formatPrefix = match ($contentType) {
+            ContentType::Checklist => 'Checkliste: ',
+            ContentType::Analysis => 'Analyse: ',
+            default => '',
+        };
+
+        return collect(match ($category->key) {
             'privacy-security' => [
-                'How to build a simple Bitcoin privacy threat model',
-                'Everyday security habits for Bitcoin wallet users',
+                'Eine einfache Bedrohungsanalyse für deinen digitalen Alltag erstellen',
+                'Sichere digitale Gewohnheiten ohne unnötige Komplexität',
             ],
             'financial-sovereignty' => [
-                'How to write a personal Bitcoin treasury policy',
-                'Why savings rules matter more than market predictions',
+                'Eigene finanzielle Regeln dokumentieren und Grenzen klar erkennen',
+                'Wie langfristige Spargewohnheiten Entscheidungen vereinfachen',
             ],
             'family-legacy' => [
-                'How to prepare family members for Bitcoin recovery',
-                'A practical Bitcoin inheritance documentation checklist',
-            ],
-            'tools-practice' => [
-                'How to test a Bitcoin wallet backup safely',
-                'A practical checklist for your first Bitcoin node',
+                'Wichtige Informationen für Angehörige verständlich dokumentieren',
+                'Eine vorsichtige Checkliste für persönliche Notfallunterlagen',
             ],
             'economics' => [
-                'What monetary scarcity means for everyday savers',
-                'How inflation changes long-term savings behavior',
+                'Was Geldgeschichte für langfristige Entscheidungen lehrt',
+                'Wie Anreize und Knappheit unsere Entscheidungen prägen',
             ],
             'mindset' => [
-                'How low time preference changes Bitcoin decisions',
-                'Why simple Bitcoin rules reduce emotional mistakes',
+                'Wie klare Entscheidungsregeln emotionale Fehler reduzieren',
+                'Langfristig denken, ohne die Gegenwart auszublenden',
             ],
             default => [
-                'Bitcoin self custody threat models for beginners',
-                'How to avoid common wallet backup mistakes',
+                'Ein praktischer erster Schritt zu mehr Eigenständigkeit',
+                'Wie du wichtige Abläufe verständlich dokumentierst',
             ],
-        };
+        })
+            ->map(fn (string $title): string => $formatPrefix.$title)
+            ->all();
     }
 
     /**
@@ -1289,46 +1873,41 @@ class MagazineAiPipeline
         ]);
     }
 
-    private function isNewsTopic(ContentTopic $topic): bool
+    private function isBriefingTopic(ContentTopic $topic): bool
     {
-        return $topic->categorySlug() === 'news';
-    }
-
-    private function hasCredibleNewsResearch(ContentTopic $topic): bool
-    {
-        $research = $topic->constraints['news_research'] ?? null;
-
-        if (! is_array($research)) {
-            return false;
-        }
-
-        return $this->hasCredibleSourceSet($research['sources'] ?? []);
+        return ($topic->content_type ?? ContentType::Guide) === ContentType::Briefing;
     }
 
     /**
      * @return Collection<int, ContentTopic>
      */
-    private function createNewsTopicsFromResearch(?array $research, Category $category, int $count, array $avoidTopics): Collection
+    private function createNewsTopicsFromResearch(?array $research, Collection $categories, int $count, array $avoidTopics): Collection
     {
         $groundingCitations = $this->groundingCitations($research['grounding_citations'] ?? []);
 
         $topics = collect($research['topics'] ?? [])
             ->filter(fn (mixed $topic): bool => is_array($topic))
             ->filter(fn (array $topic): bool => filled($topic['title'] ?? null))
-            ->map(function (array $topic): array {
-                $topic['credible_sources'] = $this->credibleSources($topic['sources'] ?? [])->values()->all();
+            ->filter(fn (array $topic): bool => $categories->has($topic['category_key'] ?? null))
+            ->map(function (array $topic) use ($groundingCitations): array {
+                $topic['credible_sources'] = $this->credibleSources(
+                    $topic['sources'] ?? [],
+                    $groundingCitations,
+                )->values()->all();
 
                 return $topic;
             })
             ->filter(fn (array $topic): bool => count($topic['credible_sources']) >= 2)
+            ->filter(fn (array $topic): bool => $this->isAllowedTopicText((string) $topic['title']))
             ->take($count)
             ->values()
-            ->map(function (array $topic, int $index) use ($category, $avoidTopics, $groundingCitations): ContentTopic {
-                $title = $this->cleanText((string) $topic['title'], 'Bitcoin news update');
+            ->map(function (array $topic, int $index) use ($categories, $avoidTopics, $groundingCitations): ContentTopic {
+                $title = $this->cleanText((string) $topic['title'], 'Bitcoin briefing');
+                $category = $categories->get($topic['category_key']);
                 $sources = $topic['credible_sources'];
                 $credibilityNotes = $this->stringList($topic['credibility_notes'] ?? []);
                 $openQuestions = $this->stringList($topic['open_questions'] ?? []);
-                $brief = $this->cleanText((string) ($topic['summary'] ?? ''), 'Current Bitcoin news item requiring sourced context.');
+                $brief = $this->cleanText((string) ($topic['summary'] ?? ''), 'Current Bitcoin development requiring sourced context.');
 
                 return ContentTopic::firstOrCreate(
                     ['slug' => Str::slug($title)],
@@ -1338,14 +1917,16 @@ class MagazineAiPipeline
                         'status' => ContentTopicStatus::Scheduled,
                         'priority' => max(1, 10 - $index),
                         'audience_level' => 'intermediate',
-                        'primary_language' => Locales::fallback(),
-                        'target_languages' => $this->translationLocales(Locales::fallback()),
+                        'primary_language' => $this->primaryEditorialLocale(),
+                        'target_languages' => $this->translationLocales($this->primaryEditorialLocale()),
                         'scheduled_for' => now(),
                         'brief' => $brief,
+                        'content_type' => ContentType::Briefing,
                         'constraints' => [
                             'tone' => 'clear, sourced, non-hype',
-                            'brand' => 'synthwave-cypherpunk editorial',
-                            'category_key' => 'news',
+                            'brand' => 'calm-editorial',
+                            'category_key' => $category->key,
+                            'content_type' => ContentType::Briefing->value,
                             'avoid_similar_topics' => $avoidTopics,
                             'news_research' => [
                                 'summary' => $brief,
@@ -1361,7 +1942,7 @@ class MagazineAiPipeline
             });
 
         if ($topics->isEmpty()) {
-            Log::channel('queue')->warning('News topic ideation produced no topics that met the credibility threshold.', [
+            Log::channel('queue')->warning('Bitcoin briefing ideation produced no topics that met the credibility threshold.', [
                 'required_credible_sources' => 2,
                 'candidate_topics' => is_countable($research['topics'] ?? null) ? count($research['topics']) : 0,
             ]);
@@ -1373,7 +1954,7 @@ class MagazineAiPipeline
     /**
      * @return Collection<int, array<string, string>>
      */
-    private function credibleSources(mixed $sources): Collection
+    private function credibleSources(mixed $sources, array $groundingCitations = []): Collection
     {
         if (! is_array($sources)) {
             return collect();
@@ -1394,14 +1975,10 @@ class MagazineAiPipeline
             ->filter(fn (array $source): bool => filter_var($source['url'], FILTER_VALIDATE_URL) !== false)
             ->filter(fn (array $source): bool => str_starts_with($source['url'], 'https://'))
             ->filter(fn (array $source): bool => in_array($source['type'], ['primary', 'reputable_reporting', 'technical', 'official'], true))
+            ->filter(fn (array $source): bool => $this->sourceIsGrounded($source, $groundingCitations))
             ->filter(fn (array $source): bool => $this->sourceUrlIsReachable($source['url']))
             ->unique(fn (array $source): string => $this->urlHost($source['url']) ?? $this->normalizedUrl($source['url']))
             ->values();
-    }
-
-    private function hasCredibleSourceSet(mixed $sources): bool
-    {
-        return $this->credibleSources($sources)->count() >= 2;
     }
 
     /**
@@ -1433,6 +2010,32 @@ class MagazineAiPipeline
             ->replaceMatches('/#.*$/', '')
             ->rtrim('/')
             ->toString();
+    }
+
+    /**
+     * @param  array<string, string>  $source
+     * @param  array<int, array{title: string, url: string}>  $groundingCitations
+     */
+    private function sourceIsGrounded(array $source, array $groundingCitations): bool
+    {
+        $sourceUrl = $this->normalizedUrl($source['url']);
+        $sourceHost = $this->urlHost($source['url']);
+
+        return collect($groundingCitations)->contains(function (array $citation) use ($sourceUrl, $sourceHost): bool {
+            if ($this->normalizedUrl($citation['url']) === $sourceUrl) {
+                return true;
+            }
+
+            return $this->isGoogleGroundingRedirect($citation['url'])
+                && $sourceHost !== null
+                && $this->domainFromText($citation['title']) === $sourceHost;
+        });
+    }
+
+    private function isGoogleGroundingRedirect(string $url): bool
+    {
+        return $this->urlHost($url) === 'vertexaisearch.cloud.google.com'
+            && str_contains((string) parse_url($url, PHP_URL_PATH), '/grounding-api-redirect/');
     }
 
     private function urlHost(string $url): ?string
@@ -1511,19 +2114,15 @@ class MagazineAiPipeline
                 return true;
             }
 
-            if ($response->status() === 403) {
-                return true;
-            }
-
             if ($response->status() !== 405) {
                 return false;
             }
 
             $response = $request->get($url);
 
-            return $response->successful() || $response->status() === 403;
+            return $response->successful();
         } catch (Throwable $exception) {
-            Log::channel('queue')->warning('News source URL verification failed.', [
+            Log::channel('queue')->warning('Briefing source URL verification failed.', [
                 'url' => $url,
                 'exception_class' => $exception::class,
                 'exception_message' => $exception->getMessage(),
@@ -1583,7 +2182,7 @@ class MagazineAiPipeline
             ->take(6)
             ->implode('-');
 
-        return filled($words) ? $words : 'bitcoin-strategy';
+        return filled($words) ? $words : 'practical-guide';
     }
 
     private function startRun(AiRunType $type, ?ContentTopic $topic = null, ?Post $post = null, ?string $model = null): AiRun
@@ -1649,7 +2248,11 @@ class MagazineAiPipeline
 
     private function fallbackMarkdown(string $title, string $locale): string
     {
-        return "# {$title}\n\nThis article explains the topic with a practical focus on financial sovereignty.\n\n## Core idea\n\nBitcoin can be understood as a tool for long-term independence when risk, custody, and time horizon are handled carefully.\n\n## Practical steps\n\n- Learn the basics.\n- Understand the security model.\n- Test with small amounts.\n- Update decisions regularly.";
+        if ($locale === 'de') {
+            return "# {$title}\n\nDieser Artikel ordnet das Thema praktisch ein und zeigt, wie du im Alltag eigenständiger entscheiden kannst.\n\n## Kernidee\n\nVerstehe zuerst die Abhängigkeit, die realistischen Optionen und die jeweiligen Abwägungen.\n\n## Praktische Schritte\n\n- Die Grundlagen nachvollziehen.\n- Wichtige Informationen dokumentieren.\n- Kleine, reversible Veränderungen testen.\n- Den Ansatz bei neuen Umständen überprüfen.";
+        }
+
+        return "# {$title}\n\nThis article explains the topic with a practical focus on more independent everyday decisions.\n\n## Core idea\n\nStart by understanding the dependency involved, the realistic choices available, and the trade-offs of each option.\n\n## Practical steps\n\n- Learn the basics.\n- Document what matters.\n- Test small, reversible changes.\n- Review the approach when circumstances change.";
     }
 
     /**
@@ -1659,7 +2262,9 @@ class MagazineAiPipeline
     {
         return [
             'title' => $title,
-            'excerpt' => 'A practical guide to Bitcoin, self custody, and financial sovereignty.',
+            'excerpt' => $locale === 'de'
+                ? 'Eine praktische Anleitung für mehr Eigenständigkeit im Alltag.'
+                : 'A practical guide to greater independence in everyday life.',
             'blocks' => [],
         ];
     }

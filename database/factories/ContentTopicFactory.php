@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Enums\ContentTopicStatus;
+use App\Enums\ContentType;
 use App\Enums\Language;
 use App\Models\Category;
 use App\Models\ContentTopic;
@@ -23,6 +24,11 @@ class ContentTopicFactory extends Factory
     public function definition(): array
     {
         $title = fake()->sentence(5);
+        $primaryLocale = config('magazine_ai.primary_locale', 'de');
+        $primaryLocale = is_string($primaryLocale) && Locales::isSupported($primaryLocale)
+            ? $primaryLocale
+            : 'de';
+
         Category::query()->firstOrCreate(
             ['key' => 'self-custody', 'lang' => Language::German],
             [
@@ -43,12 +49,13 @@ class ContentTopicFactory extends Factory
                     'description' => 'Practical guidance for holding keys, building recovery plans, and reducing custody risk.',
                 ]
             )->id,
+            'content_type' => ContentType::Guide,
             'status' => ContentTopicStatus::Scheduled,
             'priority' => fake()->numberBetween(1, 10),
             'audience_level' => fake()->randomElement(['beginner', 'intermediate', 'advanced']),
-            'primary_language' => Locales::fallback(),
+            'primary_language' => $primaryLocale,
             'target_languages' => collect(Locales::supported())
-                ->reject(fn (string $locale): bool => $locale === Locales::fallback())
+                ->reject(fn (string $locale): bool => $locale === $primaryLocale)
                 ->values()
                 ->all(),
             'scheduled_for' => now()->addDay(),
