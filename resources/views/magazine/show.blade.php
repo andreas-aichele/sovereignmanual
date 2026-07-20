@@ -6,7 +6,12 @@
 
     <main class="mx-auto w-full max-w-6xl px-4 py-10 sm:px-6 lg:px-8">
         <x-breadcrumbs :label="$copy['breadcrumb_label']" :items="[
-            ['label' => $copy['magazine'], 'url' => route('magazine.index')],
+            [
+                'label' => $copy['magazine'],
+                'url' => $locale === \App\Support\Locales::fallback()
+                    ? route('magazine.index')
+                    : route('magazine.localized.index', ['locale' => $locale]),
+            ],
             [
                 'label' => $post['category_label'],
                 'url' => $post['category_url'],
@@ -16,9 +21,12 @@
 
         <article class="mt-8">
             <header class="max-w-3xl">
-                <a class="text-primary text-sm font-semibold uppercase tracking-[0.2em] underline-offset-4 hover:underline"
-                    href="{{ $post['category_url'] }}">
-                    {{ $post['category_label'] }}</a>
+                <div class="flex flex-wrap items-center gap-2">
+                    <a class="text-primary text-sm font-semibold uppercase tracking-[0.2em] underline-offset-4 hover:underline"
+                        href="{{ $post['category_url'] }}">
+                        {{ $post['category_label'] }}</a>
+                    <span class="badge badge-outline badge-sm">{{ $post['content_type_label'] }}</span>
+                </div>
                 <h1
                     class="wrap-anywhere mt-4 text-4xl font-semibold leading-tight sm:text-4xl">
                     {{ $post['title'] }}</h1>
@@ -93,9 +101,9 @@
                 </div>
 
                 <aside
-                    class="hidden text-sm lg:sticky lg:top-8 lg:block lg:border-l lg:pl-6">
+                    class="border-base-300 mt-10 border-t pt-8 text-sm lg:sticky lg:top-8 lg:mt-0 lg:border-t-0 lg:border-l lg:pl-6 lg:pt-0">
                     @if (count($post['toc']) > 0)
-                        <nav class="mb-8" aria-label="{{ $copy['toc'] }}">
+                        <nav class="mb-8 hidden lg:block" aria-label="{{ $copy['toc'] }}">
                             <p
                                 class="text-primary font-semibold uppercase tracking-[0.2em]">
                                 {{ $copy['toc'] }}</p>
@@ -130,6 +138,44 @@
                             </dd>
                         </div>
 
+                        <div>
+                            <dt
+                                class="text-base-content/45 text-xs font-semibold uppercase tracking-[0.18em]">
+                                {{ $copy['content_type'] }}</dt>
+                            <dd class="text-base-content/85 mt-2">{{ $post['content_type_label'] }}</dd>
+                        </div>
+
+                        @if ($post['created_at'])
+                            <div>
+                                <dt
+                                    class="text-base-content/45 text-xs font-semibold uppercase tracking-[0.18em]">
+                                    {{ $copy['created'] }}</dt>
+                                <dd class="text-base-content/85 mt-2">
+                                    <time datetime="{{ $post['created_at'] }}">{{ $post['created_at'] }}</time>
+                                </dd>
+                            </div>
+                        @endif
+
+                        @if ($post['substantially_updated_at'])
+                            <div>
+                                <dt
+                                    class="text-base-content/45 text-xs font-semibold uppercase tracking-[0.18em]">
+                                    {{ $copy['updated'] }}</dt>
+                                <dd class="text-base-content/85 mt-2">
+                                    <time datetime="{{ $post['substantially_updated_at'] }}">{{ $post['substantially_updated_at'] }}</time>
+                                </dd>
+                            </div>
+                        @endif
+
+                        <div>
+                            <dt
+                                class="text-base-content/45 text-xs font-semibold uppercase tracking-[0.18em]">
+                                {{ $copy['method'] }}</dt>
+                            <dd class="text-base-content/85 mt-2">
+                                {{ $post['method'] ? $copy['method_value'] : $copy['method_unrecorded'] }}
+                            </dd>
+                        </div>
+
                         @if ($meta['alternate'])
                             <div>
                                 <dt
@@ -142,6 +188,35 @@
                             </div>
                         @endif
                     </dl>
+
+                    @if (count($post['sources']) > 0)
+                        <section class="border-base-300 mt-8 border-t pt-6" aria-labelledby="article-sources">
+                            <h2 id="article-sources" class="text-primary text-xs font-semibold uppercase tracking-[0.18em]">
+                                {{ $copy['sources'] }}</h2>
+                            <ol class="mt-3 space-y-3">
+                                @foreach ($post['sources'] as $source)
+                                    <li>
+                                        <a class="text-base-content/85 font-medium underline-offset-4 hover:text-primary hover:underline"
+                                            href="{{ $source['url'] }}" rel="noopener noreferrer" target="_blank">
+                                            {{ $source['title'] }}</a>
+                                        @if ($source['publisher'] || $source['published_at'])
+                                            <p class="text-base-content/55 mt-1 text-xs">
+                                                {{ collect([$source['publisher'], $source['published_at']])->filter()->implode(' · ') }}
+                                            </p>
+                                        @endif
+                                    </li>
+                                @endforeach
+                            </ol>
+                        </section>
+                    @endif
+
+                    <section class="border-base-300 mt-8 border-t pt-6" aria-labelledby="article-corrections">
+                        <h2 id="article-corrections" class="text-primary text-xs font-semibold uppercase tracking-[0.18em]">
+                            {{ $copy['corrections'] }}</h2>
+                        <a class="text-base-content/85 mt-3 inline-block font-medium underline-offset-4 hover:text-primary hover:underline"
+                            href="https://github.com/andreas-aichele/sovereignmanual/issues/new" rel="noopener noreferrer" target="_blank">
+                            {{ $copy['report_correction'] }}</a>
+                    </section>
                 </aside>
             </div>
         </article>

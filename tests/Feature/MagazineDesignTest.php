@@ -5,7 +5,7 @@ test('magazine index is the public start page', function () {
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
         ->assertViewHas('locale', 'en')
-        ->assertSee('Sovereign Manual Magazine');
+        ->assertSee('More room to act begins with clear next steps.');
 });
 
 test('german magazine index route stores the locale and renders an indexable page', function () {
@@ -47,6 +47,7 @@ test('frontend entry is a blade asset', function () {
         ->and($contents)->toContain("import('mermaid')")
         ->and($contents)->toContain('mermaid.initialize')
         ->and($contents)->toContain("querySelector: '.mermaid'")
+        ->and($contents)->toContain('initializeAppearanceControls')
         ->and($contents)->toContain('initializeTableOfContentsScrollSpy')
         ->and($contents)->toContain('DOMContentLoaded');
 });
@@ -76,10 +77,10 @@ test('magazine localization strings live in language files', function () {
         ->and($germanTranslations)->not->toHaveKeys(['alternate_locale', 'locales'])
         ->and($englishTranslations)->not->toHaveKey('categories')
         ->and($germanTranslations)->not->toHaveKey('categories')
-        ->and($englishTranslations['index'])->toHaveKeys(['about_body', 'about_heading', 'view_category'])
-        ->and($germanTranslations['index'])->toHaveKeys(['about_body', 'about_heading', 'view_category'])
-        ->and($englishTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'details', 'language', 'magazine', 'toc'])
-        ->and($germanTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'details', 'language', 'magazine', 'toc'])
+        ->and($englishTranslations['index'])->toHaveKeys(['heading', 'paths_heading', 'featured_heading', 'briefing_heading', 'view_pillar', 'waitlist'])
+        ->and($germanTranslations['index'])->toHaveKeys(['heading', 'paths_heading', 'featured_heading', 'briefing_heading', 'view_pillar', 'waitlist'])
+        ->and($englishTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'content_type', 'corrections', 'created', 'details', 'language', 'magazine', 'method', 'sources', 'toc', 'updated'])
+        ->and($germanTranslations['show'])->toHaveKeys(['alternate', 'breadcrumb_label', 'category', 'content_type', 'corrections', 'created', 'details', 'language', 'magazine', 'method', 'sources', 'toc', 'updated'])
         ->and($controller)->not->toContain("locale === 'de'")
         ->and($controller)->not->toContain('Zurück zum Magazin')
         ->and($controller)->not->toContain('Back to magazine')
@@ -87,36 +88,34 @@ test('magazine localization strings live in language files', function () {
         ->and($controller)->not->toContain('Latest article');
 });
 
-test('magazine start page keeps visible intro copy and lower about section', function () {
+test('magazine start page presents three paths, selected briefings, and the waitlist', function () {
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
 
-    expect($index)->toContain('<section class="mb-10 max-w-3xl">')
+    expect($index)->toContain('aria-labelledby="paths-heading"')
         ->and($index)->toContain('<h1')
-        ->and($index)->toContain('$section[\'description_html\']')
-        ->and($index)->toContain('{!! $section[\'description_html\'] !!}')
+        ->and($index)->toContain('$pillarSections')
+        ->and($index)->toContain('$pillar[\'posts\']')
         ->and($index)->toContain("@include('magazine.partials.article-card'")
-        ->and($index)->toContain('flex items-start justify-between gap-4')
-        ->and($index)->toContain('mt-2 max-w-2xl text-sm')
+        ->and($index)->toContain('$briefings')
+        ->and($index)->toContain('$copy[\'paths_heading\']')
+        ->and($index)->toContain('$copy[\'briefing_heading\']')
+        ->and($index)->toContain('$copy[\'waitlist\']')
+        ->and($index)->toContain("route('waitlist.store')")
+        ->and($index)->toContain('name="consent"')
+        ->and($index)->toContain('bitcoin-pillar-accent')
         ->and($index)->toContain('btn btn-primary btn-sm')
-        ->and($index)->toContain('$copy[\'about_heading\']')
-        ->and($index)->toContain('$copy[\'about_body\']')
-        ->and($index)->toContain('mt-14')
-        ->and($index)->toContain('border-t')
-        ->and($index)->toContain('border-base-300')
-        ->and($index)->toContain('pt-10')
-        ->and($index)->not->toContain('$copy[\'featured\']');
+        ->and($index)->not->toContain('$copy[\'about_heading\']');
 });
 
-test('magazine listing uses compact mobile article cards', function () {
+test('magazine listing uses responsive editorial article cards', function () {
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
     $card = file_get_contents(resource_path('views/magazine/partials/article-card.blade.php'));
     $image = file_get_contents(resource_path('views/components/img.blade.php'));
 
-    expect($index)->toContain('relative aspect-4/3')
-        ->and($index)->toContain('absolute inset-x-0 bottom-0')
-        ->and($index)->toContain('bg-linear-to-t')
-        ->and($index)->toContain('lg:hidden')
-        ->and($index)->toContain('card-body hidden justify-center lg:flex')
+    expect($index)->toContain('lg:card-side')
+        ->and($index)->toContain('aspect-4/3')
+        ->and($index)->toContain("@include('magazine.partials.article-card'")
+        ->and($index)->toContain('lg:grid-cols-3')
         ->and($card)->toContain('card-side')
         ->and($card)->toContain('md:flex-col')
         ->and($card)->toContain('aspect-square w-2/5')
@@ -132,7 +131,8 @@ test('public navigation uses a scalable language dropdown', function () {
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
     $controller = file_get_contents(app_path('Http/Controllers/MagazineController.php'));
 
-    expect($nav)->toContain('@props([\'locale\' => null, \'languageOptions\' => []])')
+    expect($nav)->toContain("'pillarNavItems' => []")
+        ->and($nav)->toContain("'categoryNavItems' => []")
         ->and($nav)->toContain('$locale ??= \App\Support\Locales::fallback();')
         ->and($nav)->toContain('<details class="dropdown dropdown-end">')
         ->and($nav)->toContain('dropdown-content menu')
@@ -146,6 +146,34 @@ test('public navigation uses a scalable language dropdown', function () {
         ->and($controller)->toContain('private function languageOptions')
         ->and($controller)->toContain('Locales::supported()')
         ->and($controller)->toContain('Locales::language($locale)->nativeName()');
+});
+
+test('public navigation prioritizes pillar links and falls back to categories', function () {
+    $categoryNavItems = [
+        ['label' => 'Self Custody', 'url' => '/self-custody'],
+    ];
+    $pillarNavItems = [
+        ['label' => 'Digital Sovereignty', 'url' => '/digital-sovereignty'],
+    ];
+
+    $this->blade(
+        '<x-public-nav locale="en" :category-nav-items="$categoryNavItems" :pillar-nav-items="$pillarNavItems" />',
+        compact('categoryNavItems', 'pillarNavItems'),
+    )
+        ->assertSee('Topics')
+        ->assertSee('Digital Sovereignty')
+        ->assertDontSee('Self Custody')
+        ->assertSee('aria-label="Sovereign Manual"', false);
+
+    $this->blade(
+        '<x-public-nav locale="en" :category-nav-items="$categoryNavItems" :pillar-nav-items="$pillarNavItems" />',
+        [
+            'categoryNavItems' => $categoryNavItems,
+            'pillarNavItems' => [],
+        ],
+    )
+        ->assertSee('Categories')
+        ->assertSee('Self Custody');
 });
 
 test('magazine headings can break long words', function () {
@@ -179,7 +207,7 @@ test('magazine article layout keeps public container width and readable article 
         ->and($show)->toContain('header class="max-w-3xl"')
         ->and($show)->toContain('lg:grid-cols-[minmax(0,48rem)_16rem]')
         ->and($show)->toContain('lg:sticky lg:top-8')
-        ->and($show)->toContain('hidden text-sm lg:sticky')
+        ->and($show)->toContain('border-base-300 mt-10 border-t pt-8 text-sm')
         ->and($show)->toContain('content-body max-w-none');
 });
 
@@ -214,6 +242,7 @@ test('magazine article navigation uses breadcrumbs instead of a back button', fu
         ->and($breadcrumbs)->toContain('<li class="inline">')
         ->and($breadcrumbs)->not->toContain('flex')
         ->and($breadcrumbs)->not->toContain('truncate')
+        ->and($show)->toContain("route('magazine.localized.index', ['locale' => \$locale])")
         ->and($show)->not->toContain('$copy[\'back\']');
 });
 
@@ -239,23 +268,65 @@ test('magazine article diagrams have responsive readable styling', function () {
         ->and($controller)->toContain('mermaidFlowchart');
 });
 
-test('public magazine styles use theme-driven atmosphere and daisyUI panels', function () {
-    $css = file_get_contents(resource_path('css/background.css'));
+test('public magazine uses a calm editorial visual system with light and dark themes', function () {
+    $theme = file_get_contents(resource_path('css/theme.css'));
+    $background = file_get_contents(resource_path('css/background.css'));
+    $javascript = file_get_contents(resource_path('js/app.js'));
+    $layout = file_get_contents(resource_path('views/components/layouts/app.blade.php'));
     $index = file_get_contents(resource_path('views/magazine/index.blade.php'));
     $show = file_get_contents(resource_path('views/magazine/show.blade.php'));
     $nav = file_get_contents(resource_path('views/components/public-nav.blade.php'));
+    $logo = file_get_contents(public_path('logo.svg'));
 
-    expect($css)->toContain('radial-gradient(')
-        ->and($css)->toContain('circle at 12% 8%')
-        ->and($css)->toContain('circle at 86% 18%')
-        ->and($css)->toContain('body::before')
-        ->and($css)->toContain('background-size: 4rem 4rem')
+    expect($theme)->toContain("name: 'editorial-light'")
+        ->and($theme)->toContain("name: 'editorial-dark'")
+        ->and($theme)->not->toContain('synthwave')
+        ->and($theme)->not->toContain('#f7931a')
+        ->and($background)->toContain('radial-gradient(')
+        ->and($background)->toContain('ellipse at 4% 0%')
+        ->and($background)->toContain('ellipse at 96% 12%')
+        ->and($background)->not->toContain('body::before')
+        ->and($background)->not->toContain('background-size: 4rem 4rem')
+        ->and($javascript)->toContain("'editorial-light'")
+        ->and($javascript)->toContain("'editorial-dark'")
+        ->and($javascript)->toContain('data-appearance-toggle')
+        ->and($javascript)->not->toContain('#f7931a')
+        ->and($layout)->toContain('data-appearance="{{ $appearance }}"')
+        ->and($layout)->toContain('data-theme="{{ $isDarkAppearance ? \'editorial-dark\' : \'editorial-light\' }}"')
+        ->and($layout)->not->toContain('synthwave')
         ->and($index)->toContain('card card-border bg-base-200')
-        ->and($index)->toContain('badge badge-primary')
+        ->and($index)->toContain('bitcoin-pillar-accent')
         ->and($show)->toContain('card card-border bg-base-300')
         ->and($nav)->toContain('navbar bg-base-100/85')
-        ->and($nav)->not->toContain('fuchsia')
-        ->and($nav)->not->toContain('cyan');
+        ->and($nav)->toContain("'pillarNavItems' => []")
+        ->and($nav)->toContain("'categoryNavItems' => []")
+        ->and($nav)->toContain('magazine.nav.topics')
+        ->and($nav)->toContain('data-appearance-toggle')
+        ->and($nav)->toContain('magazine.nav.theme')
+        ->and($logo)->toContain('<circle')
+        ->and($logo)->not->toContain('bitcoin')
+        ->and($logo)->not->toContain('F7931A');
+});
+
+test('appearance cookie selects the matching editorial theme', function () {
+    $this->withUnencryptedCookie('appearance', 'light')
+        ->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertSee('data-appearance="light"', false)
+        ->assertSee('data-theme="editorial-light"', false);
+
+    $this->withUnencryptedCookie('appearance', 'dark')
+        ->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertSee('data-appearance="dark"', false)
+        ->assertSee('data-theme="editorial-dark"', false)
+        ->assertSee('class="dark"', false);
+
+    $this->withUnencryptedCookie('appearance', 'unexpected')
+        ->get(route('magazine.index'))
+        ->assertSuccessful()
+        ->assertSee('data-appearance="system"', false)
+        ->assertSee('data-theme="editorial-light"', false);
 });
 
 test('frontend prefers daisyUI components and semantic theme colors', function () {

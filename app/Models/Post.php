@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\ContentType;
 use App\Enums\PostStatus;
 use Database\Factories\PostFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -14,6 +15,7 @@ use OwenIt\Auditing\Contracts\Auditable;
 #[Fillable([
     'content_topic_id',
     'category_id',
+    'content_type',
     'status',
     'audience_level',
     'primary_language',
@@ -21,6 +23,7 @@ use OwenIt\Auditing\Contracts\Auditable;
     'scheduled_for',
     'seo',
     'ai_metadata',
+    'sources',
 ])]
 class Post extends Model implements Auditable
 {
@@ -28,6 +31,13 @@ class Post extends Model implements Auditable
     use HasFactory;
 
     use \OwenIt\Auditing\Auditable;
+
+    /**
+     * @var array<string, mixed>
+     */
+    protected $attributes = [
+        'content_type' => ContentType::Guide->value,
+    ];
 
     public function isPublished(): bool
     {
@@ -97,10 +107,12 @@ class Post extends Model implements Auditable
     {
         return [
             'status' => PostStatus::class,
+            'content_type' => ContentType::class,
             'published_at' => 'datetime',
             'scheduled_for' => 'datetime',
             'seo' => 'array',
             'ai_metadata' => 'array',
+            'sources' => 'array',
         ];
     }
 }

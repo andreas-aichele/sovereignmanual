@@ -1,7 +1,21 @@
+@php
+    $appearance = in_array(
+        $appearance ?? 'system',
+        ['system', 'light', 'dark'],
+        true,
+    )
+        ? $appearance
+        : 'system';
+    $isDarkAppearance = $appearance === 'dark';
+    $pageThemeColor =
+        $themeColor ?? ($isDarkAppearance ? '#20231f' : '#f7f3ea');
+@endphp
+
 <!DOCTYPE html>
-<html data-theme="synthwave"
+<html data-appearance="{{ $appearance }}"
+    data-theme="{{ $isDarkAppearance ? 'editorial-dark' : 'editorial-light' }}"
     lang="{{ str_replace('_', '-', app()->getLocale()) }}"
-    @class(['dark' => ($appearance ?? 'system') === 'dark'])>
+    @class(['dark' => $isDarkAppearance])>
 
 <head>
     <meta charset="utf-8">
@@ -11,7 +25,7 @@
     <title>{{ $title ?? config('app.name', 'Sovereign Manual') }}</title>
 
     <meta name="robots" content="{{ $robots ?? 'index, follow' }}">
-    <meta name="theme-color" content="{{ $themeColor ?? '#1a103d' }}">
+    <meta name="theme-color" content="{{ $pageThemeColor }}">
 
     @isset($author)
         <meta name="author" content="{{ $author }}">

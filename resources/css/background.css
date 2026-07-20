@@ -7,41 +7,32 @@
         @apply bg-base-100 text-base-content;
         background:
             radial-gradient(
-                circle at 12% 8%,
-                color-mix(in oklch, var(--color-accent) 28%, transparent),
-                transparent 28rem
+                ellipse at 4% 0%,
+                color-mix(in oklch, var(--color-primary) 9%, transparent),
+                transparent 42rem
             ),
             radial-gradient(
-                circle at 86% 18%,
-                color-mix(in oklch, var(--color-info) 24%, transparent),
-                transparent 24rem
+                ellipse at 96% 12%,
+                color-mix(in oklch, var(--color-secondary) 10%, transparent),
+                transparent 36rem
             ),
-            linear-gradient(
-                180deg,
-                color-mix(in oklch, var(--color-base-100) 88%, black),
-                var(--color-base-100) 38rem
-            );
+            var(--color-base-100);
         min-height: 100vh;
     }
+}
 
-    body::before {
-        background:
-            linear-gradient(
-                color-mix(in oklch, var(--color-primary) 12%, transparent) 1px,
-                transparent 1px
-            ),
-            linear-gradient(
-                90deg,
-                color-mix(in oklch, var(--color-info) 10%, transparent) 1px,
-                transparent 1px
-            );
-        background-size: 4rem 4rem;
-        content: '';
-        inset: 0;
-        mask-image: linear-gradient(to bottom, black, transparent 44rem);
-        opacity: 0.18;
-        pointer-events: none;
-        position: fixed;
-        z-index: -1;
+@layer components {
+    .bitcoin-pillar-accent {
+        border-color: color-mix(
+            in oklch,
+            var(--editorial-bitcoin-accent) 55%,
+            transparent
+        );
+        background-color: color-mix(
+            in oklch,
+            var(--editorial-bitcoin-accent) 12%,
+            transparent
+        );
+        color: var(--editorial-bitcoin-accent);
     }
 }

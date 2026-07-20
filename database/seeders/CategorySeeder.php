@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\Language;
 use App\Models\Category;
+use App\Models\Pillar;
 use Illuminate\Database\Seeder;
 
 class CategorySeeder extends Seeder
@@ -13,6 +14,19 @@ class CategorySeeder extends Seeder
      */
     public function run(): void
     {
+        $this->call(PillarSeeder::class);
+
+        $pillarKeys = [
+            'self-custody' => 'bitcoin-money',
+            'financial-sovereignty' => 'bitcoin-money',
+            'economics' => 'bitcoin-money',
+            'news' => 'bitcoin-money',
+            'tools-practice' => 'bitcoin-money',
+            'privacy-security' => 'digital-sovereignty',
+            'mindset' => 'decisions-preparedness',
+            'family-legacy' => 'decisions-preparedness',
+        ];
+
         collect([
             [
                 'key' => 'self-custody',
@@ -35,12 +49,12 @@ class CategorySeeder extends Seeder
                     Language::English->value => [
                         'slug' => 'privacy-security',
                         'name' => 'Privacy & Security',
-                        'description' => '**Security is a process, not a product.**<br><br>Protecting Bitcoin requires more than choosing a wallet. Explore practical operational security, privacy-preserving habits, secure communication, threat modeling, and risk management.<br><br>Whether you hold a small amount or significant wealth, understanding privacy and security helps reduce attack surfaces and maintain financial freedom.',
+                        'description' => '**Security is a process, not a product.**<br><br>Explore practical privacy habits, secure communication, account protection, threat modeling, and risk management for the digital tools you use every day.<br><br>Understanding privacy and security helps reduce avoidable dependencies and keeps more of your data, communication, and money under your control.',
                     ],
                     Language::German->value => [
                         'slug' => 'privatsphaere-sicherheit',
                         'name' => 'Privatsphäre & Sicherheit',
-                        'description' => '**Sicherheit ist kein Produkt, sondern ein Prozess.**<br><br>Der Schutz von Bitcoin endet nicht bei der Wahl einer Wallet. Hier findest du Inhalte zu operativer Sicherheit, Datenschutz, Bedrohungsmodellen, sicherer Kommunikation und dem Umgang mit Risiken.<br><br>Wer Privatsphäre versteht und Sicherheitsmaßnahmen bewusst einsetzt, schützt nicht nur seine Bitcoin, sondern auch seine persönliche Freiheit.',
+                        'description' => '**Sicherheit ist kein Produkt, sondern ein Prozess.**<br><br>Hier findest du praktische Inhalte zu Datenschutz, sicherer Kommunikation, Kontoschutz, Bedrohungsmodellen und dem Umgang mit digitalen Risiken.<br><br>Wer Privatsphäre versteht und Sicherheitsmaßnahmen bewusst einsetzt, reduziert unnötige Abhängigkeiten und behält mehr Kontrolle über Daten, Kommunikation und Geld.',
                     ],
                 ],
             ],
@@ -50,12 +64,12 @@ class CategorySeeder extends Seeder
                     Language::English->value => [
                         'slug' => 'financial-sovereignty',
                         'name' => 'Financial Sovereignty',
-                        'description' => '**Own your money. Own your future.**<br><br>Bitcoin changes the relationship between individuals and money. This category explores saving, spending, investing, and building long-term financial resilience without unnecessary intermediaries.<br><br>The focus is not on getting rich quickly, but on increasing independence, optionality, and personal responsibility.',
+                        'description' => '**Own your money. Own your future.**<br><br>Bitcoin changes the relationship between individuals and money. This category explains money, saving, self-custody, and long-term financial resilience without unnecessary intermediaries.<br><br>The focus is education and personal responsibility, never individual financial advice or quick-profit narratives.',
                     ],
                     Language::German->value => [
                         'slug' => 'finanzielle-souveraenitaet',
                         'name' => 'Finanzielle Souveränität',
-                        'description' => '**Eigene Entscheidungen statt fremder Kontrolle.**<br><br>Bitcoin verändert die Beziehung zwischen Mensch und Geld. Diese Kategorie beleuchtet Sparen, Investieren, Konsum und langfristigen Vermögensaufbau aus einer souveränen Perspektive.<br><br>Im Mittelpunkt steht nicht die Jagd nach schnellen Gewinnen, sondern finanzielle Unabhängigkeit, Selbstbestimmung und Verantwortung für die eigenen Entscheidungen.',
+                        'description' => '**Eigene Entscheidungen statt fremder Kontrolle.**<br><br>Bitcoin verändert die Beziehung zwischen Mensch und Geld. Diese Kategorie erklärt Geld, Sparen, Selbstverwahrung und langfristige finanzielle Resilienz ohne unnötige Vermittler.<br><br>Im Mittelpunkt stehen Bildung und Verantwortung, niemals individuelle Finanzberatung oder schnelle Gewinnversprechen.',
                     ],
                 ],
             ],
@@ -65,12 +79,12 @@ class CategorySeeder extends Seeder
                     Language::English->value => [
                         'slug' => 'family-legacy',
                         'name' => 'Family & Legacy',
-                        'description' => '**Bitcoin should survive you.**<br><br>Long-term ownership requires planning beyond your own lifetime. Learn how to prepare your family, document recovery procedures, and create inheritance strategies that balance accessibility with security.<br><br>The objective is continuity: ensuring future generations can benefit from the wealth you preserve today.',
+                        'description' => '**Important information should not live only in your head.**<br><br>Long-term responsibility includes clear documentation, careful conversations with family, and practical plans for the people who depend on you.<br><br>These articles offer education and preparation frameworks, not legal or inheritance advice.',
                     ],
                     Language::German->value => [
                         'slug' => 'familie-nachlass',
                         'name' => 'Familie & Nachlass',
-                        'description' => '**Bitcoin sollte dich überdauern.**<br><br>Langfristige Selbstverwahrung endet nicht bei der eigenen Person. Erfahre, wie du Angehörige vorbereitest, Wiederherstellungsprozesse dokumentierst und einen sicheren Bitcoin-Nachlass planst.<br><br>Das Ziel ist Kontinuität: Vermögen für kommende Generationen erhalten, ohne dabei Sicherheit oder Privatsphäre zu opfern.',
+                        'description' => '**Wichtige Informationen sollten nicht nur im eigenen Kopf liegen.**<br><br>Langfristige Verantwortung umfasst verständliche Dokumentation, gute Gespräche mit Angehörigen und praktische Pläne für Menschen, die auf dich zählen.<br><br>Diese Artikel bieten Orientierung und Vorsorge-Modelle, keine Rechts- oder Nachlassberatung.',
                     ],
                 ],
             ],
@@ -110,12 +124,12 @@ class CategorySeeder extends Seeder
                     Language::English->value => [
                         'slug' => 'mindset',
                         'name' => 'Mindset',
-                        'description' => '**Bitcoin is as much a personal journey as a technological one.**<br><br>Explore the mental models, habits, and principles that help individuals think in longer time horizons and take greater responsibility for their decisions.<br><br>Patience, conviction, humility, and continuous learning are often more valuable than any market prediction.',
+                        'description' => '**Good decisions need room to breathe.**<br><br>Explore mental models, habits, and principles that make it easier to think in longer time horizons, document trade-offs, and take responsibility for everyday decisions.<br><br>Patience, humility, and continuous learning are more useful than certainty theater or market predictions.',
                     ],
                     Language::German->value => [
                         'slug' => 'denkweise',
                         'name' => 'Denkweise',
-                        'description' => '**Bitcoin ist ebenso eine persönliche wie eine technologische Reise.**<br><br>Hier geht es um Denkmodelle, Gewohnheiten und Prinzipien, die helfen, langfristiger zu denken und Verantwortung für die eigenen Entscheidungen zu übernehmen.<br><br>Geduld, Überzeugung, Demut und kontinuierliches Lernen sind häufig wertvoller als jede Marktprognose.',
+                        'description' => '**Gute Entscheidungen brauchen Luft zum Denken.**<br><br>Hier geht es um Denkmodelle, Gewohnheiten und Prinzipien, die helfen, langfristiger zu denken, Abwägungen zu dokumentieren und Verantwortung im Alltag zu übernehmen.<br><br>Geduld, Demut und kontinuierliches Lernen sind hilfreicher als falsche Gewissheit oder Marktprognosen.',
                     ],
                 ],
             ],
@@ -125,17 +139,17 @@ class CategorySeeder extends Seeder
                     Language::English->value => [
                         'slug' => 'news',
                         'name' => 'News',
-                        'description' => '**Stay informed without the noise.**<br><br>Follow important developments from the Bitcoin ecosystem, including regulation, institutional adoption, technological upgrades, industry events, and macroeconomic trends.<br><br>The focus is on relevance and context rather than headlines, helping readers understand what matters and why.',
+                        'description' => '**Stay informed without the noise.**<br><br>This historical category contains carefully sourced Bitcoin developments, including protocol work, regulation, and ecosystem changes.<br><br>New updates are published as selective briefings with sources, relevance, and uncertainty made clear.',
                     ],
                     Language::German->value => [
                         'slug' => 'news',
                         'name' => 'News',
-                        'description' => '**Aktuelle Entwicklungen mit Kontext statt Schlagzeilen.**<br><br>Hier findest du wichtige Neuigkeiten aus dem Bitcoin-Ökosystem: regulatorische Entwicklungen, technologische Fortschritte, Unternehmensmeldungen, Markttrends und bedeutende Ereignisse.<br><br>Der Fokus liegt darauf, Nachrichten einzuordnen und ihre langfristige Bedeutung für Bitcoin verständlich zu machen.',
+                        'description' => '**Aktuelle Entwicklungen mit Kontext statt Schlagzeilen.**<br><br>Diese historische Kategorie bündelt sorgfältig belegte Entwicklungen aus dem Bitcoin-Ökosystem, etwa zu Protokoll, Regulierung und Infrastruktur.<br><br>Neue Updates erscheinen als selektive Briefings, die Quellen, Relevanz und offene Fragen sichtbar machen.',
                     ],
                 ],
             ],
-        ])->each(function (array $category): void {
-            collect($category['translations'])->each(function (array $translation, string $lang) use ($category): void {
+        ])->each(function (array $category) use ($pillarKeys): void {
+            collect($category['translations'])->each(function (array $translation, string $lang) use ($category, $pillarKeys): void {
                 Category::query()->updateOrCreate(
                     [
                         'key' => $category['key'],
@@ -145,6 +159,10 @@ class CategorySeeder extends Seeder
                         'slug' => $translation['slug'],
                         'name' => $translation['name'],
                         'description' => $translation['description'],
+                        'pillar_id' => Pillar::query()
+                            ->where('key', $pillarKeys[$category['key']])
+                            ->where('lang', $lang)
+                            ->value('id'),
                     ],
                 );
             });

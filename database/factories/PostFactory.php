@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\ContentType;
 use App\Enums\Language;
 use App\Enums\PostStatus;
 use App\Models\Category;
@@ -41,12 +42,14 @@ class PostFactory extends Factory
                     'description' => 'Practical guidance for holding keys, building recovery plans, and reducing custody risk.',
                 ]
             )->id,
+            'content_type' => ContentType::Guide,
             'status' => PostStatus::Draft,
             'audience_level' => 'beginner',
             'primary_language' => Locales::fallback(),
             'scheduled_for' => now()->addDay(),
             'seo' => ['keywords' => ['bitcoin', 'financial independence']],
             'ai_metadata' => ['provider' => 'gemini'],
+            'sources' => null,
         ];
     }
 

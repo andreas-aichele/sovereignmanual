@@ -9,8 +9,8 @@ use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
 use RuntimeException;
 
-#[Signature('app:ideate-news-topics {--count=1 : Number of researched news topic ideas to create} {--sync : Run immediately instead of dispatching a queue job}')]
-#[Description('Create sourced AI-researched Bitcoin news topic ideas for scheduled publication')]
+#[Signature('app:ideate-news-topics {--count=1 : Number of sourced Bitcoin briefing ideas to create} {--sync : Run immediately instead of dispatching a queue job}')]
+#[Description('Create sourced AI-researched Bitcoin briefing ideas for scheduled publication')]
 class IdeateNewsTopics extends Command
 {
     /**
@@ -21,7 +21,7 @@ class IdeateNewsTopics extends Command
         if (! $this->option('sync')) {
             IdeateNewsTopicsJob::dispatch((int) $this->option('count'));
 
-            $this->components->info('Queued news topic ideation job.');
+            $this->components->info('Queued Bitcoin briefing ideation job.');
 
             return self::SUCCESS;
         }
@@ -35,12 +35,12 @@ class IdeateNewsTopics extends Command
         }
 
         if ($topics->isEmpty()) {
-            $this->components->error('No researched news topic met the credibility requirements.');
+            $this->components->error('No researched Bitcoin briefing met the credibility requirements.');
 
             return self::FAILURE;
         }
 
-        $this->components->info("Created or matched {$topics->count()} researched news topic idea(s).");
+        $this->components->info("Created or matched {$topics->count()} researched Bitcoin briefing idea(s).");
 
         return self::SUCCESS;
     }

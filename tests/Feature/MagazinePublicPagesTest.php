@@ -7,6 +7,7 @@ use App\Models\PostAsset;
 use App\Models\PostBlock;
 use App\Models\PostTranslation;
 use App\Support\ResponsiveImage;
+use Database\Seeders\CategorySeeder;
 use Illuminate\Support\Facades\Storage;
 
 function selfCustodyCategory(): Category
@@ -111,8 +112,8 @@ test('about page renders project description and localized seo tags', function (
         ->assertSee('href="'.route('magazine.localized.about', ['locale' => 'de']).'"', false)
         ->assertSee('hreflang="x-default"', false)
         ->assertSee('"@type":"AboutPage"', false)
-        ->assertSee('AI-generated content, clearly disclosed')
-        ->assertSee('Bitcoin only, no trading narrative')
+        ->assertSee('Automation, openly explained')
+        ->assertSee('Bitcoin remains a core competence')
         ->assertSee('https://github.com/andreas-aichele/sovereignmanual');
 
     $this->get(route('magazine.localized.about', ['locale' => 'de']))
@@ -122,7 +123,8 @@ test('about page renders project description and localized seo tags', function (
         ->assertCookie('locale', 'de')
         ->assertSee('<link href="'.route('magazine.localized.about', ['locale' => 'de']).'" rel="canonical">', false)
         ->assertSee('Über das Projekt')
-        ->assertSee('KI-generierte Inhalte, klar offengelegt')
+        ->assertSee('Automatisierung, offen erklärt')
+        ->assertSee('Bitcoin bleibt eine Kernkompetenz')
         ->assertSee('Repository ansehen');
 });
 
@@ -140,21 +142,21 @@ test('about page language switcher stays on about pages', function () {
 });
 
 test('public navigation links localized category pages', function () {
-    selfCustodyCategory();
+    $selfCustody = selfCustodyCategory();
 
-    Category::factory()->create([
+    $news = Category::factory()->create([
         'key' => 'news',
         'lang' => Language::English,
         'slug' => 'news',
         'name' => 'News',
     ]);
-    Category::factory()->create([
+    $financialSovereignty = Category::factory()->create([
         'key' => 'financial-sovereignty',
         'lang' => Language::English,
         'slug' => 'financial-sovereignty',
         'name' => 'Financial Sovereignty',
     ]);
-    Category::factory()->create([
+    $mindset = Category::factory()->create([
         'key' => 'mindset',
         'lang' => Language::English,
         'slug' => 'mindset',
@@ -166,6 +168,25 @@ test('public navigation links localized category pages', function () {
         'slug' => 'nachrichten',
         'name' => 'Nachrichten',
     ]);
+
+    collect([$news, $financialSovereignty, $mindset, $selfCustody])->each(function (Category $category): void {
+        $post = Post::factory()->published()->create([
+            'category_id' => $category->id,
+        ]);
+
+        PostTranslation::factory()->create([
+            'post_id' => $post->id,
+            'locale' => 'en',
+            'title' => "{$category->name} article",
+            'slug' => "{$category->slug}-{$post->id}",
+        ]);
+        PostTranslation::factory()->create([
+            'post_id' => $post->id,
+            'locale' => 'de',
+            'title' => "{$category->name} Beitrag",
+            'slug' => "{$category->slug}-beitrag-{$post->id}",
+        ]);
+    });
 
     $this->get(route('magazine.index'))
         ->assertSuccessful()
@@ -187,7 +208,7 @@ test('public navigation links localized category pages', function () {
         ->assertSee('href="'.route('magazine.localized.category', ['locale' => 'de', 'category' => 'selbstverwahrung']).'"', false);
 });
 
-test('newest published post leads the magazine index', function () {
+test('newest published guide is featured on the magazine index', function () {
     $olderPost = Post::factory()->published()->create([
         'published_at' => now()->subDays(2),
     ]);
@@ -209,119 +230,48 @@ test('newest published post leads the magazine index', function () {
         'slug' => 'newest-article',
     ]);
 
-    $this->get(route('magazine.index'))
+    $response = $this->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
-        ->assertSeeInOrder(['Newest article', 'Older article']);
+        ->assertSee('Newest article');
+
+    expect($response->viewData('featuredPost')['title'])->toBe('Newest article');
 });
 
-test('magazine index groups category articles below the hero and latest posts', function () {
-    $selfCustody = selfCustodyCategory();
-    $news = Category::factory()->create([
-        'key' => 'news',
-        'slug' => 'news',
-        'name' => 'News',
-        'description' => '**Stay informed without the noise.**<br><br>News context.',
-    ]);
-    $financialSovereignty = Category::factory()->create([
-        'key' => 'financial-sovereignty',
-        'slug' => 'financial-sovereignty',
-        'name' => 'Financial Sovereignty',
-        'description' => '**Own your money.**<br><br>Financial resilience.',
-    ]);
-    $mindset = Category::factory()->create([
-        'key' => 'mindset',
-        'slug' => 'mindset',
-        'name' => 'Mindset',
-        'description' => '**Bitcoin is as much a personal journey as a technological one.**<br><br>Long-term thinking.',
-    ]);
+test('magazine index curates start articles under the three pillars', function () {
+    $this->seed(CategorySeeder::class);
 
-    publishedMagazinePost($selfCustody, 'Hero article', 'hero-article', 0);
-    publishedMagazinePost($selfCustody, 'Latest self custody', 'latest-self-custody', 1);
-    publishedMagazinePost($news, 'Latest news', 'latest-news', 2);
-    publishedMagazinePost($financialSovereignty, 'Latest financial sovereignty', 'latest-financial-sovereignty', 3);
-    publishedMagazinePost($news, 'Protocol update context', 'protocol-update-context', 4);
-    publishedMagazinePost($news, 'Policy update explained', 'policy-update-explained', 5);
-    publishedMagazinePost($news, 'Mining news analysis', 'mining-news-analysis', 6);
-    publishedMagazinePost($financialSovereignty, 'Long-term savings', 'long-term-savings', 7);
-    publishedMagazinePost($financialSovereignty, 'Spending with intention', 'spending-with-intention', 8);
-    publishedMagazinePost($financialSovereignty, 'Building resilience', 'building-resilience', 9);
-    publishedMagazinePost($mindset, 'Low time preference', 'low-time-preference', 10);
-    publishedMagazinePost($mindset, 'Conviction without hype', 'conviction-without-hype', 11);
-    publishedMagazinePost($mindset, 'Patience and responsibility', 'patience-and-responsibility', 12);
-    publishedMagazinePost($selfCustody, 'Seed backup plans', 'seed-backup-plans', 13);
-    publishedMagazinePost($selfCustody, 'Hardware wallet checks', 'hardware-wallet-checks', 14);
-    publishedMagazinePost($selfCustody, 'Recovery drill basics', 'recovery-drill-basics', 15);
+    $bitcoinCategory = Category::query()->where('key', 'self-custody')->where('lang', Language::English)->firstOrFail();
+    $digitalCategory = Category::query()->where('key', 'privacy-security')->where('lang', Language::English)->firstOrFail();
+    $decisionsCategory = Category::query()->where('key', 'mindset')->where('lang', Language::English)->firstOrFail();
+
+    foreach (range(1, 6) as $index) {
+        publishedMagazinePost($bitcoinCategory, "Bitcoin start {$index}", "bitcoin-start-{$index}", $index);
+    }
+    publishedMagazinePost($digitalCategory, 'Digital start', 'digital-start', 7);
+    publishedMagazinePost($decisionsCategory, 'Decision start', 'decision-start', 8);
 
     $response = $this->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertViewIs('magazine.index')
-        ->assertSee('<strong>Stay informed without the noise.</strong>', false)
-        ->assertDontSee('**Stay informed without the noise.**')
-        ->assertDontSee('Latest articles')
-        ->assertSeeInOrder([
-            'Hero article',
-            'Latest self custody',
-            'Latest news',
-            'Latest financial sovereignty',
-            'News',
-            'Protocol update context',
-            'Policy update explained',
-            'Mining news analysis',
-            'Financial Sovereignty',
-            'Long-term savings',
-            'Spending with intention',
-            'Building resilience',
-            'Mindset',
-            'Low time preference',
-            'Conviction without hype',
-            'Patience and responsibility',
-            'Self Custody',
-            'Seed backup plans',
-            'Hardware wallet checks',
-            'Recovery drill basics',
-        ]);
+        ->assertSee('Where would you like to become more independent?')
+        ->assertSee('Bitcoin &amp; Money', false)
+        ->assertSee('Digital Sovereignty')
+        ->assertSee('Decisions &amp; Preparedness', false)
+        ->assertSee('Bitcoin start 1')
+        ->assertSee('Digital start')
+        ->assertSee('Decision start');
 
-    $categorySections = collect($response->viewData('categorySections'));
-    $categoryArticleTitles = $categorySections->pluck('posts')->flatten(1)->pluck('title');
+    $pillars = collect($response->viewData('pillarSections'));
 
-    expect($response->viewData('featuredPost')['title'])->toBe('Hero article');
-    expect($response->viewData('latestPosts')->pluck('title')->all())->toBe([
-        'Latest self custody',
-        'Latest news',
-        'Latest financial sovereignty',
-    ]);
-    expect($categorySections->pluck('key')->all())->toBe([
-        'news',
-        'financial-sovereignty',
-        'mindset',
-        'self-custody',
-    ]);
-    expect($categoryArticleTitles)
-        ->not->toContain('Hero article')
-        ->not->toContain('Latest self custody')
-        ->not->toContain('Latest news')
-        ->not->toContain('Latest financial sovereignty');
-    expect(collect($categorySections->firstWhere('key', 'news')['posts'])->pluck('title')->all())->toBe([
-        'Protocol update context',
-        'Policy update explained',
-        'Mining news analysis',
-    ]);
-    expect(collect($categorySections->firstWhere('key', 'financial-sovereignty')['posts'])->pluck('title')->all())->toBe([
-        'Long-term savings',
-        'Spending with intention',
-        'Building resilience',
-    ]);
-    expect(collect($categorySections->firstWhere('key', 'mindset')['posts'])->pluck('title')->all())->toBe([
-        'Low time preference',
-        'Conviction without hype',
-        'Patience and responsibility',
-    ]);
-    expect(collect($categorySections->firstWhere('key', 'self-custody')['posts'])->pluck('title')->all())->toBe([
-        'Seed backup plans',
-        'Hardware wallet checks',
-        'Recovery drill basics',
-    ]);
+    expect($pillars->pluck('key')->all())->toBe([
+        'bitcoin-money',
+        'digital-sovereignty',
+        'decisions-preparedness',
+    ])
+        ->and($pillars->firstWhere('key', 'bitcoin-money')['is_ready'])->toBeTrue()
+        ->and($pillars->firstWhere('key', 'digital-sovereignty')['is_ready'])->toBeFalse()
+        ->and($pillars->firstWhere('key', 'decisions-preparedness')['is_ready'])->toBeFalse();
 });
 
 test('unpublished posts are hidden from the public magazine', function () {
@@ -466,7 +416,7 @@ test('category page renders heading description and paginated article listing', 
         ->assertSuccessful()
         ->assertViewIs('magazine.category')
         ->assertSee('aria-label="Breadcrumb"', false)
-        ->assertSee('href="'.route('magazine.index').'"', false)
+        ->assertSee('href="'.route('magazine.localized.index', ['locale' => 'de']).'"', false)
         ->assertSee('Magazin')
         ->assertSee('aria-current="page"', false)
         ->assertSee('Selbstverwahrung')
@@ -1063,7 +1013,7 @@ test('public index renders canonical alternate social and structured data tags',
     $this->get(route('magazine.index'))
         ->assertSuccessful()
         ->assertSee('<meta name="robots" content="index, follow">', false)
-        ->assertSee('<meta name="theme-color" content="#1a103d">', false)
+        ->assertSee('<meta name="theme-color" content="#f7f3ea">', false)
         ->assertSee('<link href="'.route('magazine.index').'" rel="canonical">', false)
         ->assertSee('href="'.route('magazine.localized.index', ['locale' => 'en']).'"', false)
         ->assertSee('hreflang="en"', false)
@@ -1076,12 +1026,12 @@ test('public index renders canonical alternate social and structured data tags',
         ->assertSee('property="og:locale:alternate"', false)
         ->assertSee('content="de_DE"', false)
         ->assertSee('property="og:title"', false)
-        ->assertSee('content="Sovereign Manual Magazine"', false)
+        ->assertSee('content="Sovereign Manual"', false)
         ->assertSee('name="twitter:card"', false)
         ->assertSee('content="summary"', false)
         ->assertSee('<script type="application/ld+json">', false)
         ->assertSee('"@type":"WebSite"', false)
-        ->assertSee('Sovereign Manual Magazine');
+        ->assertSee('Sovereign Manual');
 });
 
 test('localized start pages are indexable with their own canonical urls', function () {
@@ -1112,7 +1062,7 @@ test('category pages render canonical alternate social and structured data tags'
     $this->get(route('magazine.category', ['category' => 'self-custody']))
         ->assertSuccessful()
         ->assertSee('<meta name="robots" content="index, follow">', false)
-        ->assertSee('<meta name="theme-color" content="#1a103d">', false)
+        ->assertSee('<meta name="theme-color" content="#f7f3ea">', false)
         ->assertSee('<link href="'.route('magazine.category', ['category' => 'self-custody']).'" rel="canonical">', false)
         ->assertSee('href="'.route('magazine.localized.category', ['locale' => 'en', 'category' => 'self-custody']).'"', false)
         ->assertSee('href="'.route('magazine.localized.category', ['locale' => 'de', 'category' => 'selbstverwahrung']).'"', false)
@@ -1151,7 +1101,7 @@ test('article pages render canonical hreflang social and article structured data
     $this->get(route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-custody-seo']))
         ->assertSuccessful()
         ->assertSee('<meta name="robots" content="index, follow">', false)
-        ->assertSee('<meta name="theme-color" content="#1a103d">', false)
+        ->assertSee('<meta name="theme-color" content="#f7f3ea">', false)
         ->assertSee('<meta name="author" content="Sovereign Manual">', false)
         ->assertSee('<link href="'.route('magazine.show', ['category' => 'self-custody', 'slug' => 'bitcoin-custody-seo']).'" rel="canonical">', false)
         ->assertSee('href="'.route('magazine.localized.show', ['locale' => 'en', 'category' => 'self-custody', 'slug' => 'bitcoin-custody-seo']).'"', false)
@@ -1271,7 +1221,23 @@ test('post sitemap lists public magazine urls for all translations', function ()
 });
 
 test('category sitemap lists category urls', function () {
-    selfCustodyCategory();
+    $category = selfCustodyCategory();
+
+    $post = Post::factory()->published()->create([
+        'category_id' => $category->id,
+    ]);
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'en',
+        'title' => 'Bitcoin basics',
+        'slug' => 'bitcoin-basics',
+    ]);
+    PostTranslation::factory()->create([
+        'post_id' => $post->id,
+        'locale' => 'de',
+        'title' => 'Bitcoin Grundlagen',
+        'slug' => 'bitcoin-grundlagen',
+    ]);
 
     $this->get(route('sitemap.categories'))
         ->assertSuccessful()

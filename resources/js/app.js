@@ -1,3 +1,9 @@
+const themeVariable = (name) =>
+    window
+        .getComputedStyle(document.documentElement)
+        .getPropertyValue(name)
+        .trim();
+
 const renderMermaidDiagrams = () => {
     if (!document.querySelector('.mermaid')) {
         return;
@@ -11,12 +17,18 @@ const renderMermaidDiagrams = () => {
                 theme: 'base',
                 themeVariables: {
                     background: 'transparent',
-                    primaryColor: '#1c1630',
-                    primaryTextColor: '#f5f1ff',
-                    primaryBorderColor: '#26d9ff',
-                    lineColor: '#f7931a',
-                    secondaryColor: '#241337',
-                    tertiaryColor: '#130821',
+                    primaryColor: themeVariable('--editorial-mermaid-primary'),
+                    primaryTextColor: themeVariable('--editorial-mermaid-text'),
+                    primaryBorderColor: themeVariable(
+                        '--editorial-mermaid-border',
+                    ),
+                    lineColor: themeVariable('--editorial-mermaid-line'),
+                    secondaryColor: themeVariable(
+                        '--editorial-mermaid-secondary',
+                    ),
+                    tertiaryColor: themeVariable(
+                        '--editorial-mermaid-tertiary',
+                    ),
                 },
             });
 
@@ -31,14 +43,68 @@ const setCookie = (name, value) => {
     document.cookie = `${name}=${value}; path=/; max-age=31536000; SameSite=Lax`;
 };
 
+const isDarkAppearance = (appearance) =>
+    appearance === 'dark' ||
+    (appearance === 'system' &&
+        window.matchMedia('(prefers-color-scheme: dark)').matches);
+
 const applyAppearance = (appearance) => {
-    const prefersDark = window.matchMedia(
-        '(prefers-color-scheme: dark)',
-    ).matches;
-    document.documentElement.classList.toggle(
-        'dark',
-        appearance === 'dark' || (appearance === 'system' && prefersDark),
-    );
+    const isDark = isDarkAppearance(appearance);
+    const root = document.documentElement;
+
+    root.classList.toggle('dark', isDark);
+    root.dataset.appearance = appearance;
+    root.dataset.theme = isDark ? 'editorial-dark' : 'editorial-light';
+    root.style.colorScheme = isDark ? 'dark' : 'light';
+
+    document
+        .querySelector('meta[name="theme-color"]')
+        ?.setAttribute('content', isDark ? '#20231f' : '#f7f3ea');
+
+    document.querySelectorAll('[data-appearance-toggle]').forEach((button) => {
+        button.setAttribute('aria-pressed', String(isDark));
+    });
+};
+
+applyAppearance(document.documentElement.dataset.appearance || 'system');
+
+const initializeAppearanceControls = () => {
+    document.querySelectorAll('[data-appearance-value]').forEach((button) => {
+        button.addEventListener('click', () => {
+            const appearance = button.dataset.appearanceValue || 'system';
+
+            setCookie('appearance', appearance);
+            applyAppearance(appearance);
+            window.location.reload();
+        });
+    });
+
+    document.querySelectorAll('[data-appearance-toggle]').forEach((button) => {
+        button.setAttribute(
+            'aria-pressed',
+            String(document.documentElement.classList.contains('dark')),
+        );
+
+        button.addEventListener('click', () => {
+            const appearance = document.documentElement.classList.contains(
+                'dark',
+            )
+                ? 'light'
+                : 'dark';
+
+            setCookie('appearance', appearance);
+            applyAppearance(appearance);
+            window.location.reload();
+        });
+    });
+
+    window
+        .matchMedia('(prefers-color-scheme: dark)')
+        .addEventListener('change', () => {
+            if (document.documentElement.dataset.appearance === 'system') {
+                applyAppearance('system');
+            }
+        });
 };
 
 const initializeTableOfContentsScrollSpy = () => {
@@ -76,17 +142,8 @@ const initializeTableOfContentsScrollSpy = () => {
     window.addEventListener('resize', updateActiveLink);
 };
 
-document.querySelectorAll('[data-appearance-value]').forEach((button) => {
-    button.addEventListener('click', () => {
-        const appearance = button.dataset.appearanceValue || 'system';
-
-        setCookie('appearance', appearance);
-        applyAppearance(appearance);
-        window.location.reload();
-    });
-});
-
 document.addEventListener('DOMContentLoaded', () => {
+    initializeAppearanceControls();
     renderMermaidDiagrams();
     initializeTableOfContentsScrollSpy();
 });

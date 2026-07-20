@@ -31,16 +31,16 @@ class IdeateNewsTopicsJob implements ShouldQueue
      */
     public function middleware(): array
     {
-        return [(new WithoutOverlapping('news-topic-ideation'))->expireAfter(900)];
+        return [(new WithoutOverlapping('bitcoin-briefing-ideation'))->expireAfter(900)];
     }
 
     public function handle(MagazineAiPipeline $pipeline): void
     {
-        Log::channel('queue')->info('News topic ideation started.', $this->logContext());
+        Log::channel('queue')->info('Bitcoin briefing ideation started.', $this->logContext());
 
         $topics = $pipeline->createNewsTopicIdeas($this->count);
 
-        Log::channel('queue')->info('News topic ideation completed.', $this->logContext() + [
+        Log::channel('queue')->info('Bitcoin briefing ideation completed.', $this->logContext() + [
             'created_topics' => $topics->pluck('id')->all(),
             'created_topic_count' => $topics->count(),
         ]);
@@ -48,7 +48,7 @@ class IdeateNewsTopicsJob implements ShouldQueue
 
     public function failed(?Throwable $exception): void
     {
-        Log::channel('queue')->error('News topic ideation job failed.', $this->logContext() + [
+        Log::channel('queue')->error('Bitcoin briefing ideation job failed.', $this->logContext() + [
             'exception_class' => $exception !== null ? $exception::class : null,
             'exception_message' => $exception?->getMessage(),
         ]);

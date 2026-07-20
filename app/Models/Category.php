@@ -7,11 +7,13 @@ use Database\Factories\CategoryFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'key',
     'lang',
+    'pillar_id',
     'slug',
     'name',
     'description',
@@ -74,6 +76,14 @@ class Category extends Model
             ->where('lang', $language)
             ->first()
             ?? $this;
+    }
+
+    /**
+     * @return BelongsTo<Pillar, $this>
+     */
+    public function pillar(): BelongsTo
+    {
+        return $this->belongsTo(Pillar::class);
     }
 
     /**

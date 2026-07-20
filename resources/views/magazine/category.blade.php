@@ -7,7 +7,9 @@
         <x-breadcrumbs :label="__('magazine.show.breadcrumb_label', [], $locale)" :items="[
             [
                 'label' => __('magazine.show.magazine', [], $locale),
-                'url' => route('magazine.index'),
+                'url' => $locale === \App\Support\Locales::fallback()
+                    ? route('magazine.index')
+                    : route('magazine.localized.index', ['locale' => $locale]),
             ],
             ['label' => $category['title'], 'current' => true],
         ]" />
@@ -42,9 +44,10 @@
                             </figure>
 
                             <div class="card-body">
-                                <div
-                                    class="badge badge-primary badge-outline badge-sm">
-                                    {{ $post['category_label'] }}</div>
+                                <div class="flex flex-wrap gap-2">
+                                    <span class="badge badge-outline badge-sm">{{ $post['content_type_label'] }}</span>
+                                    <span class="badge badge-ghost badge-sm">{{ $post['category_label'] }}</span>
+                                </div>
                                 <h2
                                     class="card-title wrap-anywhere leading-tight">
                                     {{ $post['title'] }}</h2>
